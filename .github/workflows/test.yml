@@ -25,9 +25,11 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       
-      - run: cd web-app && npm install
+      - run: npm install
+        working-directory: web-app
       
-      - run: cd web-app && npm test -- --maxWorkers=2
+      - run: npm test -- --maxWorkers=2
+        working-directory: web-app
         env:
           CI: true
           NODE_ENV: test

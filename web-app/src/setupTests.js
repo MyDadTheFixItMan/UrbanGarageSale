@@ -6,26 +6,25 @@ jest.mock('@/api/firebaseClient');
 jest.mock('@/lib/query-client');
 jest.mock('@/lib/AuthContext');
 
-// Mock Image Optimization directly
-jest.mock('@/lib/imageOptimization', () => ({
-  compressImage: jest.fn().mockImplementation((file) => {
-    // Only allow image files
-    if (!file.type.startsWith('image/')) {
-      return Promise.reject(new Error(`File type ${file.type} is not a valid image format`));
-    }
-    // Return a File object with proper properties for tests
-    const compressedBlob = new Blob(['compressed'], { type: file.type });
-    const compressedFile = new File([compressedBlob], file.name, { type: file.type });
-    return Promise.resolve(compressedFile);
-  }),
-  getFileSizeDisplay: jest.fn(bytes => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-  }),
-}));
+// Mock Image Optimization with proper jest.fn() syntax
+jest.mock('@/lib/imageOptimization', () => {
+  return {
+    compressImage: jest.fn().mockImplementation(async (file) => {
+      if (!file.type.startsWith('image/')) {
+        return Promise.reject(new Error(`File type ${file.type} is not a valid image format`));
+      }
+      // For jsdom, just return the file as-is (compression not needed in tests)
+      return Promise.resolve(file);
+    }),
+    getFileSizeDisplay: jest.fn((bytes) => {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    }),
+  };
+});
 
 // Mock lucide-react icons
 jest.mock('lucide-react', () => ({

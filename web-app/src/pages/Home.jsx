@@ -318,7 +318,7 @@ export default function Home() {
 
             {/* Hero Section */}
             <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
-                <div className="max-w-7xl mx-auto pt-8 md:pt-20 relative z-10">
+                <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
                     <div className="text-center mb-8">
                         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#001f3f] mb-4">
                             Discover Local <span className="inline-block w-44 text-[#FF9500] mr-2">{saleTypeLabels[saleTypeIndex]}</span> Sales

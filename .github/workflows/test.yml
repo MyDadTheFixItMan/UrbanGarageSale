@@ -24,14 +24,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - run: |
-          echo "Current directory:"
-          pwd
-          echo "Directory listing:"
-          ls -la
-          echo "web-app contents:"
-          ls -la web-app/
-      
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}

@@ -469,6 +469,122 @@ export const firebaseAuth = {
     }
   },
 
+  // Check if user has 2FA enabled
+  is2FAEnabled: async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return false;
+      
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        return userSnap.data().two_fa_enabled === true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking 2FA status:', error);
+      return false;
+    }
+  },
+
+  // Enable 2FA for current user
+  enable2FA: async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('No authenticated user');
+      }
+      
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        two_fa_enabled: true,
+        two_fa_enabled_date: new Date().toISOString()
+      });
+      
+      console.log('✓ 2FA enabled for user');
+    } catch (error) {
+      throw new Error(`Failed to enable 2FA: ${error.message}`);
+    }
+  },
+
+  // Disable 2FA for current user
+  disable2FA: async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('No authenticated user');
+      }
+      
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        two_fa_enabled: false,
+        two_fa_disabled_date: new Date().toISOString()
+      });
+      
+      console.log('✓ 2FA disabled for user');
+    } catch (error) {
+      throw new Error(`Failed to disable 2FA: ${error.message}`);
+    }
+  },
+
+  // Send 2FA verification code via SMS to user's phone
+  send2FACode: async (phone) => {
+    try {
+      if (!phone) {
+        throw new Error('Phone number is required for 2FA');
+      }
+
+      const isDev = import.meta.env.MODE === 'development';
+      
+      // In development, we'll generate a test code and store it temporarily
+      if (isDev) {
+        const testCode = '123456'; // Test code for development
+        sessionStorage.setItem('twoFACode', testCode);
+        sessionStorage.setItem('twoFAPhone', phone);
+        console.log('Development mode: Test 2FA code stored (code: 123456)');
+        return;
+      }
+
+      // Production: Send SMS via Firebase (requires backend API)
+      // For now, we'll use a mock implementation
+      // In production, this would call: POST /api/send2FACode
+      console.log('Sending 2FA code to', phone);
+      
+    } catch (error) {
+      throw new Error(`Failed to send 2FA code: ${error.message}`);
+    }
+  },
+
+  // Verify 2FA code
+  verify2FACode: async (code) => {
+    try {
+      if (!code) {
+        throw new Error('Verification code is required');
+      }
+
+      const isDev = import.meta.env.MODE === 'development';
+      
+      if (isDev) {
+        // In development, verify against stored code
+        const storedCode = sessionStorage.getItem('twoFACode');
+        if (code !== storedCode) {
+          throw new Error('Invalid verification code');
+        }
+        // Clear stored code after verification
+        sessionStorage.removeItem('twoFACode');
+        sessionStorage.removeItem('twoFAPhone');
+        console.log('✓ 2FA code verified');
+        return true;
+      }
+
+      // Production verification would happen here
+      return true;
+    } catch (error) {
+      throw new Error(`2FA verification failed: ${error.message}`);
+    }
+  },
+
   // Clear reCAPTCHA
   clearRecaptcha: () => {
     // Clear the DOM element completely

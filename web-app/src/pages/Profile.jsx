@@ -64,6 +64,8 @@ export default function Profile() {
     const [passwordError, setPasswordError] = useState('');
     const [passwordLoading, setPasswordLoading] = useState(false);
     const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+    const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+    const [twoFALoading, setTwoFALoading] = useState(false);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -110,6 +112,11 @@ export default function Profile() {
                 address: userData.address || '',
                 phone: userData.phone || '',
             });
+            
+            // Load 2FA status
+            const is2FAEnabled = await firebase.auth.is2FAEnabled();
+            setTwoFAEnabled(is2FAEnabled);
+            
             setLoading(false);
         };
         init();
@@ -200,6 +207,32 @@ export default function Profile() {
             toast.error(error.message || 'Failed to send reset email');
         } finally {
             setResetPasswordLoading(false);
+        }
+    };
+
+    const handleToggle2FA = async () => {
+        setTwoFALoading(true);
+        try {
+            if (twoFAEnabled) {
+                // Disable 2FA
+                await firebase.auth.disable2FA();
+                setTwoFAEnabled(false);
+                toast.success('Two-Factor Authentication disabled');
+            } else {
+                // Enable 2FA
+                if (!user?.phone || !user?.phone_verified) {
+                    toast.error('Please add and verify a phone number first');
+                    setTwoFALoading(false);
+                    return;
+                }
+                await firebase.auth.enable2FA();
+                setTwoFAEnabled(true);
+                toast.success('Two-Factor Authentication enabled');
+            }
+        } catch (error) {
+            toast.error(error.message || 'Failed to update 2FA settings');
+        } finally {
+            setTwoFALoading(false);
         }
     };
 
@@ -532,6 +565,25 @@ export default function Profile() {
                                 </form>
                             </DialogContent>
                         </Dialog>
+
+                        <Button 
+                            onClick={handleToggle2FA}
+                            disabled={twoFALoading}
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-2 flex-1"
+                        >
+                            {twoFALoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    {twoFAEnabled ? '2FA On' : '2FA Off'}
+                                </>
+                            )}
+                        </Button>
                     </div>
                     </div>
 

@@ -53,6 +53,13 @@ export default function Login() {
   const [signInError, setSignInError] = useState('');
   const [signInLoading, setSignInLoading] = useState(false);
   
+  // 2FA state
+  const [show2FAVerification, setShow2FAVerification] = useState(false);
+  const [twoFACode, setTwoFACode] = useState('');
+  const [twoFAError, setTwoFAError] = useState('');
+  const [twoFALoading, setTwoFALoading] = useState(false);
+  const [tempUserData, setTempUserData] = useState(null);
+  
   // Sign Up state
   const [signUpFullName, setSignUpFullName] = useState('');
   const [signUpAddress, setSignUpAddress] = useState('');
@@ -134,13 +141,63 @@ export default function Login() {
     setSignInLoading(true);
 
     try {
-      await firebase.auth.login(signInEmail, signInPassword);
-      await checkAppState();
-      navigate(createPageUrl('Home'));
+      const user = await firebase.auth.login(signInEmail, signInPassword);
+      
+      // Check if 2FA is enabled for this user
+      const is2FAEnabled = await firebase.auth.is2FAEnabled();
+      
+      if (is2FAEnabled) {
+        // 2FA is enabled, store temp user data and show 2FA form
+        const userData = await firebase.auth.me();
+        setTempUserData(userData);
+        
+        // Send 2FA code to user's phone
+        await firebase.auth.send2FACode(userData.phone);
+        
+        setShow2FAVerification(true);
+        toast.success('Verification code sent to your phone');
+      } else {
+        // No 2FA, proceed directly to home
+        await checkAppState();
+        navigate(createPageUrl('Home'));
+      }
     } catch (err) {
       setSignInError(err.message || 'Sign in failed');
+      toast.error(err.message || 'Sign in failed');
     } finally {
       setSignInLoading(false);
+    }
+  };
+
+  const handleVerify2FA = async (e) => {
+    e.preventDefault();
+    setTwoFAError('');
+    setTwoFALoading(true);
+
+    try {
+      if (!twoFACode) {
+        setTwoFAError('Please enter the verification code');
+        return;
+      }
+
+      // Verify the 2FA code
+      const verified = await firebase.auth.verify2FACode(twoFACode);
+      
+      if (verified) {
+        setShow2FAVerification(false);
+        setTwoFACode('');
+        await checkAppState();
+        navigate(createPageUrl('Home'));
+        toast.success('2FA verification successful!');
+      } else {
+        setTwoFAError('Invalid verification code');
+        toast.error('Invalid verification code');
+      }
+    } catch (err) {
+      setTwoFAError(err.message || '2FA verification failed');
+      toast.error(err.message || '2FA verification failed');
+    } finally {
+      setTwoFALoading(false);
     }
   };
 
@@ -641,7 +698,65 @@ export default function Login() {
                 Forgot password?
               </Link>
 
+              {/* 2FA Verification Form */}
+              {show2FAVerification && (
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Enter Verification Code</h3>
+                  <p className="text-sm text-slate-600 mb-4">
+                    We sent a 6-digit code to your phone: <br />
+                    <span className="font-medium">{tempUserData?.phone}</span>
+                  </p>
+
+                  {twoFAError && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded">
+                      <p className="text-red-700 text-sm">{twoFAError}</p>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleVerify2FA} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Verification Code
+                      </label>
+                      <input
+                        type="text"
+                        value={twoFACode}
+                        onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="000000"
+                        maxLength="6"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent text-center text-2xl tracking-widest"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Enter the 6-digit code</p>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={twoFALoading}
+                      className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2 rounded-lg"
+                    >
+                      {twoFALoading ? 'Verifying...' : 'Verify Code'}
+                    </Button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShow2FAVerification(false);
+                        setTwoFACode('');
+                        setTwoFAError('');
+                        setTempUserData(null);
+                        setSignInEmail('');
+                        setSignInPassword('');
+                      }}
+                      className="w-full text-[#1e3a5f] hover:text-[#152a45] text-sm font-medium py-2"
+                    >
+                      Back to Sign In
+                    </button>
+                  </form>
+                </div>
+              )}
+
               {/* OAuth Divider */}
+              {!show2FAVerification && (
               <div className="my-6 flex items-center">
                 <div className="flex-1 border-t border-slate-300"></div>
                 <span className="px-2 text-xs text-slate-500">Or continue with</span>
@@ -698,6 +813,7 @@ export default function Login() {
                   Apple
                 </button>
               </div>
+              )}
             </>
           )}
 

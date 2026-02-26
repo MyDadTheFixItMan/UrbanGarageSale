@@ -1,25 +1,17 @@
-name: Test Suite & Coverage
+name: Test Suite
 
 on:
   push:
     branches: [main, develop]
     paths:
       - 'web-app/src/**'
-      - 'web-app/src/__tests__/**'
       - 'web-app/package.json'
-      - 'web-app/jest.config.cjs'
       - '.github/workflows/test.yml'
   pull_request:
     branches: [main, develop]
-    paths:
-      - 'web-app/src/**'
-      - 'web-app/src/__tests__/**'
-      - 'web-app/package.json'
-      - 'web-app/jest.config.cjs'
 
 jobs:
   test:
-    name: Run Tests & Coverage
     runs-on: ubuntu-latest
     
     strategy:
@@ -27,256 +19,17 @@ jobs:
         node-version: [18.x, 20.x]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for better analysis
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
           cache-dependency-path: 'web-app/package-lock.json'
-
-      - name: Install dependencies
-        working-directory: web-app
-        run: npm ci
+      
+      - run: cd web-app && npm ci
+      
+      - run: cd web-app && npm test -- --maxWorkers=2
         env:
           CI: true
-
-      - name: Run ESLint
-        working-directory: web-app
-        run: npm run lint 2>/dev/null || echo "Linting complete"
-        continue-on-error: true
-
-      - name: Run tests
-        working-directory: web-app
-        run: npm test -- --coverage --testPathIgnorePatterns="integration" --maxWorkers=2
-        env:
-          CI: true
-          NODE_OPTIONS: --max-old-space-size=4096
           NODE_ENV: test
-
-      - name: Archive coverage
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-${{ matrix.node-version }}
-          path: web-app/coverage/
-          retention-days: 7
-        continue-on-error: true
-
-  lint:
-    name: Lint Code
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          cache: 'npm'
-          cache-dependency-path: 'web-app/package-lock.json'
-
-      - name: Install dependencies
-        working-directory: web-app
-        run: npm ci
-        env:
-          CI: true
-
-      - name: Run ESLint
-        working-directory: web-app
-        run: npm run lint 2>/dev/null || echo "Lint check complete"
-        continue-on-error: true
-
-      - name: Verify lint results
-        working-directory: web-app
-        run: echo "✅ Lint validation complete"
-
-  security:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          cache: 'npm'
-          cache-dependency-path: 'web-app/package-lock.json'
-
-      - name: Install dependencies
-        working-directory: web-app
-        run: npm ci
-        env:
-          CI: true
-
-      - name: Audit dependencies
-        working-directory: web-app
-        run: |
-          npm audit --audit-level=moderate 2>&1 || true
-        continue-on-error: true
-
-      - name: Check for hardcoded secrets
-        run: |
-          echo "Scanning for potential secrets..."
-          grep -r "password" web-app/src --include="*.js" --include="*.jsx" \
-            | grep -v "password123" | grep -v "test" | grep -v "comment" || echo "✅ No hardcoded passwords found"
-        continue-on-error: true
-
-  build:
-    name: Build Application
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          cache: 'npm'
-          cache-dependency-path: 'web-app/package-lock.json'
-
-      - name: Install dependencies
-        working-directory: web-app
-        run: npm ci
-        env:
-          CI: true
-
-      - name: Build application
-        working-directory: web-app
-        run: npm run build 2>/dev/null || echo "Build check complete"
-        env:
-          CI: true
-        continue-on-error: true
-
-      - name: Archive build artifacts
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: build-output
-          path: web-app/dist/
-          retention-days: 7
-        continue-on-error: true
-
-  # Summary job that requires all other jobs
-  summary:
-    name: Test Summary
-    needs: [test, lint, security, build]
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-      - name: Check test results
-        run: |
-          echo "## GitHub Actions Summary"
-          echo "Test: ${{ needs.test.result }}"
-          echo "Lint: ${{ needs.lint.result }}"
-          echo "Security: ${{ needs.security.result }}"
-          echo "Build: ${{ needs.build.result }}"
-          
-          if [[ "${{ needs.test.result }}" == "failure" ]]; then
-            echo "❌ Tests failed"
-            exit 1
-          fi
-          
-          echo "✅ All checks passed"
-
----
-
-## Workflow Documentation
-
-### Configuration Details
-
-**Trigger Events**:
-- Push to `main` and `develop` branches
-- Pull requests to `main` and `develop`
-- Only runs if tests or config files changed
-
-**Node Versions Tested**:
-- 18.x (LTS)
-- 20.x (Current)
-
-**Jobs**:
-1. **test**: Jest unit tests with coverage
-2. **lint**: ESLint code quality checks
-3. **security**: Dependency audit and secret scanning
-4. **build**: Application build verification
-5. **summary**: Overall status check
-
-### Artifacts Retained
-
-- **coverage-report**: 7 days (HTML coverage visualization)
-- **test-results**: 30 days (detailed test metrics)
-- **build-output**: 7 days (compiled distributable)
-
-### Environment Variables (Hidden)
-
-Required in GitHub repository settings:
-```
-CODECOV_TOKEN  # For codecov.io integration
-```
-
-Optional:
-```
-CI=true        # Automatically set, reduces npm install output
-```
-
-### Failure Handling
-
-- ✅ Tests MUST pass (blocker for merge)
-- ⚠️ Linting is informational (allowed to continue)
-- ⚠️ Security audit is informational (allowed to continue)
-- ⚠️ Build is informational (allowed to continue)
-
-### Performance
-
-- **Parallel Jobs**: lint, security, build run simultaneously
-- **Caching**: npm dependencies cached for ~7 days
-- **Duration**: Typically 3-5 minutes total
-- **Artifacts**: Only uploaded on failure for debugging
-
-### Local Reproduction
-
-To run the same tests locally:
-
-```bash
-cd web-app
-
-# Test with coverage
-npm test -- --coverage
-
-# Lint
-npm run lint
-
-# Security audit
-npm audit --production
-
-# Build
-npm run build
-```
-
-### Troubleshooting
-
-**Tests fail locally but pass in CI**:
-- Clear npm cache: `npm cache clean --force`
-- Reinstall: `rm -rf node_modules && npm install`
-- Check Node version: `node --version` (should be 18.x or 20.x)
-
-**Coverage artifacts too large**:
-- Reduce retention days in yml above
-- Remove html report generation
-
-**Slow CI runs**:
-- Check if pushing large files
-- Verify not committing node_modules
-- Use git-lfs for binary assets

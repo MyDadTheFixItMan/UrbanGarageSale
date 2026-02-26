@@ -38,13 +38,36 @@ export default function Privacy() {
     }, [allPromotions.length]);
 
     return (
-        <div className="min-h-screen bg-[#f5f1e8] pb-24 md:pb-0">
-            {/*Watermark removed*/}
+        <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
+            {/* Watermark */}
+            <style>{`
+                @media (min-width: 768px) {
+                    .watermark-page {
+                        top: -90px !important;
+                    }
+                }
+            `}</style>
+            <img
+                src="/Logo Webpage.png"
+                alt="watermark"
+                className="fixed left-0 pointer-events-none watermark-page"
+                style={{
+                    width: '1200px',
+                    height: 'auto',
+                    clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
+                    top: '35px',
+                    zIndex: 5,
+                    opacity: 0.35,
+                    objectFit: 'contain'
+                }}
+            />
 
-            {/* Orange Promotional Ribbon */}
+            {/* Advertising Ribbon */}
             {allPromotions.length > 0 && (
-                <div className="fixed top-20 left-0 right-0 bg-[#FF9500] text-white py-3 text-center text-sm font-medium z-40 w-full">
-                    {allPromotions[promoIndex]?.message}
+                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                    <p className="text-sm sm:text-base font-semibold">
+                        {allPromotions[promoIndex]?.message}
+                    </p>
                 </div>
             )}
 

@@ -52,10 +52,11 @@ jobs:
 
       - name: Run tests
         working-directory: web-app
-        run: npm test -- --coverage --testPathIgnorePatterns="integration"
+        run: npm test -- --coverage --testPathIgnorePatterns="integration" --maxWorkers=2
         env:
           CI: true
           NODE_OPTIONS: --max-old-space-size=4096
+          NODE_ENV: test
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -179,8 +180,7 @@ jobs:
       - name: Audit dependencies
         working-directory: web-app
         run: |
-          echo "Running npm audit..."
-          npm audit --production 2>/dev/null || echo "Audit complete with warnings"
+          npm audit --audit-level=moderate 2>&1 || true
         continue-on-error: true
 
       - name: Check for hardcoded secrets

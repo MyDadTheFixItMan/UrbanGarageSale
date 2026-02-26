@@ -3,48 +3,48 @@
  * Tests authentication operations: login, signup, password reset, etc.
  */
 
-// Mock Firebase auth module BEFORE importing firebaseClient
-jest.mock('firebase/auth', () => ({
-  initializeApp: jest.fn(),
-  getAuth: jest.fn(() => ({
-    settings: {
-      appVerificationDisabledForTesting: true,
+// Mock the entire firebaseClient module BEFORE importing
+jest.mock('@/api/firebaseClient', () => ({
+  firebase: {
+    auth: {
+      login: jest.fn(),
+      signUp: jest.fn(),
+      logout: jest.fn(),
+      resetPassword: jest.fn(),
+      onAuthStateChanged: jest.fn(),
+      me: jest.fn(),
+      isAuthenticated: jest.fn(),
+      updateProfile: jest.fn(),
     },
-    currentUser: null,
-  })),
-  signInWithEmailAndPassword: jest.fn(),
-  createUserWithEmailAndPassword: jest.fn(),
-  signOut: jest.fn(),
-  onAuthStateChanged: jest.fn(),
-  sendPasswordResetEmail: jest.fn(),
-  updatePassword: jest.fn(),
+    entities: {
+      GarageSale: jest.fn(),
+      Payment: jest.fn(),
+      AppSettings: jest.fn(),
+      SavedListing: jest.fn(),
+    },
+    functions: {
+      createCheckoutSession: jest.fn(),
+      verifyPayment: jest.fn(),
+    },
+    storage: {
+      upload: jest.fn(),
+      download: jest.fn(),
+    },
+    firestore: {
+      query: jest.fn(),
+    },
+    seedSampleListings: jest.fn(),
+  },
+  firebaseAuth: {
+    login: jest.fn(),
+    signUp: jest.fn(),
+    logout: jest.fn(),
+    resetPassword: jest.fn(),
+    onAuthStateChanged: jest.fn(),
+    me: jest.fn(),
+  },
 }));
 
-// Mock Firebase firestore
-jest.mock('firebase/firestore', () => ({
-  getFirestore: jest.fn(),
-  collection: jest.fn(),
-  query: jest.fn(),
-  where: jest.fn(),
-  getDocs: jest.fn(),
-  addDoc: jest.fn(),
-  updateDoc: jest.fn(),
-  deleteDoc: jest.fn(),
-  doc: jest.fn(),
-  getDoc: jest.fn(),
-  setDoc: jest.fn(),
-  orderBy: jest.fn(),
-}));
-
-// Mock Firebase storage
-jest.mock('firebase/storage', () => ({
-  getStorage: jest.fn(),
-  ref: jest.fn(),
-  uploadBytes: jest.fn(),
-  getDownloadURL: jest.fn(),
-}));
-
-// Import firebaseClient AFTER mocking Firebase modules
 import * as firebaseModule from '@/api/firebaseClient';
 
 describe('Firebase Client Module', () => {

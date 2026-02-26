@@ -1,0 +1,93 @@
+🎉 URBANGARAGESALE LIVE TESTING - QUICK START CARD
+
+═══════════════════════════════════════════════════════════════
+
+✅ STATUS: FULLY OPERATIONAL AND RUNNING
+
+API Server:  http://localhost:3000 ✅ RUNNING
+Web App:     http://localhost:5175 ✅ RUNNING
+
+═══════════════════════════════════════════════════════════════
+
+🧪 TEST A PAYMENT IN 5 STEPS:
+
+1. Open: http://localhost:5175
+2. Create a listing (fill in details, upload photo)
+3. Click "Submit for Payment"
+4. Use card: 4242 4242 4242 4242 (any expiry, any CVC)
+5. Check Admin Dashboard > Payments tab for transaction
+
+═══════════════════════════════════════════════════════════════
+
+📋 STRIPE TEST CARDS:
+
+✅ 4242 4242 4242 4242 → Success (USE THIS ONE!)
+❌ 4000 0000 0000 0002 → Declined
+⚠️  4000 0025 0000 3155 → Requires Auth
+
+All: Any future expiry (12/25), any CVC (123), any name
+
+═══════════════════════════════════════════════════════════════
+
+🔗 IMPORTANT URLS:
+
+Web App:           http://localhost:5175
+Admin Dashboard:   http://localhost:5175/admin
+API Server:        http://localhost:3000
+API Health Check:  http://localhost:3000/health
+
+═══════════════════════════════════════════════════════════════
+
+✨ FEATURES TO TEST:
+
+□ Create listing with address autocomplete
+□ Upload photo to listing
+□ Save listing as draft
+□ Submit listing for payment
+□ Complete Stripe payment with test card
+□ View payment in Admin > Payments tab
+□ Filter payments by date/suburb/state
+□ Approve/reject listings as admin
+□ Delete listings
+□ Check auto-expiry of old listings
+
+═══════════════════════════════════════════════════════════════
+
+🛑 TO STOP SERVERS:
+
+Terminal 1 (API):  Ctrl+C
+Terminal 2 (Web):  Ctrl+C
+
+═══════════════════════════════════════════════════════════════
+
+🚀 TO RESTART LATER:
+
+Terminal 1: npm run dev:api
+Terminal 2: npm run dev:web
+
+═══════════════════════════════════════════════════════════════
+
+❓ HELP:
+
+- Full guide:      See LIVE_TESTING_ACTIVE.md
+- Troubleshooting: See GETTING_STARTED.md
+- Setup details:   See LIVE_TESTING_SETUP.md
+
+═══════════════════════════════════════════════════════════════
+
+🎯 WHAT'S WORKING:
+
+✅ Real Stripe payment processing
+✅ Stripe test mode with test cards
+✅ Payment verification
+✅ Admin dashboard with payment history
+✅ Payment filtering by date/suburb/state
+✅ Address validation (Google Places)
+✅ Photo upload
+✅ Draft saving
+✅ Listing approval workflow
+✅ Auto-expiry for old listings
+
+═══════════════════════════════════════════════════════════════
+
+Ready to test? Open http://localhost:5175 and start! 🚀

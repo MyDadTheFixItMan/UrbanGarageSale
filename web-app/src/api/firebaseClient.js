@@ -13,7 +13,11 @@ import {
   PhoneAuthProvider,
   updatePassword,
   reauthenticateWithCredential,
-  EmailAuthProvider
+  EmailAuthProvider,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+  OAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -110,6 +114,60 @@ export const firebaseAuth = {
       await signOut(auth);
     } catch (error) {
       throw new Error(`Logout failed: ${error.message}`);
+    }
+  },
+
+  // Sign in with Google
+  signInWithGoogle: async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      return result.user;
+    } catch (error) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Sign in was cancelled');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('Sign in popup was blocked. Please allow popups for this site.');
+      } else {
+        throw new Error(`Google sign in failed: ${error.message}`);
+      }
+    }
+  },
+
+  // Sign in with Facebook
+  signInWithFacebook: async () => {
+    try {
+      const provider = new FacebookAuthProvider();
+      provider.addScope('email');
+      const result = await signInWithPopup(auth, provider);
+      return result.user;
+    } catch (error) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Sign in was cancelled');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('Sign in popup was blocked. Please allow popups for this site.');
+      } else {
+        throw new Error(`Facebook sign in failed: ${error.message}`);
+      }
+    }
+  },
+
+  // Sign in with Apple
+  signInWithApple: async () => {
+    try {
+      const provider = new OAuthProvider('apple.com');
+      provider.addScope('email');
+      provider.addScope('name');
+      const result = await signInWithPopup(auth, provider);
+      return result.user;
+    } catch (error) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Sign in was cancelled');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('Sign in popup was blocked. Please allow popups for this site.');
+      } else {
+        throw new Error(`Apple sign in failed: ${error.message}`);
+      }
     }
   },
 

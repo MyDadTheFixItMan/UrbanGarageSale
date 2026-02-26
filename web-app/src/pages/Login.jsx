@@ -373,6 +373,144 @@ export default function Login() {
   };
 
   
+  // OAuth sign in/sign up handlers
+  const handleOAuthSignIn = async (provider) => {
+    setSignInLoading(true);
+    setSignInError('');
+    
+    try {
+      let user;
+      
+      if (provider === 'google') {
+        user = await firebase.auth.signInWithGoogle();
+      } else if (provider === 'facebook') {
+        user = await firebase.auth.signInWithFacebook();
+      } else if (provider === 'apple') {
+        user = await firebase.auth.signInWithApple();
+      }
+      
+      if (!user) {
+        throw new Error('Failed to get user from OAuth provider');
+      }
+      
+      console.log(`✓ ${provider} OAuth sign in successful:`, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName
+      });
+      
+      // Check if profile already exists
+      let existingProfile = await firebase.auth.me();
+      
+      if (!existingProfile || !existingProfile.full_name) {
+        // Create or update profile with OAuth data
+        const profileData = {
+          email: user.email,
+          full_name: user.displayName || user.email.split('@')[0],
+          phone_verified: false,
+          created_date: new Date().toISOString(),
+          role: 'user'
+        };
+        
+        console.log('Creating profile from OAuth data:', profileData);
+        await firebase.auth.updateProfile(profileData);
+        console.log('✓ Profile created from OAuth');
+      } else {
+        console.log('Profile already exists, skipping creation');
+      }
+      
+      // Navigate to home
+      toast.success(`Signed in with ${provider}!`);
+      navigate(createPageUrl('Home'));
+    } catch (err) {
+      console.error(`${provider} OAuth error:`, err);
+      let errorMsg = err.message || `Failed to sign in with ${provider}`;
+      
+      // Handle specific error cases
+      if (err.message?.includes('popup-closed')) {
+        errorMsg = 'Sign in was cancelled';
+      } else if (err.message?.includes('popup-blocked')) {
+        errorMsg = 'Sign in popup was blocked. Please allow popups for this site.';
+      }
+      
+      setSignInError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setSignInLoading(false);
+    }
+  };
+
+  const handleOAuthSignUp = async (provider) => {
+    setSignUpLoading(true);
+    setSignUpError('');
+    
+    try {
+      let user;
+      
+      if (provider === 'google') {
+        user = await firebase.auth.signInWithGoogle();
+      } else if (provider === 'facebook') {
+        user = await firebase.auth.signInWithFacebook();
+      } else if (provider === 'apple') {
+        user = await firebase.auth.signInWithApple();
+      }
+      
+      if (!user) {
+        throw new Error('Failed to get user from OAuth provider');
+      }
+      
+      console.log(`✓ ${provider} OAuth sign up successful:`, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName
+      });
+      
+      // Check if profile already exists
+      let existingProfile = await firebase.auth.me();
+      
+      if (!existingProfile || !existingProfile.full_name) {
+        // Create profile with OAuth data
+        const profileData = {
+          email: user.email,
+          full_name: user.displayName || user.email.split('@')[0],
+          phone_verified: false,
+          created_date: new Date().toISOString(),
+          role: 'user'
+        };
+        
+        console.log('Creating profile from OAuth:', profileData);
+        await firebase.auth.updateProfile(profileData);
+        console.log('✓ Profile created from OAuth');
+      }
+      
+      // Set signup complete to show success screen
+      setIsSignUpComplete(true);
+      setSignUpSuccess('');
+      
+      // Auto-navigate to Home after 3 seconds
+      setTimeout(() => {
+        navigate(createPageUrl('Home'));
+      }, 3000);
+      
+      toast.success(`Account created with ${provider}!`);
+    } catch (err) {
+      console.error(`${provider} OAuth error:`, err);
+      let errorMsg = err.message || `Failed to sign up with ${provider}`;
+      
+      // Handle specific error cases
+      if (err.message?.includes('popup-closed')) {
+        errorMsg = 'Sign up was cancelled';
+      } else if (err.message?.includes('popup-blocked')) {
+        errorMsg = 'Sign up popup was blocked. Please allow popups for this site.';
+      }
+      
+      setSignUpError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setSignUpLoading(false);
+    }
+  };
+
   const handleDemoLogin = async (role) => {
     // Demo login removed
   };
@@ -502,6 +640,64 @@ export default function Login() {
               >
                 Forgot password?
               </Link>
+
+              {/* OAuth Divider */}
+              <div className="my-6 flex items-center">
+                <div className="flex-1 border-t border-slate-300"></div>
+                <span className="px-2 text-xs text-slate-500">Or continue with</span>
+                <div className="flex-1 border-t border-slate-300"></div>
+              </div>
+
+              {/* OAuth Buttons */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleOAuthSignIn('google')}
+                  disabled={signInLoading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path
+                      fill="currentColor"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    />
+                  </svg>
+                  Google
+                </button>
+
+                <button
+                  onClick={() => handleOAuthSignIn('facebook')}
+                  disabled={signInLoading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-5 h-5 text-[#1877F2]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                  </svg>
+                  Facebook
+                </button>
+
+                <button
+                  onClick={() => handleOAuthSignIn('apple')}
+                  disabled={signInLoading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.05 13.5c-.91 0-1.82-.44-2.49-1.32-.67-.88-.67-2.04 0-2.92.67-.88 1.58-1.32 2.49-1.32s1.82.44 2.49 1.31c.67.88.67 2.04 0 2.93-.67.88-1.58 1.32-2.49 1.32zm-10.1 0c-.91 0-1.82-.44-2.49-1.32-.67-.88-.67-2.04 0-2.92.67-.88 1.58-1.32 2.49-1.32s1.82.44 2.49 1.31c.67.88.67 2.04 0 2.93-.67.88-1.58 1.32-2.49 1.32zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                  </svg>
+                  Apple
+                </button>
+              </div>
             </>
           )}
 
@@ -636,6 +832,67 @@ export default function Login() {
                 >
                   {signUpLoading ? 'Sending verification code...' : 'Continue'}
                 </Button>
+
+                {/* OAuth Divider */}
+                <div className="my-4 flex items-center">
+                  <div className="flex-1 border-t border-slate-300"></div>
+                  <span className="px-2 text-xs text-slate-500">Or sign up with</span>
+                  <div className="flex-1 border-t border-slate-300"></div>
+                </div>
+
+                {/* OAuth Buttons */}
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOAuthSignUp('google')}
+                    disabled={signUpLoading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path
+                        fill="currentColor"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="currentColor"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="currentColor"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      />
+                      <path
+                        fill="currentColor"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      />
+                    </svg>
+                    Google
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOAuthSignUp('facebook')}
+                    disabled={signUpLoading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <svg className="w-4 h-4 text-[#1877F2]" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                    </svg>
+                    Facebook
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOAuthSignUp('apple')}
+                    disabled={signUpLoading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.05 13.5c-.91 0-1.82-.44-2.49-1.32-.67-.88-.67-2.04 0-2.92.67-.88 1.58-1.32 2.49-1.32s1.82.44 2.49 1.31c.67.88.67 2.04 0 2.93-.67.88-1.58 1.32-2.49 1.32zm-10.1 0c-.91 0-1.82-.44-2.49-1.32-.67-.88-.67-2.04 0-2.92.67-.88 1.58-1.32 2.49-1.32s1.82.44 2.49 1.31c.67.88.67 2.04 0 2.93-.67.88-1.58 1.32-2.49 1.32zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                    </svg>
+                    Apple
+                  </button>
+                </div>
               </form>
 
               <p className="text-xs text-slate-500 mt-4 text-center">

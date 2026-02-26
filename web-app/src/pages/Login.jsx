@@ -78,6 +78,7 @@ export default function Login() {
   const [userCountry, setUserCountry] = useState('');
   const [phonePlaceholder, setPhonePlaceholder] = useState(countryPlaceholders['default']);
   const [isSignUpComplete, setIsSignUpComplete] = useState(false);
+  const [enable2FAOnSignup, setEnable2FAOnSignup] = useState(false);
   
   // Active tab
   const [activeTab, setActiveTab] = useState('signin');
@@ -409,6 +410,17 @@ export default function Login() {
         console.warn('⚠️ Profile created but address is missing!');
       }
       
+      // Enable 2FA if user opted in during signup
+      if (enable2FAOnSignup) {
+        try {
+          await firebase.auth.enable2FA();
+          console.log('✓ 2FA enabled during signup');
+        } catch (error) {
+          console.error('Error enabling 2FA:', error);
+          // Don't fail signup if 2FA enable fails, just proceed
+        }
+      }
+      
       // Clean up session storage
       sessionStorage.removeItem('signupData');
       
@@ -416,6 +428,7 @@ export default function Login() {
       setIsSignUpComplete(true);
       setVerificationCode('');
       setShowPhoneVerification(false);
+      setEnable2FAOnSignup(false);
       firebase.auth.clearRecaptcha();
       
       // Auto-navigate to Home after 3 seconds
@@ -941,6 +954,20 @@ export default function Login() {
                     placeholder="••••••••"
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
                   />
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="enable2FA"
+                    checked={enable2FAOnSignup}
+                    onChange={(e) => setEnable2FAOnSignup(e.target.checked)}
+                    className="w-4 h-4 text-[#1e3a5f] rounded"
+                  />
+                  <label htmlFor="enable2FA" className="text-sm text-slate-700 cursor-pointer">
+                    <span className="font-medium">Enable Two-Factor Authentication</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">Add extra security with SMS verification</span>
+                  </label>
                 </div>
 
                 <Button

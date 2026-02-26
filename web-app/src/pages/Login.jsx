@@ -1,0 +1,707 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { firebase } from '@/api/firebaseClient';
+import { useAuth } from '@/lib/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { createPageUrl } from '../utils';
+import { Mail } from 'lucide-react';
+import GooglePlacesAutocomplete from '@/components/GooglePlacesAutocomplete';
+import toast from 'react-hot-toast';
+
+// Country code mapping
+const countryCallingCodes = {
+  'AU': '+61',
+  'US': '+1',
+  'CA': '+1',
+  'GB': '+44',
+  'NZ': '+64',
+  'JP': '+81',
+  'CN': '+86',
+  'IN': '+91',
+  'DE': '+49',
+  'FR': '+33',
+  'IT': '+39',
+  'ES': '+34',
+  'BR': '+55',
+  'MX': '+52',
+  'SG': '+65',
+  'MY': '+60',
+  'TH': '+66',
+  'PH': '+63',
+  'VN': '+84',
+  'ID': '+62',
+  'ZA': '+27',
+};
+
+const countryPlaceholders = {
+  'AU': '+61 412 345 678',
+  'US': '+1 (234) 567-8900',
+  'GB': '+44 7700 900000',
+  'NZ': '+64 21 234 5678',
+  'default': '+1 (234) 567-8900'
+};
+
+export default function Login() {
+  const navigate = useNavigate();
+  const { checkAppState } = useAuth();
+  const [promoIndex, setPromoIndex] = useState(0);
+  
+  // Sign In state
+  const [signInEmail, setSignInEmail] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
+  const [signInError, setSignInError] = useState('');
+  const [signInLoading, setSignInLoading] = useState(false);
+  
+  // Sign Up state
+  const [signUpFullName, setSignUpFullName] = useState('');
+  const [signUpAddress, setSignUpAddress] = useState('');
+  const [signUpPostcode, setSignUpPostcode] = useState('');
+  const [signUpState, setSignUpState] = useState('');
+  const [signUpEmail, setSignUpEmail] = useState('');
+  const [signUpPhone, setSignUpPhone] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [signUpConfirmPassword, setSignUpConfirmPassword] = useState('');
+  const [signUpError, setSignUpError] = useState('');
+  const [signUpSuccess, setSignUpSuccess] = useState('');
+  const [signUpLoading, setSignUpLoading] = useState(false);
+  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationError, setVerificationError] = useState('');
+  const [userCountry, setUserCountry] = useState('');
+  const [phonePlaceholder, setPhonePlaceholder] = useState(countryPlaceholders['default']);
+  const [isSignUpComplete, setIsSignUpComplete] = useState(false);
+  
+  // Active tab
+  const [activeTab, setActiveTab] = useState('signin');
+
+  const { data: allPromotions = [] } = useQuery({
+    queryKey: ['allPromotions'],
+    queryFn: async () => {
+      try {
+        return await firebase.firestore.collection('promotions').getDocs('sequence', 'asc');
+      } catch (error) {
+        console.error('Error fetching promotions:', error);
+        return [];
+      }
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Rotate promotional messages every 5 seconds
+  useEffect(() => {
+    if (allPromotions.length === 0) return;
+    const interval = setInterval(() => {
+      setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [allPromotions.length]);
+
+  // Auto-detect user's country on component mount
+  useEffect(() => {
+    const detectCountry = async () => {
+      try {
+        // Only attempt detection in production (skip for local dev)
+        if (process.env.NODE_ENV !== 'development') {
+          const response = await fetch('/.netlify/functions/detectCountry');
+          const data = await response.json();
+          const countryCode = data.country_code;
+          
+          if (countryCode && countryCallingCodes[countryCode]) {
+            setUserCountry(countryCode);
+            const callingCode = countryCallingCodes[countryCode];
+            setSignUpPhone(callingCode + ' ');
+            setPhonePlaceholder(countryPlaceholders[countryCode] || countryPlaceholders['default']);
+            return;
+          }
+        }
+      } catch (error) {
+        console.log('Country detection not available, using default');
+      }
+      
+      // Fallback to Australia (default for UrbanGarageSale)
+      setUserCountry('AU');
+      setSignUpPhone('+61 ');
+      setPhonePlaceholder(countryPlaceholders['AU']);
+    };
+
+    detectCountry();
+  }, []);
+
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    setSignInError('');
+    setSignInLoading(true);
+
+    try {
+      await firebase.auth.login(signInEmail, signInPassword);
+      await checkAppState();
+      navigate(createPageUrl('Home'));
+    } catch (err) {
+      setSignInError(err.message || 'Sign in failed');
+    } finally {
+      setSignInLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setSignUpError('');
+    setSignUpSuccess('');
+    
+    // Prevent double submission
+    if (signUpLoading) {
+      console.log('Signup already in progress, ignoring duplicate submission');
+      return;
+    }
+    
+    // Validation
+    if (!signUpFullName || !signUpAddress || !signUpEmail || !signUpPhone || !signUpPassword || !signUpConfirmPassword) {
+      setSignUpError('Please fill in all fields');
+      return;
+    }
+    
+    if (signUpPassword !== signUpConfirmPassword) {
+      setSignUpError('Passwords do not match');
+      return;
+    }
+    
+    if (signUpPassword.length < 6) {
+      setSignUpError('Password must be at least 6 characters');
+      return;
+    }
+
+    // Clean and normalize phone number before validation
+    let cleanedPhone = signUpPhone.replace(/[\s\-\(\)]/g, ''); // Remove spaces, dashes, parentheses
+    
+    // Validate phone number is complete (not just country code)
+    if (cleanedPhone === '+61' || cleanedPhone.length < 10) {
+      setSignUpError('Please enter a complete phone number (minimum 10 digits)');
+      return;
+    }
+    // Handle Australian numbers - convert +610 to +61
+    let normalizedPhone = cleanedPhone;
+    if (normalizedPhone.match(/^\+610/)) {
+      normalizedPhone = normalizedPhone.replace(/^\+610/, '+61');
+    }
+    
+    // Validate phone number format (E.164 format required by Firebase)
+    const phoneRegex = /^\+[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(normalizedPhone)) {
+      setSignUpError('Please enter a valid phone number with country code (e.g., +61 412 345 678)');
+      return;
+    }
+
+    setSignUpLoading(true);
+
+    try {
+      // Fallback: If postcode/state not already set, try to extract from address
+      let finalPostcode = signUpPostcode;
+      let finalState = signUpState;
+      
+      if ((!finalPostcode || !finalState) && signUpAddress) {
+        console.log('Attempting to extract postcode/state from address:', signUpAddress);
+        
+        // Try to extract state and postcode using pattern "STATE POSTCODE"
+        const statePostcodeMatch = signUpAddress.match(/\b([A-Z]{2})\s+(\d{4})\b/);
+        if (statePostcodeMatch) {
+          finalState = statePostcodeMatch[1];
+          finalPostcode = statePostcodeMatch[2];
+          console.log('Extracted state:', finalState, 'postcode:', finalPostcode);
+        }
+      }
+      
+      // Clear any existing reCAPTCHA from previous attempts
+      firebase.auth.clearRecaptcha();
+      
+      // Create email/password account FIRST
+      await firebase.auth.signUp(signUpEmail, signUpPassword);
+      console.log('✓ Firebase Auth user created');
+      
+      // Store signup data for phone verification (don't create profile yet)
+      const signupToStore = {
+        normalizedPhone: normalizedPhone,
+        full_name: signUpFullName,
+        address: signUpAddress,
+        postcode: finalPostcode,
+        state: finalState
+      };
+      sessionStorage.setItem('signupData', JSON.stringify(signupToStore));
+      console.log('Stored signup data for phone verification');
+      
+      // For development: Use Firebase test phone number for SMS verification
+      // Real phone numbers will work in production with proper reCAPTCHA configuration
+      const isDev = import.meta.env.MODE === 'development';
+      if (isDev) {
+        console.log('Development mode detected - using test SMS flow');
+        // In development, we'll auto-confirm the phone
+        setShowPhoneVerification(true);
+        setSignUpSuccess('Test mode: Phone verification skipped. Enter any code to continue.');
+        window.scrollTo(0, 0);
+      } else {
+        // Production: Setup reCAPTCHA for phone verification
+        await firebase.auth.setupRecaptcha('recaptcha-container');
+        
+        // Send SMS verification code
+        console.log('Sending SMS to:', signUpPhone);
+        await firebase.auth.sendPhoneVerification(signUpPhone);
+        
+        setShowPhoneVerification(true);
+        setSignUpSuccess('Verification code sent to your phone!');
+        window.scrollTo(0, 0);
+      }
+    } catch (err) {
+      console.error('Sign up error:', err);
+      
+      // Check if it's an email-already-in-use error
+      if (err.message && err.message.includes('already registered')) {
+        console.log('Email already in use - switching to login form');
+        setSignUpError('');
+        // Switch to login tab and pre-fill email immediately
+        setSignInEmail(signUpEmail);
+        setActiveTab('signin');
+        toast.info('This email is already registered. Please sign in instead.');
+      } else {
+        setSignUpError(err.message || 'Failed to create account or send verification code');
+        toast.error(err.message || 'Failed to create account');
+      }
+      firebase.auth.clearRecaptcha();
+    } finally {
+      setSignUpLoading(false);
+    }
+  };
+
+  const handleVerifyPhoneCode = async (e) => {
+    e.preventDefault();
+    setVerificationError('');
+    
+    if (!verificationCode) {
+      setVerificationError('Please enter the verification code');
+      return;
+    }
+
+    setSignUpLoading(true);
+
+    try {
+      // In development mode, skip Firebase phone verification
+      // In production, verify the actual SMS code
+      const isDev = import.meta.env.MODE === 'development';
+      
+      if (!isDev) {
+        // Production: Verify the phone code with Firebase
+        await firebase.auth.verifyPhoneCode(verificationCode);
+        console.log('✓ Phone code verified');
+      } else {
+        // Development: Accept any code
+        console.log('Development mode: Skipping Firebase verification, accepting code:', verificationCode);
+      }
+      
+      // Get signup data from sessionStorage (stored during signup step)
+      const signupDataStr = sessionStorage.getItem('signupData');
+      let signupData = null;
+      
+      if (signupDataStr) {
+        signupData = JSON.parse(signupDataStr);
+        console.log('Retrieved signup data from session:', signupData);
+      } else {
+        console.warn('⚠️ No signup data found in session, using form values');
+      }
+      
+      const profileData = {
+        phone: signupData?.normalizedPhone || signUpPhone.replace(/[\s\-\(\)]/g, ''),
+        phone_verified: true,  // Mark as verified (development uses test mode, production uses real SMS)
+        full_name: signupData?.full_name || signUpFullName,
+        address: signupData?.address || signUpAddress,
+        postcode: signupData?.postcode || signUpPostcode,
+        state: signupData?.state || signUpState,
+        created_date: new Date().toISOString(),
+        role: 'user'
+      };
+      
+      console.log('Profile data to save:', {
+        phone: profileData.phone,
+        full_name: profileData.full_name,
+        address: profileData.address,
+        postcode: profileData.postcode,
+        state: profileData.state,
+        phone_verified: profileData.phone_verified
+      });
+      
+      // Update user profile to mark phone as verified and ensure all fields are set
+      const user = firebase.auth.getCurrentUser();
+      if (user) {
+        console.log('Phone verification complete - updating Firestore profile:', profileData);
+        await firebase.auth.updateProfile(profileData);
+        console.log('✓ Profile updated with phone verification');
+      }
+
+      // Verify profile was created and contains address
+      const verifyProfile = await firebase.auth.me();
+      console.log('✓ Verified profile after update:', {
+        full_name: verifyProfile.full_name,
+        address: verifyProfile.address,
+        postcode: verifyProfile.postcode,
+        state: verifyProfile.state,
+        phone_verified: verifyProfile.phone_verified
+      });
+      
+      if (!verifyProfile.full_name) {
+        console.warn('⚠️ Profile created but full_name is missing!');
+      }
+      if (!verifyProfile.address) {
+        console.warn('⚠️ Profile created but address is missing!');
+      }
+      
+      // Clean up session storage
+      sessionStorage.removeItem('signupData');
+      
+      // Show success screen only
+      setIsSignUpComplete(true);
+      setVerificationCode('');
+      setShowPhoneVerification(false);
+      firebase.auth.clearRecaptcha();
+      
+      // Auto-navigate to Home after 3 seconds
+      setTimeout(() => {
+        navigate(createPageUrl('Home'));
+      }, 3000);
+    } catch (err) {
+      setVerificationError(err.message || 'Verification failed');
+    } finally {
+      setSignUpLoading(false);
+    }
+  };
+
+  
+  const handleDemoLogin = async (role) => {
+    // Demo login removed
+  };
+
+
+  return (
+    <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen flex flex-col overflow-x-hidden pb-32 md:pb-8">
+      {/* Watermark */}
+      <style>{`
+          @media (min-width: 768px) {
+              .watermark-page {
+                  top: -90px !important;
+              }
+          }
+      `}</style>
+      <img
+        src="/Logo Webpage.png"
+        alt="watermark"
+        className="fixed left-0 pointer-events-none watermark-page"
+        style={{
+          width: '1200px',
+          height: 'auto',
+          clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
+          top: '35px',
+          zIndex: 5,
+          opacity: 0.35,
+          objectFit: 'contain'
+        }}
+      />
+
+      {/* Advertising Ribbon */}
+      {allPromotions.length > 0 && (
+        <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+          <p className="text-sm sm:text-base font-semibold">
+            {allPromotions[promoIndex]?.message}
+          </p>
+        </div>
+      )}
+      
+      <section className="relative bg-[#f5f1e8] py-0 sm:py-8 md:py-16 px-4 sm:px-6 overflow-hidden -mt-2">
+        <div className="max-w-md mx-auto pt-24 sm:pt-8 md:pt-20 relative z-10">
+          {/* Page Header */}
+          <div className="flex items-center gap-3 mb-12 sm:mb-8">
+            <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
+              <Mail className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-[#1e3a5f]">Account</h2>
+              <p className="text-slate-500">Log in or create an account</p>
+            </div>
+          </div>
+
+          {/* Login/Sign Up Card */}
+          <div className="bg-white rounded-2xl shadow-xl p-8 mt-15 sm:mt-0">
+          {/* Tabs */}
+          <div className="flex border-b border-slate-200 mb-6">
+            <button
+              onClick={() => setActiveTab('signin')}
+              className={`flex-1 py-2 px-4 font-medium text-center transition-colors ${
+                activeTab === 'signin'
+                  ? 'text-[#1e3a5f] border-b-2 border-[#1e3a5f]'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Log In
+            </button>
+            <button
+              onClick={() => setActiveTab('signup')}
+              className={`flex-1 py-2 px-4 font-medium text-center transition-colors ${
+                activeTab === 'signup'
+                  ? 'text-[#1e3a5f] border-b-2 border-[#1e3a5f]'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Sign Up
+            </button>
+          </div>
+
+          {/* Sign In Tab */}
+          {activeTab === 'signin' && (
+            <>
+              {signInError && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-700 text-sm">{signInError}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={signInEmail}
+                    onChange={(e) => setSignInEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={signInPassword}
+                    onChange={(e) => setSignInPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={signInLoading}
+                  className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2 rounded-lg"
+                >
+                  {signInLoading ? 'Signing in...' : 'Sign In'}
+                </Button>
+              </form>
+
+              <Link
+                to={createPageUrl('ResetPassword')}
+                className="block w-full mt-4 text-[#1e3a5f] hover:text-[#152a45] text-sm font-medium text-center"
+              >
+                Forgot password?
+              </Link>
+            </>
+          )}
+
+          {/* Sign Up Tab */}
+          {activeTab === 'signup' && (
+            <>
+              {/* reCAPTCHA container - must persist across both form and verification */}
+              <div id="recaptcha-container" className="mb-4"></div>
+
+              {isSignUpComplete && (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="mb-4 flex justify-center">
+                      <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full">
+                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Authentication Successful!</h2>
+                    <p className="text-slate-600 mb-6">Your account has been created successfully.</p>
+                    <p className="text-sm text-slate-500">Redirecting to home...</p>
+                  </div>
+                </div>
+              )}
+
+              {!isSignUpComplete && !showPhoneVerification && (
+                <>
+                  {signUpError && (
+                    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-red-700 text-sm">{signUpError}</p>
+                    </div>
+                  )}
+
+                  {signUpSuccess && (
+                    <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-green-700 text-sm">{signUpSuccess}</p>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSignUp} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={signUpFullName}
+                    onChange={(e) => setSignUpFullName(e.target.value)}
+                    placeholder="John Doe"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Address
+                  </label>
+                  <GooglePlacesAutocomplete
+                    value={signUpAddress}
+                    onChange={(val) => setSignUpAddress(val)}
+                    onSelect={(place) => {
+                      if (place.address) {
+                        setSignUpAddress(place.address);
+                        setSignUpPostcode(place.postcode || '');
+                        setSignUpState(place.state || '');
+                      }
+                    }}
+                    placeholder="123 Main Street, Sydney NSW 2000"
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={signUpEmail}
+                    onChange={(e) => setSignUpEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={signUpPhone}
+                    onChange={(e) => setSignUpPhone(e.target.value)}
+                    placeholder={phonePlaceholder}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Include country code (spaces and dashes optional)</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={signUpPassword}
+                    onChange={(e) => setSignUpPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Confirm Password
+                  </label>
+                  <input
+                    type="password"
+                    value={signUpConfirmPassword}
+                    onChange={(e) => setSignUpConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={signUpLoading}
+                  className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2 rounded-lg"
+                >
+                  {signUpLoading ? 'Sending verification code...' : 'Continue'}
+                </Button>
+              </form>
+
+              <p className="text-xs text-slate-500 mt-4 text-center">
+                By signing up, you agree to our Terms of Service and Privacy Policy
+              </p>
+                </>
+              )}
+
+              {!isSignUpComplete && showPhoneVerification && (
+                <>
+                  {verificationError && (
+                    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-red-700 text-sm">{verificationError}</p>
+                    </div>
+                  )}
+
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">Verify Your Phone</h3>
+                    <p className="text-sm text-slate-600">
+                      We sent a verification code to<br />
+                      <span className="font-medium">{signUpPhone}</span>
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleVerifyPhoneCode} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Verification Code
+                      </label>
+                      <input
+                        type="text"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="000000"
+                        maxLength="6"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent text-center text-2xl tracking-widest"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Enter the 6-digit code</p>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={signUpLoading}
+                      className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2 rounded-lg"
+                    >
+                      {signUpLoading ? 'Verifying...' : 'Verify & Create Account'}
+                    </Button>
+                  </form>
+
+                  <button
+                    onClick={() => {
+                      setShowPhoneVerification(false);
+                      setVerificationCode('');
+                      firebase.auth.clearRecaptcha();
+                    }}
+                    className="w-full mt-4 text-[#1e3a5f] hover:text-[#152a45] text-sm font-medium"
+                  >
+                    Back to Sign Up
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </div>
+        </div>
+      </section>
+    </div>
+  );
+}

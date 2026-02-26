@@ -1,0 +1,41 @@
+<svg viewBox="0 0 250 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <!-- Gradient for U shape -->
+    <linearGradient id="uGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF9500;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0D9488;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- LEFT HOUSE (Orange) -->
+  <g>
+    <!-- Roof -->
+    <polygon points="18,28 30,16 42,28" fill="#FF9500"/>
+    <!-- Body -->
+    <rect x="18" y="28" width="24" height="30" fill="#FF9500"/>
+    <!-- Windows -->
+    <rect x="22" y="34" width="5" height="5" fill="white"/>
+    <rect x="32" y="34" width="5" height="5" fill="white"/>
+    <rect x="22" y="44" width="5" height="5" fill="white"/>
+    <rect x="32" y="44" width="5" height="5" fill="white"/>
+  </g>
+
+  <!-- RIGHT HOUSE (Teal) -->
+  <g>
+    <!-- Roof -->
+    <polygon points="52,32 64,20 76,32" fill="#0D9488"/>
+    <!-- Body -->
+    <rect x="52" y="32" width="24" height="26" fill="#0D9488"/>
+    <!-- Window -->
+    <rect x="59" y="39" width="10" height="10" fill="white" rx="1"/>
+  </g>
+
+  <!-- BOTTOM CURVE - U connector -->
+  <ellipse cx="47" cy="62" rx="28" ry="10" fill="url(#uGradient)"/>
+
+  <!-- "Urban" text -->
+  <text x="90" y="40" font-size="20" font-weight="900" fill="#FF9500" font-family="Arial, sans-serif">Urban</text>
+
+  <!-- "GAR" text -->
+  <text x="170" y="40" font-size="18" font-weight="900" fill="#001f3f" font-family="Arial, sans-serif">GAR</text>
+</svg>

@@ -942,7 +942,7 @@ export default function CreateListing() {
                             ) : (
                                 <>
                                     <Send className="w-5 h-5" />
-                                    {(isInFreePeriod() || checkFreePeriodDirect()) ? 'Publish FREE' : 'Publish for $10'}
+                                    {(isInFreePeriod() || checkFreePeriodDirect()) ? 'Publish FREE' : 'Publish my Sale'}
                                 </>
                             )}
                         </Button>

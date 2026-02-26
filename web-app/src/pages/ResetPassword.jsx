@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { firebase } from '@/api/firebaseClient';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,18 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export default function ResetPassword() {
+    const [searchParams] = useSearchParams();
+    const oobCode = searchParams.get('oobCode');
+    const mode = searchParams.get('mode');
+    
     const [email, setEmail] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
     const [promoIndex, setPromoIndex] = useState(0);
+    const [isConfirmingReset, setIsConfirmingReset] = useState(mode === 'resetPassword' && !!oobCode);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -64,6 +71,40 @@ export default function ResetPassword() {
         }
     };
 
+    const handleConfirmPasswordReset = async (e) => {
+        e.preventDefault();
+        setError('');
+        setSuccess('');
+
+        // Validation
+        if (!newPassword) {
+            setError('Please enter a new password');
+            return;
+        }
+        if (newPassword.length < 6) {
+            setError('Password must be at least 6 characters');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setError('Passwords do not match');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            await firebase.auth.confirmPasswordResetCode(oobCode, newPassword);
+            setSuccess('Password reset successful! Redirecting to login...');
+            setTimeout(() => {
+                window.location.href = createPageUrl('Login');
+            }, 2000);
+        } catch (err) {
+            setError(err.message || 'Failed to reset password');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
             {/* Watermark U Shape */}
@@ -107,60 +148,127 @@ export default function ResetPassword() {
                             Back to Login
                         </Link>
 
-                        <div className="mb-8">
-                            <h1 className="text-2xl font-bold text-[#1e3a5f] mb-2">Reset Your Password</h1>
-                            <p className="text-slate-600 text-sm">
-                                Enter your email address and we'll send you a link to reset your password.
-                            </p>
-                        </div>
+                        {!isConfirmingReset ? (
+                            <>
+                                <div className="mb-8">
+                                    <h1 className="text-2xl font-bold text-[#1e3a5f] mb-2">Reset Your Password</h1>
+                                    <p className="text-slate-600 text-sm">
+                                        Enter your email address and we'll send you a link to reset your password.
+                                    </p>
+                                </div>
 
-                        {error && (
-                            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                                <p className="text-red-700 text-sm">{error}</p>
-                            </div>
-                        )}
-
-                        {success && (
-                            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                                <p className="text-green-700 text-sm">{success}</p>
-                            </div>
-                        )}
-
-                        <form onSubmit={handleResetPassword} className="space-y-4">
-                            <div>
-                                <Label htmlFor="email">Email Address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="you@example.com"
-                                    className="mt-1.5"
-                                />
-                            </div>
-
-                            <Button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2"
-                            >
-                                {loading ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                        Sending...
-                                    </>
-                                ) : (
-                                    'Send Reset Email'
+                                {error && (
+                                    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                        <p className="text-red-700 text-sm">{error}</p>
+                                    </div>
                                 )}
-                            </Button>
-                        </form>
 
-                        <div className="mt-6 pt-6 border-t text-center">
-                            <p className="text-slate-600 text-sm mb-3">Know your password?</p>
-                            <Link to={createPageUrl('Login')} className="inline-block px-4 py-2 bg-slate-100 hover:bg-slate-200 text-[#1e3a5f] font-medium rounded-lg transition-colors">
-                                Back to Sign In
-                            </Link>
-                        </div>
+                                {success && (
+                                    <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                                        <p className="text-green-700 text-sm">{success}</p>
+                                    </div>
+                                )}
+
+                                <form onSubmit={handleResetPassword} className="space-y-4">
+                                    <div>
+                                        <Label htmlFor="email">Email Address</Label>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="you@example.com"
+                                            className="mt-1.5"
+                                        />
+                                    </div>
+
+                                    <Button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2"
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                Sending...
+                                            </>
+                                        ) : (
+                                            'Send Reset Email'
+                                        )}
+                                    </Button>
+                                </form>
+
+                                <div className="mt-6 pt-6 border-t text-center">
+                                    <p className="text-slate-600 text-sm mb-3">Know your password?</p>
+                                    <Link to={createPageUrl('Login')} className="inline-block px-4 py-2 bg-slate-100 hover:bg-slate-200 text-[#1e3a5f] font-medium rounded-lg transition-colors">
+                                        Back to Sign In
+                                    </Link>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="mb-8">
+                                    <h1 className="text-2xl font-bold text-[#1e3a5f] mb-2">Create New Password</h1>
+                                    <p className="text-slate-600 text-sm">
+                                        Please enter your new password below.
+                                    </p>
+                                </div>
+
+                                {error && (
+                                    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                        <p className="text-red-700 text-sm">{error}</p>
+                                    </div>
+                                )}
+
+                                {success && (
+                                    <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                                        <p className="text-green-700 text-sm">{success}</p>
+                                    </div>
+                                )}
+
+                                <form onSubmit={handleConfirmPasswordReset} className="space-y-4">
+                                    <div>
+                                        <Label htmlFor="newPassword">New Password</Label>
+                                        <Input
+                                            id="newPassword"
+                                            type="password"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            placeholder="Enter new password"
+                                            className="mt-1.5"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
+                                    </div>
+
+                                    <div>
+                                        <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                        <Input
+                                            id="confirmPassword"
+                                            type="password"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            placeholder="Confirm new password"
+                                            className="mt-1.5"
+                                        />
+                                    </div>
+
+                                    <Button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2"
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                Resetting...
+                                            </>
+                                        ) : (
+                                            'Reset Password'
+                                        )}
+                                    </Button>
+                                </form>
+                            </>
+                        )}
                     </div>
                 </div>
             </section>

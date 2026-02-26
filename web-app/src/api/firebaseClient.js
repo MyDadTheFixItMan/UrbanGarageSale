@@ -6,6 +6,8 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  verifyPasswordResetCode,
+  confirmPasswordReset,
   signInWithPhoneNumber,
   linkWithPhoneNumber,
   RecaptchaVerifier,
@@ -250,6 +252,24 @@ export const firebaseAuth = {
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
+      throw new Error(`Password reset failed: ${error.message}`);
+    }
+  },
+
+  // Verify password reset code and confirm new password
+  confirmPasswordResetCode: async (code, newPassword) => {
+    try {
+      // Verify the code is valid and get the email
+      const email = await verifyPasswordResetCode(auth, code);
+      
+      // Confirm the password reset with the new password
+      await confirmPasswordReset(auth, code, newPassword);
+      
+      return email;
+    } catch (error) {
+      if (error.code === 'auth/invalid-action-code' || error.code === 'auth/expired-action-code') {
+        throw new Error('Your password reset link has expired. Please request a new one.');
+      }
       throw new Error(`Password reset failed: ${error.message}`);
     }
   },

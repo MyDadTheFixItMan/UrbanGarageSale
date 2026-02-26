@@ -1007,7 +1007,7 @@ export default function AdminDashboard() {
             )}
             
             <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
-            <div className="max-w-7xl mx-auto pt-8 md:pt-20 relative z-10">
+            <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-8">
                     <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">

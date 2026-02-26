@@ -636,7 +636,7 @@ export default function CreateListing() {
             )}
 
             <section className="relative bg-[#f5f1e8] py-0 sm:py-8 md:py-16 px-4 sm:px-6 overflow-hidden -mt-2 pt-24 sm:pt-0">
-            <div className="max-w-3xl mx-auto pt-0 sm:pt-8 md:pt-20 relative z-20">
+            <div className="max-w-3xl mx-auto pt-0 sm:pt-2 md:pt-4 relative z-20">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-1 sm:mb-8">
                     <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">

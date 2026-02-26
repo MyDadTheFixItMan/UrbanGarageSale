@@ -621,7 +621,7 @@ export default function Login() {
       )}
       
       <section className="relative bg-[#f5f1e8] py-0 sm:py-8 md:py-16 px-4 sm:px-6 overflow-hidden -mt-2">
-        <div className="max-w-md mx-auto pt-24 sm:pt-8 md:pt-20 relative z-10">
+        <div className="max-w-md mx-auto pt-24 sm:pt-2 md:pt-4 relative z-10">
           {/* Page Header */}
           <div className="flex items-center gap-3 mb-12 sm:mb-8">
             <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">

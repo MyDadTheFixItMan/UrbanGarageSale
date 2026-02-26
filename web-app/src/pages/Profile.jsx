@@ -63,6 +63,7 @@ export default function Profile() {
     });
     const [passwordError, setPasswordError] = useState('');
     const [passwordLoading, setPasswordLoading] = useState(false);
+    const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -190,11 +191,15 @@ export default function Profile() {
     };
 
     const handleResetPassword = async () => {
+        setResetPasswordLoading(true);
         try {
             await firebase.auth.resetPassword(user?.email);
             toast.success('Password reset email sent to your inbox');
+            setChangePasswordDialogOpen(false);
         } catch (error) {
             toast.error(error.message || 'Failed to send reset email');
+        } finally {
+            setResetPasswordLoading(false);
         }
     };
 
@@ -512,8 +517,16 @@ export default function Profile() {
                                             variant="outline"
                                             className="w-full"
                                             onClick={handleResetPassword}
+                                            disabled={resetPasswordLoading}
                                         >
-                                            Send Reset Email
+                                            {resetPasswordLoading ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                    Sending...
+                                                </>
+                                            ) : (
+                                                'Send Reset Email'
+                                            )}
                                         </Button>
                                     </div>
                                 </form>

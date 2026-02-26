@@ -26,16 +26,21 @@ export default function About() {
         staleTime: 1000 * 60 * 5, // 5 minutes
     });
 
+    // Add default promotion if none exist
+    const promotions = allPromotions.length > 0 ? allPromotions : [
+        { id: 'default', message: '🎉 Welcome to Urban Garage Sale! Find amazing deals near you!' }
+    ];
+
     // Rotate promotional messages every 5 seconds
     useEffect(() => {
-        if (allPromotions.length === 0) return;
+        if (promotions.length === 0) return;
 
         const interval = setInterval(() => {
-            setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
+            setPromoIndex((prevIndex) => (prevIndex + 1) % promotions.length);
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [allPromotions.length]);
+    }, [promotions.length]);
 
     return (
         <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
@@ -63,13 +68,11 @@ export default function About() {
             />
 
             {/* Advertising Ribbon */}
-            {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
-                    <p className="text-sm sm:text-base font-semibold">
-                        {allPromotions[promoIndex]?.message}
-                    </p>
-                </div>
-            )}
+            <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                <p className="text-sm sm:text-base font-semibold">
+                    {promotions[promoIndex]?.message}
+                </p>
+            </div>
 
             {/* Main Content */}
             <section className="max-w-4xl mx-auto px-4 sm:px-6 pt-24 pb-12 relative z-10">

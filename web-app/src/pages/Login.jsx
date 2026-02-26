@@ -757,14 +757,15 @@ export default function Login() {
 
               {/* OAuth Divider */}
               {!show2FAVerification && (
-              <div className="my-6 flex items-center">
-                <div className="flex-1 border-t border-slate-300"></div>
-                <span className="px-2 text-xs text-slate-500">Or continue with</span>
-                <div className="flex-1 border-t border-slate-300"></div>
-              </div>
+                <>
+                  <div className="my-6 flex items-center">
+                    <div className="flex-1 border-t border-slate-300"></div>
+                    <span className="px-2 text-xs text-slate-500">Or continue with</span>
+                    <div className="flex-1 border-t border-slate-300"></div>
+                  </div>
 
-              {/* OAuth Buttons */}
-              <div className="space-y-3">
+                  {/* OAuth Buttons */}
+                  <div className="space-y-3">
                 <button
                   onClick={() => handleOAuthSignIn('google')}
                   disabled={signInLoading}
@@ -812,7 +813,8 @@ export default function Login() {
                   </svg>
                   Apple
                 </button>
-              </div>
+                  </div>
+                </>
               )}
             </>
           )}

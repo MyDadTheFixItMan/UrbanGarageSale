@@ -6,7 +6,7 @@ import 'dart:convert';
 import '../models/sale.dart';
 
 class UrbanPayService {
-  static const String apiBaseUrl = 'https://your-deno-deployment-url.com';
+  static const String apiBaseUrl = 'https://urban-garage-sale.vercel.app';
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
 

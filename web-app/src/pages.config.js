@@ -12,6 +12,7 @@ import ResetPassword from './pages/ResetPassword';
 import SavedListings from './pages/SavedListings';
 import TabTest from './pages/TabTest';
 import Terms from './pages/Terms';
+import UrbanPay from './pages/UrbanPay';
 import __Layout from './Layout.jsx';
 
 
@@ -30,6 +31,7 @@ export const PAGES = {
     "SavedListings": SavedListings,
     "TabTest": TabTest,
     "Terms": Terms,
+    "UrbanPay": UrbanPay,
 }
 
 export const pagesConfig = {

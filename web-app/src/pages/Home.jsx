@@ -438,7 +438,7 @@ export default function Home() {
                                         <TrendingUp className="w-8 h-8 text-green-600" />
                                     </div>
                                 </div>
-                                <Link to={createPageUrl('Payment') + '?tab=seller'} className="w-full">
+                                <Link to={createPageUrl('UrbanPay')} className="w-full">
                                     <Button className="w-full bg-[#1e3a5f] hover:bg-[#152a45] gap-2 h-11">
                                         <QrCode className="w-4 h-4" />
                                         Start Selling with Urban Pay

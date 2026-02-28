@@ -71,5 +71,42 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false; // Only written by server via Admin SDK
     }
+
+    // Urban Pay Sales Transactions
+    match /sales/{saleId} {
+      // Seller can create sales (from their payments)
+      allow create: if request.auth != null && 
+                     request.auth.uid == request.resource.data.sellerId;
+      
+      // Seller can read their own sales
+      allow read: if request.auth != null && 
+                  request.auth.uid == resource.data.sellerId;
+      
+      // Admins can read all sales
+      allow read: if request.auth != null && isAdmin();
+      
+      // Seller can update their own sales
+      allow update: if request.auth != null && 
+                   request.auth.uid == resource.data.sellerId;
+      
+      // Only admins can delete
+      allow delete: if request.auth != null && isAdmin();
+    }
+
+    // Urban Pay Seller Statistics
+    match /sellerStats/{sellerId} {
+      // User can read and write their own stats
+      allow read, write: if request.auth != null && 
+                        request.auth.uid == sellerId;
+      
+      // Admins can read all stats
+      allow read: if request.auth != null && isAdmin();
+      
+      // Admins can update stats
+      allow update: if request.auth != null && isAdmin();
+      
+      // Only admins can delete
+      allow delete: if request.auth != null && isAdmin();
+    }
   }
 }

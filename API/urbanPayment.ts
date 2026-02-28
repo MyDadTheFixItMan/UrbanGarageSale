@@ -116,8 +116,8 @@ const recordSale = async (
   }
 };
 
-// Handle incoming requests
-Deno.serve(async (req: Request) => {
+// Handle incoming requests - Vercel Deno handler
+export default async (req: Request): Promise<Response> => {
   // CORS headers
   const headers = new Headers({
     "Content-Type": "application/json",
@@ -128,15 +128,15 @@ Deno.serve(async (req: Request) => {
 
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers });
+    return new Response(null, { status: 204, headers });
   }
 
   try {
     const url = new URL(req.url);
     const pathname = url.pathname;
 
-    // POST /urbanPayment/createPaymentIntent
-    if (req.method === "POST" && pathname === "/urbanPayment/createPaymentIntent") {
+    // POST /api/urbanPayment/createPaymentIntent
+    if (req.method === "POST" && pathname.includes("createPaymentIntent")) {
       const authHeader = req.headers.get("Authorization");
       if (!authHeader?.startsWith("Bearer ")) {
         return new Response(
@@ -156,8 +156,8 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify(result), { status: 200, headers });
     }
 
-    // POST /urbanPayment/recordSale
-    if (req.method === "POST" && pathname === "/urbanPayment/recordSale") {
+    // POST /api/urbanPayment/recordSale
+    if (req.method === "POST" && pathname.includes("recordSale")) {
       const authHeader = req.headers.get("Authorization");
       if (!authHeader?.startsWith("Bearer ")) {
         return new Response(
@@ -183,15 +183,15 @@ Deno.serve(async (req: Request) => {
     }
 
     // Health check endpoint
-    if (req.method === "GET" && pathname === "/health") {
+    if (req.method === "GET" && (pathname === "/health" || pathname.includes("health"))) {
       return new Response(
-        JSON.stringify({ status: "ok", project: projectId }),
+        JSON.stringify({ status: "ok", project: projectId, timestamp: new Date().toISOString() }),
         { status: 200, headers }
       );
     }
 
     return new Response(
-      JSON.stringify({ error: "Endpoint not found" }),
+      JSON.stringify({ error: "Endpoint not found", path: pathname }),
       { status: 404, headers }
     );
   } catch (error) {
@@ -201,4 +201,4 @@ Deno.serve(async (req: Request) => {
       { status: 500, headers: new Headers({ "Content-Type": "application/json" }) }
     );
   }
-});
+};

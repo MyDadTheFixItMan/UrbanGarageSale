@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { firebase } from '@/api/firebaseClient';
-import { Map, List, Tag, Search, Loader2, Heart } from 'lucide-react';
+import { Map, List, Tag, Search, Loader2, Heart, QrCode, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Link } from 'react-router-dom';
@@ -397,6 +397,58 @@ export default function Home() {
                     </div>
                 </div>
             </section>
+
+            {/* Urban Pay Section - For Authenticated Sellers */}
+            {isAuthenticated && (
+                <section className="bg-gradient-to-r from-blue-50 to-blue-100 py-8 px-4 sm:px-6 border-y border-blue-200">
+                    <div className="max-w-7xl mx-auto relative z-10">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                            {/* Left Side - Info */}
+                            <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="bg-[#1e3a5f] p-3 rounded-lg">
+                                        <QrCode className="w-6 h-6 text-white" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-[#1e3a5f]">Urban Pay</h3>
+                                </div>
+                                <p className="text-slate-700 mb-2">
+                                    Accept real-time payments from buyers during your garage sale
+                                </p>
+                                <ul className="text-sm text-slate-600 space-y-1">
+                                    <li className="flex items-center gap-2">
+                                        <span className="text-green-600">✓</span> Card & Cash Payments
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <span className="text-green-600">✓</span> Live Earnings Tracking
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <span className="text-green-600">✓</span> QR Code for Buyers
+                                    </li>
+                                </ul>
+                            </div>
+
+                            {/* Right Side - Stats or CTA */}
+                            <div className="flex-1 flex flex-col gap-4">
+                                <div className="bg-white rounded-lg p-4 border border-blue-200">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-1">
+                                            <p className="text-xs text-slate-600 font-medium">TRANSACTION STATUS</p>
+                                            <p className="text-2xl font-bold text-[#1e3a5f]">Real-Time</p>
+                                        </div>
+                                        <TrendingUp className="w-8 h-8 text-green-600" />
+                                    </div>
+                                </div>
+                                <Link to={createPageUrl('Payment') + '?tab=seller'} className="w-full">
+                                    <Button className="w-full bg-[#1e3a5f] hover:bg-[#152a45] gap-2 h-11">
+                                        <QrCode className="w-4 h-4" />
+                                        Start Selling with Urban Pay
+                                    </Button>
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
 
             {/* Main Content */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 py-8 relative z-10">

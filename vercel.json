@@ -1,0 +1,9 @@
+{
+  "buildCommand": "echo 'Vercel auto-deploying API routes'",
+  "outputDirectory": ".",
+  "functions": {
+    "api/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  }
+}

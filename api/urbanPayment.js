@@ -6,10 +6,11 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "";
 
 // Initialize Stripe (lazy load to avoid errors if key is missing)
 let stripe = null;
-const getStripe = () => {
+const getStripe = async () => {
   if (!stripe && stripeSecretKey) {
     try {
-      const Stripe = require("stripe");
+      const StripeModule = await import("stripe");
+      const Stripe = StripeModule.default;
       stripe = new Stripe(stripeSecretKey);
     } catch (error) {
       console.error("Failed to initialize Stripe:", error.message);
@@ -40,7 +41,7 @@ async function getBody(req) {
 
 // Create Payment Intent with Stripe
 async function createPaymentIntent(userId, amount, description, currency = "aud") {
-  const stripe = getStripe();
+  const stripe = await getStripe();
   if (!stripe) {
     throw new Error("Stripe not configured - missing STRIPE_SECRET_KEY");
   }
@@ -111,8 +112,8 @@ function setCorsHeaders(res) {
   res.setHeader("Content-Type", "application/json");
 }
 
-// Main handler - CommonJS export for Vercel
-module.exports = async (req, res) => {
+// Main handler - ES6 export for Vercel
+export default async (req, res) => {
   setCorsHeaders(res);
 
   // Handle CORS preflight

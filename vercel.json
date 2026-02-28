@@ -1,19 +1,7 @@
 {
-  "buildCommand": "npm run build || echo 'No build step needed'",
-  "outputDirectory": "public",
   "functions": {
     "api/*.js": {
       "runtime": "nodejs18.x"
     }
-  },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+  }
 }

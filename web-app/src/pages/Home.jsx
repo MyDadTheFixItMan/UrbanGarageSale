@@ -321,7 +321,7 @@ export default function Home() {
                 <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
                     <div className="text-center mb-8">
                         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#001f3f] mb-4">
-                            Discover Local <span className="inline-block w-44 text-[#FF9500] mr-2">{saleTypeLabels[saleTypeIndex]}</span> Sales
+                            Discover Local <span className="inline-block w-24 sm:w-40 md:w-44 text-[#FF9500] mr-2">{saleTypeLabels[saleTypeIndex]}</span> Sales
                         </h1>
                         <p className="text-lg text-slate-700 max-w-2xl mx-auto">
                             Find unique treasures in your neighbourhood.
@@ -397,58 +397,6 @@ export default function Home() {
                     </div>
                 </div>
             </section>
-
-            {/* Urban Pay Section - For Authenticated Sellers */}
-            {isAuthenticated && (
-                <section className="bg-gradient-to-r from-blue-50 to-blue-100 py-8 px-4 sm:px-6 border-y border-blue-200">
-                    <div className="max-w-7xl mx-auto relative z-10">
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                            {/* Left Side - Info */}
-                            <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="bg-[#1e3a5f] p-3 rounded-lg">
-                                        <QrCode className="w-6 h-6 text-white" />
-                                    </div>
-                                    <h3 className="text-2xl font-bold text-[#1e3a5f]">Urban Pay</h3>
-                                </div>
-                                <p className="text-slate-700 mb-2">
-                                    Accept real-time payments from buyers during your garage sale
-                                </p>
-                                <ul className="text-sm text-slate-600 space-y-1">
-                                    <li className="flex items-center gap-2">
-                                        <span className="text-green-600">✓</span> Card & Cash Payments
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <span className="text-green-600">✓</span> Live Earnings Tracking
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <span className="text-green-600">✓</span> QR Code for Buyers
-                                    </li>
-                                </ul>
-                            </div>
-
-                            {/* Right Side - Stats or CTA */}
-                            <div className="flex-1 flex flex-col gap-4">
-                                <div className="bg-white rounded-lg p-4 border border-blue-200">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex-1">
-                                            <p className="text-xs text-slate-600 font-medium">TRANSACTION STATUS</p>
-                                            <p className="text-2xl font-bold text-[#1e3a5f]">Real-Time</p>
-                                        </div>
-                                        <TrendingUp className="w-8 h-8 text-green-600" />
-                                    </div>
-                                </div>
-                                <Link to={createPageUrl('UrbanPay')} className="w-full">
-                                    <Button className="w-full bg-[#1e3a5f] hover:bg-[#152a45] gap-2 h-11">
-                                        <QrCode className="w-4 h-4" />
-                                        Start Selling with Urban Pay
-                                    </Button>
-                                </Link>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            )}
 
             {/* Main Content */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 py-8 relative z-10">

@@ -1,0 +1,14 @@
+{
+  "buildCommand": "echo 'Skipping build'",
+  "outputDirectory": ".",
+  "framework": "other",
+  "functions": {
+    "API/urbanPayment.ts": {
+      "runtime": "deno"
+    }
+  },
+  "env": {
+    "FIREBASE_PROJECT_ID": "@FIREBASE_PROJECT_ID",
+    "STRIPE_SECRET_KEY": "@STRIPE_SECRET_KEY"
+  }
+}

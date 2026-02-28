@@ -1,8 +1,16 @@
-import Stripe from "https://esm.sh/stripe@13.0.0";
-
-// Initialize Stripe
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "");
+// Initialize environment variables
 const projectId = Deno.env.get("FIREBASE_PROJECT_ID") || "";
+const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
+
+// Lazy import Stripe to avoid errors if key is missing
+let stripe: any = null;
+const getStripe = async () => {
+  if (!stripe && stripeKey) {
+    const Stripe = (await import("https://esm.sh/stripe@13.0.0")).default;
+    stripe = new Stripe(stripeKey);
+  }
+  return stripe;
+};
 const firebaseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
 interface PaymentRequest {
@@ -45,8 +53,10 @@ async function firestoreRequest(
 // Create Payment Intent for Urban Pay
 const createPaymentIntent = async (req: PaymentRequest): Promise<PaymentResponse> => {
   try {
-    // For now, we trust the client provides valid auth
-    // In production, verify the token with Firebase Auth REST API
+    const stripe = await getStripe();
+    if (!stripe) {
+      throw new Error("Stripe not configured - missing STRIPE_SECRET_KEY");
+    }
     
     const sellerId = req.userId;
 
@@ -135,6 +145,23 @@ export default async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const pathname = url.pathname;
 
+    // GET /api/urbanPayment (health check / info)
+    if (req.method === "GET" && pathname.endsWith("/urbanPayment")) {
+      return new Response(
+        JSON.stringify({
+          status: "ok",
+          project: projectId,
+          timestamp: new Date().toISOString(),
+          version: "1.0.0",
+          endpoints: [
+            "/api/urbanPayment/createPaymentIntent",
+            "/api/urbanPayment/recordSale",
+          ],
+        }),
+        { status: 200, headers }
+      );
+    }
+
     // POST /api/urbanPayment/createPaymentIntent
     if (req.method === "POST" && pathname.includes("createPaymentIntent")) {
       const authHeader = req.headers.get("Authorization");
@@ -182,22 +209,26 @@ export default async (req: Request): Promise<Response> => {
       return new Response(JSON.stringify(result), { status: 200, headers });
     }
 
-    // Health check endpoint
-    if (req.method === "GET" && (pathname === "/health" || pathname.includes("health"))) {
-      return new Response(
-        JSON.stringify({ status: "ok", project: projectId, timestamp: new Date().toISOString() }),
-        { status: 200, headers }
-      );
-    }
-
     return new Response(
-      JSON.stringify({ error: "Endpoint not found", path: pathname }),
+      JSON.stringify({
+        error: "Endpoint not found",
+        path: pathname,
+        method: req.method,
+        availableEndpoints: [
+          "GET /api/urbanPayment",
+          "POST /api/urbanPayment/createPaymentIntent",
+          "POST /api/urbanPayment/recordSale",
+        ],
+      }),
       { status: 404, headers }
     );
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" }),
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Internal server error",
+        type: error instanceof Error ? error.constructor.name : "Unknown",
+      }),
       { status: 500, headers: new Headers({ "Content-Type": "application/json" }) }
     );
   }

@@ -1,20 +1,18 @@
 // lib/firebase_options.dart
-// Generated file for Firebase configuration
-// Update with your Firebase project credentials
+// Firebase configuration for UrbanGarageSale
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    // TODO: Replace with your Firebase project credentials
     return const FirebaseOptions(
-      apiKey: 'YOUR_FIREBASE_API_KEY',
-      appId: 'YOUR_FIREBASE_APP_ID',
-      messagingSenderId: 'YOUR_FIREBASE_MESSAGING_SENDER_ID',
-      projectId: 'YOUR_FIREBASE_PROJECT_ID',
-      authDomain: 'YOUR_FIREBASE_PROJECT_ID.firebaseapp.com',
-      databaseURL: 'https://YOUR_FIREBASE_PROJECT_ID.firebaseio.com',
-      storageBucket: 'YOUR_FIREBASE_PROJECT_ID.appspot.com',
+      apiKey: 'AIzaSyCmAD0m-2Z_-WomxpDvREimaPSp2CtjmEY',
+      appId: '1:264749197802:web:f09553f241658137af6a93',
+      messagingSenderId: '264749197802',
+      projectId: 'urbangaragesale',
+      authDomain: 'urbangaragesale.firebaseapp.com',
+      databaseURL: 'https://urbangaragesale.firebaseio.com',
+      storageBucket: 'urbangaragesale.appspot.com',
     );
   }
 }

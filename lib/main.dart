@@ -7,16 +7,13 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   // Initialize Stripe with your publishable key
-  // TODO: Replace with your Stripe publishable key
-  Stripe.publishableKey = 'pk_test_YOUR_STRIPE_PUBLISHABLE_KEY';
-  
+  Stripe.publishableKey = 'pk_live_OlSbCxeHrHkFwobGROFX32Md';
+
   runApp(const MyApp());
 }
 

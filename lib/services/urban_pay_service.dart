@@ -7,7 +7,7 @@ import '../models/sale.dart';
 
 class UrbanPayService {
   static const String apiBaseUrl = 'https://your-deno-deployment-url.com';
-  
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<String> _getAuthToken() async {

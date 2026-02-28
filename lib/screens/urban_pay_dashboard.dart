@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 import '../models/sale.dart';
 import '../services/urban_pay_service.dart';
@@ -155,10 +154,10 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                               ),
                               const SizedBox(height: 12),
                               const Text(
-                                'Ask buyers to scan this with their phone',
+                                'QR code display coming soon',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.grey,
+                                  color: Colors.orange,
                                 ),
                               ),
                               const SizedBox(height: 24),
@@ -172,18 +171,15 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 padding: const EdgeInsets.all(16),
-                                child: QrImage(
-                                  data: _urbanPayService.generateQRCodeUrl(
-                                    _sellerId,
+                                child: Center(
+                                  child: Text(
+                                    'QR: $_sellerId',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                      fontFamily: 'Courier',
+                                    ),
                                   ),
-                                  version: QrVersions.auto,
-                                  size: 250,
-                                  gapless: false,
-                                  errorStateBuilder: (context, err) {
-                                    return const Center(
-                                      child: Text('Error generating QR code'),
-                                    );
-                                  },
                                 ),
                               ),
                               const SizedBox(height: 16),

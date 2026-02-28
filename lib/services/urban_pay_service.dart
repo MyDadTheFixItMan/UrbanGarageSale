@@ -13,7 +13,9 @@ class UrbanPayService {
   Future<String> _getAuthToken() async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
-    return await user.getIdToken();
+    final token = await user.getIdToken();
+    if (token == null) throw Exception('Failed to get auth token');
+    return token;
   }
 
   /// Create a payment intent for a sale

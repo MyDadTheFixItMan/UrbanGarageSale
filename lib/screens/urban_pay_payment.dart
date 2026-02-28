@@ -1,7 +1,7 @@
 // lib/screens/urban_pay_payment.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/urban_pay_service.dart';
 

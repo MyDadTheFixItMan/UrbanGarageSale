@@ -304,7 +304,7 @@ class _ManualCashEntryScreenState extends State<ManualCashEntryScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                );
+                ),
               ),
               const SizedBox(height: 16),
             ],

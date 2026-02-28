@@ -1,5 +1,5 @@
 // Urban Pay API - Node.js handler for Vercel
-// This replaces the Deno version for better Vercel compatibility
+// This handler works with Vercel's serverless Node.js runtime
 
 const projectId = process.env.FIREBASE_PROJECT_ID || "";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "";
@@ -8,8 +8,12 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "";
 let stripe = null;
 const getStripe = () => {
   if (!stripe && stripeSecretKey) {
-    const Stripe = require("stripe");
-    stripe = new Stripe(stripeSecretKey);
+    try {
+      const Stripe = require("stripe");
+      stripe = new Stripe(stripeSecretKey);
+    } catch (error) {
+      console.error("Failed to initialize Stripe:", error.message);
+    }
   }
   return stripe;
 };
@@ -27,7 +31,7 @@ async function getBody(req) {
       try {
         resolve(body ? JSON.parse(body) : {});
       } catch (e) {
-        reject(e);
+        reject(new Error("Invalid JSON in request body"));
       }
     });
     req.on("error", reject);
@@ -79,7 +83,7 @@ async function recordSale(sellerId, amount, description, paymentMethod, idToken,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
+        "Authorization": `Bearer ${idToken}`,
       },
       body: JSON.stringify(saleData),
     });
@@ -107,8 +111,8 @@ function setCorsHeaders(res) {
   res.setHeader("Content-Type", "application/json");
 }
 
-// Main handler
-export default async (req, res) => {
+// Main handler - CommonJS export for Vercel
+module.exports = async (req, res) => {
   setCorsHeaders(res);
 
   // Handle CORS preflight

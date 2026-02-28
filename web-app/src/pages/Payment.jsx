@@ -3,17 +3,19 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { Check, Loader2, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Check, Loader2, ArrowLeft, AlertCircle, QrCode, DollarSign } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Payment() {
     const queryClient = useQueryClient();
     const urlParams = new URLSearchParams(window.location.search);
     const saleId = urlParams.get('id');
     const sessionId = urlParams.get('session_id');
+    const tab = urlParams.get('tab') || 'buyer'; // 'buyer' or 'seller'
 
     const [user, setUser] = useState(null);
     const [sale, setSale] = useState(null);
@@ -21,6 +23,9 @@ export default function Payment() {
     const [processingPayment, setProcessingPayment] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [promoIndex, setPromoIndex] = useState(0);
+    const [activeTab, setActiveTab] = useState(tab);
+    const [sellerStats, setSellerStats] = useState({ totalEarnings: 0, totalSales: 0 });
+    const [quickAmounts] = useState([5, 10, 20, 50, 100]);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -264,44 +269,145 @@ export default function Payment() {
             )}
             
             <div className="flex-1 flex items-center justify-center p-4 pt-32 md:pt-4 relative z-10">
-                <Card className="max-w-md w-full">
-                <CardHeader className="text-center">
-                    <CardTitle>Complete Payment</CardTitle>
-                    <CardDescription>
-                        {sale?.title || 'Your Garage Sale Listing'}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Alert>
-                        <AlertCircle className="w-4 h-4" />
-                        <AlertDescription>
-                            Click the button below to proceed to secure payment.
-                        </AlertDescription>
-                    </Alert>
+                <Card className="max-w-2xl w-full">
+                    <CardHeader className="text-center">
+                        <CardTitle>Payment Options</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 mb-4">
+                                <TabsTrigger value="buyer" className="flex items-center gap-2">
+                                    <DollarSign className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Buyer Payment</span>
+                                    <span className="sm:hidden">Buyer</span>
+                                </TabsTrigger>
+                                <TabsTrigger value="seller" className="flex items-center gap-2">
+                                    <QrCode className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Seller (Urban Pay)</span>
+                                    <span className="sm:hidden">Seller</span>
+                                </TabsTrigger>
+                            </TabsList>
 
-                    <div className="bg-slate-100 rounded-lg p-4 text-center">
-                        <p className="text-sm text-slate-600 mb-2">Total Amount</p>
-                        <p className="text-3xl font-bold text-[#1e3a5f]">$10.00</p>
-                    </div>
+                            {/* BUYER TAB - Original Stripe Payment */}
+                            <TabsContent value="buyer" className="space-y-4">
+                                <Alert>
+                                    <AlertCircle className="w-4 h-4" />
+                                    <AlertDescription>
+                                        Complete payment for your listing to get it approved.
+                                    </AlertDescription>
+                                </Alert>
 
-                    <div className="flex flex-col gap-3">
-                        <Button 
-                            onClick={handleCheckout} 
-                            disabled={processingPayment}
-                            className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
-                        >
-                            {processingPayment && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            {processingPayment ? 'Processing...' : 'Pay $10.00'}
-                        </Button>
-                        <Link to={createPageUrl('Profile')}>
-                            <Button variant="outline" className="w-full">
-                                <ArrowLeft className="w-4 h-4 mr-2" />
-                                Back to My Listings
-                            </Button>
-                        </Link>
-                    </div>
-                </CardContent>
-            </Card>
+                                <div className="bg-slate-100 rounded-lg p-4 text-center">
+                                    <p className="text-sm text-slate-600 mb-2">Listing Fee</p>
+                                    <p className="text-3xl font-bold text-[#1e3a5f]">$10.00</p>
+                                    <p className="text-xs text-slate-500 mt-2">One-time fee to list your garage sale</p>
+                                </div>
+
+                                <div className="flex flex-col gap-3">
+                                    <Button 
+                                        onClick={handleCheckout} 
+                                        disabled={processingPayment}
+                                        className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
+                                    >
+                                        {processingPayment && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                        {processingPayment ? 'Processing...' : 'Pay $10.00 with Stripe'}
+                                    </Button>
+                                    <Link to={createPageUrl('Profile')}>
+                                        <Button variant="outline" className="w-full">
+                                            <ArrowLeft className="w-4 h-4 mr-2" />
+                                            Back to My Listings
+                                        </Button>
+                                    </Link>
+                                </div>
+                            </TabsContent>
+
+                            {/* SELLER TAB - Urban Pay */}
+                            <TabsContent value="seller" className="space-y-4">
+                                <Alert className="border-blue-200 bg-blue-50">
+                                    <QrCode className="w-4 h-4 text-blue-600" />
+                                    <AlertDescription className="text-blue-900">
+                                        Accept payments from buyers during your garage sale with Urban Pay
+                                    </AlertDescription>
+                                </Alert>
+
+                                {/* Seller Stats */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
+                                        <p className="text-xs text-slate-600 font-semibold">Total Earnings</p>
+                                        <p className="text-2xl font-bold text-[#1e3a5f] mt-1">${sellerStats.totalEarnings.toFixed(2)}</p>
+                                    </div>
+                                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
+                                        <p className="text-xs text-slate-600 font-semibold">Total Sales</p>
+                                        <p className="text-2xl font-bold text-green-600 mt-1">{sellerStats.totalSales}</p>
+                                    </div>
+                                </div>
+
+                                {/* QR Code Display */}
+                                <div className="bg-white border-2 border-dashed border-[#1e3a5f] rounded-lg p-6 text-center">
+                                    <QrCode className="w-12 h-12 text-[#1e3a5f] mx-auto mb-3" />
+                                    <p className="text-sm font-semibold text-[#1e3a5f]">Your Payment QR Code</p>
+                                    <p className="text-xs text-slate-600 mt-1 mb-4">Buyers scan this to pay you directly</p>
+                                    
+                                    <div className="bg-slate-100 rounded-lg p-6 mb-4 flex items-center justify-center aspect-square">
+                                        <div className="text-center">
+                                            <QrCode className="w-20 h-20 text-slate-400 mx-auto" />
+                                            <p className="text-xs text-slate-500 mt-2">QR Code would display here</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-slate-500">Seller ID: {user?.uid?.substring(0, 8)}...</p>
+                                </div>
+
+                                {/* Quick Amount Buttons */}
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-700 mb-2">Quick Amounts</p>
+                                    <div className="grid grid-cols-5 gap-2">
+                                        {quickAmounts.map(amount => (
+                                            <Button 
+                                                key={amount}
+                                                variant="outline"
+                                                className="text-sm font-semibold hover:bg-[#1e3a5f] hover:text-white"
+                                            >
+                                                ${amount}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Manual Entry */}
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                    <p className="text-sm font-semibold text-amber-900 mb-2">Manual Sale Entry</p>
+                                    <p className="text-xs text-amber-800 mb-3">For cash payments - enter amount and description</p>
+                                    <div className="space-y-2">
+                                        <input 
+                                            type="number" 
+                                            placeholder="Amount ($)" 
+                                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                                            defaultValue="0"
+                                        />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Item description" 
+                                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                                        />
+                                        <Button className="w-full bg-green-600 hover:bg-green-700">
+                                            Record Cash Sale
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Urban Pay Info */}
+                                <Alert className="border-slate-200 bg-slate-50">
+                                    <AlertCircle className="w-4 h-4 text-slate-600" />
+                                    <AlertDescription className="text-sm text-slate-700">
+                                        <strong>Urban Pay:</strong> Real-time payment processing for your garage sale. Accept card and cash payments with live earnings tracking.
+                                        <br />
+                                        <a href="https://urban-garage-sale.vercel.app" className="text-blue-600 hover:underline text-xs mt-1 inline-block">Learn more →</a>
+                                    </AlertDescription>
+                                </Alert>
+                            </TabsContent>
+                        </Tabs>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );

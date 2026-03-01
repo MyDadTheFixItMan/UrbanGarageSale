@@ -44,7 +44,29 @@ async function recordSale(sellerId, amount, description, paymentMethod, idToken,
   };
 
   try {
+    // 1. Record the sale
     const docRef = await db.collection("sales").add(saleData);
+
+    // 2. Update seller stats - increment totalEarnings and totalSales
+    const statsRef = db.collection("sellerStats").doc(sellerId);
+    await statsRef.update({
+      totalEarnings: admin.firestore.FieldValue.increment(amount),
+      totalSales: admin.firestore.FieldValue.increment(1),
+      lastUpdated: timestamp,
+    }).catch(async (error) => {
+      // If document doesn't exist, create it
+      if (error.code === 'not-found') {
+        await statsRef.set({
+          sellerId: sellerId,
+          totalEarnings: amount,
+          totalSales: 1,
+          lastUpdated: timestamp,
+        });
+      } else {
+        throw error;
+      }
+    });
+
     return {
       saleId: docRef.id,
       success: true,

@@ -57,6 +57,7 @@ export default async function handler(req, res) {
     const db = adminInstance.firestore();
     const transactionFee = amount * 0.029 + 0.30;
     const netEarnings = amount - transactionFee;
+    const timestamp = adminInstance.firestore.Timestamp.now();
 
     const saleRecord = {
       sellerId: sellerId,
@@ -66,12 +67,33 @@ export default async function handler(req, res) {
       paymentMethod: 'tap_to_pay',
       status: 'completed',
       currency: currency.toUpperCase(),
-      timestamp: adminInstance.firestore.Timestamp.now(),
+      timestamp: timestamp,
       transactionFee: Math.round(transactionFee * 100) / 100,
       netEarnings: Math.round(netEarnings * 100) / 100,
     };
 
+    // 1. Record the sale
     const docRef = await db.collection('sales').add(saleRecord);
+
+    // 2. Update seller stats - increment totalEarnings and totalSales
+    const statsRef = db.collection('sellerStats').doc(sellerId);
+    await statsRef.update({
+      totalEarnings: adminInstance.firestore.FieldValue.increment(amount),
+      totalSales: adminInstance.firestore.FieldValue.increment(1),
+      lastUpdated: timestamp,
+    }).catch(async (error) => {
+      // If document doesn't exist, create it
+      if (error.code === 'not-found') {
+        await statsRef.set({
+          sellerId: sellerId,
+          totalEarnings: amount,
+          totalSales: 1,
+          lastUpdated: timestamp,
+        });
+      } else {
+        throw error;
+      }
+    });
 
     return res.status(200).json({
       success: true,

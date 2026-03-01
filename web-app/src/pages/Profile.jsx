@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { MapPin, Mail, Phone, Pencil, Plus, Loader2,
-    Tag, Clock, Trash2, Eye, FileText, CheckCircle, XCircle
+    Tag, Clock, Trash2, Eye, FileText, CheckCircle, XCircle, CreditCard
 } from 'lucide-react';
 import GooglePlacesAutocomplete from '@/components/GooglePlacesAutocomplete';
 import { Button } from "@/components/ui/button";
@@ -66,6 +66,8 @@ export default function Profile() {
     const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
     const [twoFAEnabled, setTwoFAEnabled] = useState(false);
     const [twoFALoading, setTwoFALoading] = useState(false);
+    const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
+    const [cardPaymentsLoading, setCardPaymentsLoading] = useState(false);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -116,6 +118,11 @@ export default function Profile() {
             // Load 2FA status
             const is2FAEnabled = await firebase.auth.is2FAEnabled();
             setTwoFAEnabled(is2FAEnabled);
+            
+            // Load card payments status
+            const cardPaymentsStatus = userData.cardPaymentsEnabled || false;
+            const stripeConnectId = userData.stripeConnectId || null;
+            setCardPaymentsEnabled(cardPaymentsStatus && !!stripeConnectId);
             
             setLoading(false);
         };
@@ -233,6 +240,55 @@ export default function Profile() {
             toast.error(error.message || 'Failed to update 2FA settings');
         } finally {
             setTwoFALoading(false);
+        }
+    };
+
+    const handleEnableCardPayments = async () => {
+        setCardPaymentsLoading(true);
+        try {
+            // Get the user's ID token
+            const currentUser = firebase.auth.getCurrentUser();
+            if (!currentUser) {
+                throw new Error('Not authenticated');
+            }
+
+            const token = await currentUser.getIdToken();
+
+            // Call the backend to initialize Stripe Connect
+            const response = await fetch('https://urban-garage-sale.vercel.app/api/urbanPayment/enableStripeConnect', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: user.email,
+                    firstName: user.full_name?.split(' ')[0] || 'Seller',
+                    lastName: user.full_name?.split(' ').slice(1).join(' ') || user.email.split('@')[0],
+                    address: user.address,
+                    city: 'Sydney',
+                    state: 'NSW',
+                    postcode: '2000',
+                    refreshUrl: window.location.href,
+                    returnUrl: window.location.href,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `Failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Redirect to Stripe onboarding
+            if (data.onboardingUrl) {
+                window.location.href = data.onboardingUrl;
+            }
+        } catch (error) {
+            console.error('Error enabling card payments:', error);
+            toast.error('Failed to enable card payments: ' + error.message);
+            setCardPaymentsLoading(false);
         }
     };
 
@@ -567,6 +623,23 @@ export default function Profile() {
                         </Dialog>
 
                         <Button 
+                            onClick={handleEnableCardPayments}
+                            disabled={cardPaymentsLoading || cardPaymentsEnabled}
+                            variant="outline" 
+                            size="sm" 
+                            className={`gap-2 flex-1 ${cardPaymentsEnabled ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-50' : ''}`}
+                        >
+                            {cardPaymentsLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <>
+                                    <CreditCard className="w-4 h-4" />
+                                    {cardPaymentsEnabled ? 'Card Payments Enabled' : 'Enable Card Payments'}
+                                </>
+                            )}
+                        </Button>
+
+                        <Button 
                             onClick={handleToggle2FA}
                             disabled={twoFALoading}
                             variant="outline" 
@@ -580,7 +653,7 @@ export default function Profile() {
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
-                                    {twoFAEnabled ? '2FactorAuthentication On' : '2FactorAuthentication Off'}
+                                    {twoFAEnabled ? '2FA On' : '2FA Off'}
                                 </>
                             )}
                         </Button>

@@ -2,12 +2,18 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/tap_to_pay_service.dart';
 import '../services/urban_pay_service.dart';
 import '../models/sale.dart';
 
 class TapToPayReader extends StatefulWidget {
-  const TapToPayReader({Key? key}) : super(key: key);
+  final String? stripeConnectId;
+
+  const TapToPayReader({
+    Key? key,
+    this.stripeConnectId,
+  }) : super(key: key);
 
   @override
   State<TapToPayReader> createState() => _TapToPayReaderState();
@@ -22,16 +28,39 @@ class _TapToPayReaderState extends State<TapToPayReader> {
   bool _readerActive = false;
   double _currentAmount = 0;
   String? _lastTransactionId;
+  bool _stripeValid = true;
   
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
     _tapToPayService = TapToPayService();
     _urbanPayService = UrbanPayService();
+    _verifyStripeStatus();
     _checkTapToPaySupport();
+  }
+
+  Future<void> _verifyStripeStatus() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        setState(() => _stripeValid = false);
+        return;
+      }
+
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final hasStripe = userDoc.data()?['stripeConnectId'] != null;
+      
+      setState(() {
+        _stripeValid = hasStripe;
+      });
+    } catch (e) {
+      setState(() => _stripeValid = false);
+    }
   }
 
   Future<void> _checkTapToPaySupport() async {
@@ -168,6 +197,60 @@ class _TapToPayReaderState extends State<TapToPayReader> {
 
   @override
   Widget build(BuildContext context) {
+    // If Stripe is not valid, show error screen
+    if (!_stripeValid) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Tap to Pay'),
+          backgroundColor: const Color(0xFF1e3a5f),
+          foregroundColor: Colors.white,
+        ),
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF9500).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.credit_card,
+                    size: 40,
+                    color: Color(0xFFFF9500),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Card Payments Not Enabled',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1e3a5f),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'To use Tap to Pay, please enable card payments in your profile settings first.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tap to Pay Reader'),

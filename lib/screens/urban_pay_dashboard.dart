@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../models/sale.dart';
 import '../services/urban_pay_service.dart';
@@ -18,11 +19,13 @@ class UrbanPayDashboard extends StatefulWidget {
 class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
   final _urbanPayService = UrbanPayService();
   final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
 
   late String _sellerId;
   late SellerStats _stats;
   late List<Sale> _recentSales;
   bool _isLoading = true;
+  bool _stripeConnected = false;
   String? _error;
 
   @override
@@ -39,12 +42,17 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
         _error = null;
       });
 
+      // Check Stripe status
+      final userDoc = await _firestore.collection('users').doc(_sellerId).get();
+      final hasStripe = userDoc.data()?['stripeConnectId'] != null;
+
       final stats = await _urbanPayService.getSellerStats(_sellerId);
       final sales = await _urbanPayService.getSalesHistory(_sellerId);
 
       setState(() {
         _stats = stats;
         _recentSales = sales.take(10).toList();
+        _stripeConnected = hasStripe;
         _isLoading = false;
       });
     } catch (e) {
@@ -134,20 +142,22 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
-                      // Tap to Pay Active Banner
+                      // Stripe Status Card
                       Card(
-                        color: Colors.blue[50],
+                        color: _stripeConnected ? Colors.green[50] : Colors.orange[50],
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.blue.shade200),
+                          side: BorderSide(
+                            color: _stripeConnected ? Colors.green.shade200 : Colors.orange.shade200,
+                          ),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Row(
                             children: [
                               Icon(
-                                Icons.tap_and_play,
-                                color: Colors.blue.shade700,
+                                Icons.credit_card,
+                                color: _stripeConnected ? Colors.green.shade700 : Colors.orange.shade700,
                                 size: 28,
                               ),
                               const SizedBox(width: 12),
@@ -155,20 +165,22 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      'Tap to Pay Ready',
+                                    Text(
+                                      _stripeConnected ? 'Card Payments Enabled' : 'Card Payments Not Enabled',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
-                                        color: Color(0xFF001F3F),
+                                        color: Color(_stripeConnected ? 0xFF001F3F : 0xFF1F3F2F),
                                       ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      'Use the Tap to Pay screen to accept contactless payments',
+                                      _stripeConnected
+                                          ? 'You can accept Tap to Pay and card payments'
+                                          : 'Enable card payments in your profile to accept Tap to Pay',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.blue.shade700,
+                                        color: _stripeConnected ? Colors.green.shade700 : Colors.orange.shade700,
                                       ),
                                     ),
                                   ],
@@ -179,6 +191,53 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                         ),
                       ),
                       const SizedBox(height: 20),
+
+                      // Tap to Pay Active Banner
+                      if (_stripeConnected)
+                        Card(
+                          color: Colors.blue[50],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: Colors.blue.shade200),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.tap_and_play,
+                                  color: Colors.blue.shade700,
+                                  size: 28,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Tap to Pay Ready',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF001F3F),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Use the Tap to Pay screen to accept contactless payments',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.blue.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (_stripeConnected) const SizedBox(height: 20),
 
                       // Quick Stats Section
                       Row(

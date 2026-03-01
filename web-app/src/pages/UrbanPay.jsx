@@ -47,7 +47,7 @@ export default function UrbanPay() {
             return;
         }
 
-        if (!cashDescription.trim()) {
+        if (!cashDescription || !cashDescription.trim()) {
             toast.error('Please enter a description');
             return;
         }
@@ -56,12 +56,12 @@ export default function UrbanPay() {
 
         try {
             // Get current user and token
-            const user = firebase.auth.getCurrentUser();
-            if (!user) {
+            const currentUser = firebase.auth.getCurrentUser();
+            if (!currentUser) {
                 throw new Error('Not authenticated');
             }
 
-            const token = await user.getIdToken();
+            const token = await currentUser.getIdToken();
             const response = await fetch('https://urban-garage-sale.vercel.app/api/urbanPayment/recordSale', {
                 method: 'POST',
                 headers: {
@@ -70,19 +70,20 @@ export default function UrbanPay() {
                 },
                 body: JSON.stringify({
                     amount: parseFloat(cashAmount),
-                    description: cashDescription,
+                    description: cashDescription.trim(),
                     paymentMethod: 'cash',
+                    sellerId: currentUser.uid,
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to record cash sale');
+                throw new Error(errorData.error || `Failed: ${response.status}`);
             }
 
             toast.success(`Cash sale recorded! $${parseFloat(cashAmount).toFixed(2)}`);
             
-            // Reset form
+            // Reset form to empty strings (not undefined)
             setCashAmount('');
             setCashDescription('');
             
@@ -192,6 +193,8 @@ export default function UrbanPay() {
                                         key={amount}
                                         variant="outline"
                                         className="text-sm font-semibold hover:bg-[#1e3a5f] hover:text-white"
+                                        onClick={() => setCashAmount(amount.toString())}
+                                        disabled={isRecordingCash}
                                     >
                                         ${amount}
                                     </Button>

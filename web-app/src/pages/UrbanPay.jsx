@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { AlertCircle, Smartphone } from 'lucide-react';
+import { AlertCircle, Smartphone, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,6 +18,7 @@ export default function UrbanPay() {
     const [cashAmount, setCashAmount] = useState('');
     const [cashDescription, setCashDescription] = useState('');
     const [isRecordingCash, setIsRecordingCash] = useState(false);
+    const [isRefreshingStats, setIsRefreshingStats] = useState(false);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -31,6 +32,27 @@ export default function UrbanPay() {
         },
         staleTime: 1000 * 60 * 5,
     });
+
+    // Fetch seller stats from Firestore
+    async function refreshSellerStats() {
+        if (!user) return;
+        
+        setIsRefreshingStats(true);
+        try {
+            const statsDoc = await firebase.firestore.collection('sellerStats').doc(user.uid).get();
+            if (statsDoc.exists) {
+                setSellerStats(statsDoc.data());
+            } else {
+                // If document doesn't exist yet, initialize with zeros
+                setSellerStats({ totalEarnings: 0, totalSales: 0 });
+            }
+        } catch (error) {
+            console.error('Error fetching seller stats:', error);
+            toast.error('Failed to load seller stats');
+        } finally {
+            setIsRefreshingStats(false);
+        }
+    }
 
     // Rotate promotional messages every 5 seconds
     useEffect(() => {
@@ -87,6 +109,9 @@ export default function UrbanPay() {
             setCashAmount('');
             setCashDescription('');
             
+            // Refresh seller stats after successful sale
+            await refreshSellerStats();
+            
         } catch (error) {
             console.error('Error recording cash sale:', error);
             toast.error('Failed to record cash sale: ' + error.message);
@@ -107,6 +132,8 @@ export default function UrbanPay() {
                 const userData = await firebase.auth.me();
                 setUser(userData);
 
+                // Load seller stats after user is set
+                await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay to ensure state update
                 setLoading(false);
             } catch (error) {
                 console.error('Urban Pay page init error:', error);
@@ -116,6 +143,13 @@ export default function UrbanPay() {
         };
         init();
     }, []);
+
+    // Load seller stats when user is available
+    useEffect(() => {
+        if (user) {
+            refreshSellerStats();
+        }
+    }, [user]);
 
     if (loading) {
         return (
@@ -171,14 +205,28 @@ export default function UrbanPay() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         {/* Seller Stats */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
-                                <p className="text-xs text-slate-600 font-semibold">Total Earnings</p>
-                                <p className="text-2xl font-bold text-[#1e3a5f] mt-1">${sellerStats.totalEarnings.toFixed(2)}</p>
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-sm font-semibold text-slate-700">Your Earnings</h3>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={refreshSellerStats}
+                                    disabled={isRefreshingStats}
+                                    className="h-8 w-8 p-0"
+                                >
+                                    <RefreshCw className={`w-4 h-4 ${isRefreshingStats ? 'animate-spin' : ''}`} />
+                                </Button>
                             </div>
-                            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
-                                <p className="text-xs text-slate-600 font-semibold">Total Sales</p>
-                                <p className="text-2xl font-bold text-green-600 mt-1">{sellerStats.totalSales}</p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
+                                    <p className="text-xs text-slate-600 font-semibold">Total Earnings</p>
+                                    <p className="text-2xl font-bold text-[#1e3a5f] mt-1">${sellerStats.totalEarnings.toFixed(2)}</p>
+                                </div>
+                                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
+                                    <p className="text-xs text-slate-600 font-semibold">Total Sales</p>
+                                    <p className="text-2xl font-bold text-green-600 mt-1">{sellerStats.totalSales}</p>
+                                </div>
                             </div>
                         </div>
 
@@ -238,6 +286,14 @@ export default function UrbanPay() {
                             <Smartphone className="w-4 h-4 text-blue-600" />
                             <AlertDescription className="text-sm text-blue-900">
                                 <strong>Urban Pay:</strong> Real-time payment processing with Tap to Pay. Accept contactless payments directly on your phone with live earnings tracking.
+                            </AlertDescription>
+                        </Alert>
+
+                        {/* Card Payments Info */}
+                        <Alert className="border-purple-200 bg-purple-50">
+                            <AlertCircle className="w-4 h-4 text-purple-600" />
+                            <AlertDescription className="text-sm text-purple-900">
+                                <strong>Credit Card Payments:</strong> To accept debit and credit card payments, you'll need to enable Stripe processing in your seller profile. This allows buyers to pay with cards during checkout.
                             </AlertDescription>
                         </Alert>
 

@@ -111,11 +111,16 @@ export default async (req, res) => {
       });
 
     // Return onboarding link for seller to complete setup
+    // Determine the proper return URL based on the request origin
+    const origin = req.headers.origin || 'https://urban-garage-sale.vercel.app';
+    const returnPath = '/profile?tab=payments&success=true';
+    const refreshPath = '/profile?tab=payments';
+    
     const link = await stripe.accountLinks.create({
       account: account.id,
       type: 'account_onboarding',
-      refresh_url: body.refreshUrl || 'https://urbangaragesale.com/profile?tab=payments',
-      return_url: body.returnUrl || 'https://urbangaragesale.com/profile?tab=payments&success=true',
+      refresh_url: body.refreshUrl || `${origin}${refreshPath}`,
+      return_url: body.returnUrl || `${origin}${returnPath}`,
     });
 
     return res.status(200).json({

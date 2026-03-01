@@ -623,18 +623,24 @@ export default function Profile() {
                         </Dialog>
 
                         <Button 
-                            onClick={handleEnableCardPayments}
+                            onClick={cardPaymentsEnabled ? undefined : handleEnableCardPayments}
                             disabled={cardPaymentsLoading || cardPaymentsEnabled}
-                            variant="outline" 
+                            variant={cardPaymentsEnabled ? "outline" : "default"}
                             size="sm" 
-                            className={`gap-2 flex-1 ${cardPaymentsEnabled ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-50' : ''}`}
+                            className={`gap-2 flex-1 ${cardPaymentsEnabled ? 'bg-green-50 border-green-300 text-green-700 cursor-not-allowed opacity-75' : ''}`}
                         >
                             {cardPaymentsLoading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                                 <>
                                     <CreditCard className="w-4 h-4" />
-                                    {cardPaymentsEnabled ? 'Card Payments Enabled' : 'Enable Card Payments'}
+                                    {cardPaymentsEnabled ? (
+                                        <>
+                                            Card Payments <span className="text-lg">✓</span>
+                                        </>
+                                    ) : (
+                                        'Enable Card Payments'
+                                    )}
                                 </>
                             )}
                         </Button>

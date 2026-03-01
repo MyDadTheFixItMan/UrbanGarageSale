@@ -35,11 +35,11 @@ export default function UrbanPay() {
 
     // Fetch seller stats from Firestore
     async function refreshSellerStats() {
-        if (!user) return;
+        if (!user || !user.id) return;
         
         setIsRefreshingStats(true);
         try {
-            const statsDoc = await firebase.firestore.collection('sellerStats').doc(user.uid).get();
+            const statsDoc = await firebase.firestore.collection('sellerStats').doc(user.id).get();
             if (statsDoc.exists) {
                 setSellerStats(statsDoc.data());
             } else {

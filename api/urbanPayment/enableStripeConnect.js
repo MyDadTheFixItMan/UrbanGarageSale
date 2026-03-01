@@ -81,7 +81,7 @@ export default async (req, res) => {
         },
       },
       business_profile: {
-        product_category: 'general_retail',
+        product_description: 'Online garage sale marketplace',
         support_url: 'https://urbangaragesale.com/support',
         url: 'https://urbangaragesale.com',
       },

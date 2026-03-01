@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
-import 'screens/urban_pay_dashboard.dart';
+import 'screens/urban_pay_home.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -35,9 +35,9 @@ class MyApp extends StatelessWidget {
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
-          // Show Urban Pay dashboard if authenticated
+          // Show Urban Pay home with Tap to Pay if authenticated
           if (snapshot.hasData && snapshot.data != null) {
-            return const UrbanPayDashboard();
+            return const UrbanPayHome();
           }
           // Show login/demo screen if not authenticated
           return const MyHomePage(title: 'Urban Garage Sale');

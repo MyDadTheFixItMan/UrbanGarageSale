@@ -1,5 +1,6 @@
 // Record Sale endpoint for Vercel
-const projectId = process.env.FIREBASE_PROJECT_ID ||  "";
+import admin from 'firebase-admin';
+import { getFirebaseAdmin, verifyToken } from '../firebase-admin.js';
 
 async function getBody(req) {
   if (req.method === "GET") return null;
@@ -20,45 +21,37 @@ async function getBody(req) {
   });
 }
 
-// Record Sale to Firestore via REST API
+// Record Sale to Firestore via Admin SDK
 async function recordSale(sellerId, amount, description, paymentMethod, idToken, paymentIntentId) {
-  const timestamp = new Date().toISOString();
-  const firebaseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+  // Verify that the idToken belongs to the sellerId
+  const userId = await verifyToken(idToken);
+  if (userId !== sellerId) {
+    throw new Error("Token does not match seller ID");
+  }
+
+  const admin = getFirebaseAdmin();
+  const db = admin.firestore();
+  const timestamp = admin.firestore.Timestamp.now();
 
   const saleData = {
-    fields: {
-      sellerId: { stringValue: sellerId },
-      amount: { doubleValue: amount },
-      description: { stringValue: description },
-      paymentMethod: { stringValue: paymentMethod },
-      paymentIntentId: paymentIntentId ? { stringValue: paymentIntentId } : { nullValue: null },
-      timestamp: { timestampValue: timestamp },
-      status: { stringValue: paymentMethod === "card" ? "completed" : "recorded" },
-    },
+    sellerId: sellerId,
+    amount: amount,
+    description: description,
+    paymentMethod: paymentMethod,
+    paymentIntentId: paymentIntentId || null,
+    timestamp: timestamp,
+    status: paymentMethod === "card" ? "completed" : "recorded",
   };
 
   try {
-    const response = await fetch(`${firebaseUrl}/sales`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idToken}`,
-      },
-      body: JSON.stringify(saleData),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Firestore error: ${response.statusText}`);
-    }
-
-    const result = await response.json();
+    const docRef = await db.collection("sales").add(saleData);
     return {
-      saleId: result.name?.split("/").pop() || "unknown",
+      saleId: docRef.id,
       success: true,
     };
   } catch (error) {
-    console.error("Error recording sale:", error);
-    throw error;
+    console.error("Error recording sale to Firestore:", error.message);
+    throw new Error(`Firestore write failed: ${error.message}`);
   }
 }
 

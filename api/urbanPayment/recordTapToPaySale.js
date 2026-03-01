@@ -1,6 +1,8 @@
 // api/urbanPayment/recordTapToPaySale.js
 
 import Stripe from "stripe";
+import admin from 'firebase-admin';
+import { getFirebaseAdmin, verifyToken } from '../firebase-admin.js';
 
 const getStripe = async () => {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -21,6 +23,9 @@ export default async function handler(req, res) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Missing or invalid authorization header' });
     }
+
+    const idToken = authHeader.substring(7);
+    const sellerId = await verifyToken(idToken);
 
     const {
       amount,
@@ -47,24 +52,31 @@ export default async function handler(req, res) {
       });
     }
 
-    // In production, save this to Firestore:
-    // const saleRecord = {
-    //   sellerId: decoded.uid,
-    //   amount,
-    //   description,
-    //   paymentIntentId,
-    //   paymentMethod: 'tap_to_pay',
-    //   status: 'completed',
-    //   currency: currency.toUpperCase(),
-    //   timestamp: admin.firestore.Timestamp.now(),
-    //   transactionFee: Math.round(amount * 0.029 * 100 + 30) / 100, // Stripe fees
-    // };
-    // 
-    // await admin.firestore().collection('sales').add(saleRecord);
+    // Save to Firestore using Admin SDK
+    const adminInstance = getFirebaseAdmin();
+    const db = adminInstance.firestore();
+    const transactionFee = amount * 0.029 + 0.30;
+    const netEarnings = amount - transactionFee;
+
+    const saleRecord = {
+      sellerId: sellerId,
+      amount: amount,
+      description: description,
+      paymentIntentId: paymentIntentId,
+      paymentMethod: 'tap_to_pay',
+      status: 'completed',
+      currency: currency.toUpperCase(),
+      timestamp: adminInstance.firestore.Timestamp.now(),
+      transactionFee: Math.round(transactionFee * 100) / 100,
+      netEarnings: Math.round(netEarnings * 100) / 100,
+    };
+
+    const docRef = await db.collection('sales').add(saleRecord);
 
     return res.status(200).json({
       success: true,
       message: 'Tap to Pay sale recorded successfully',
+      saleId: docRef.id,
       saleData: {
         amount,
         description,
@@ -73,8 +85,8 @@ export default async function handler(req, res) {
         status: 'completed',
         currency: currency.toUpperCase(),
         timestamp: new Date().toISOString(),
-        transactionFee: (amount * 0.029 + 0.30).toFixed(2),
-        netEarnings: (amount - (amount * 0.029 + 0.30)).toFixed(2),
+        transactionFee: transactionFee.toFixed(2),
+        netEarnings: netEarnings.toFixed(2),
       },
     });
   } catch (error) {

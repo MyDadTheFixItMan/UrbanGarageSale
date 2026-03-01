@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { firebase } from '@/api/firebaseClient';
-import { Plus, Heart, User, Home, Shield, LogOut, QrCode } from 'lucide-react';
+import { Plus, Heart, User, Home, Shield, LogOut, Smartphone } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
 export default function Layout({ children, currentPageName }) {
@@ -37,7 +37,7 @@ export default function Layout({ children, currentPageName }) {
         { name: 'Home', page: 'Home', icon: Home, requiresAuth: false },
         { name: 'Create Listing', page: 'CreateListing', icon: Plus, requiresAuth: false },
         { name: 'Favourites', page: 'SavedListings', icon: Heart, requiresAuth: false },
-        { name: 'Urban Pay', page: 'UrbanPay', icon: QrCode, requiresAuth: true },
+        { name: 'Urban Pay', page: 'UrbanPay', icon: Smartphone, requiresAuth: true },
         { name: 'Profile', page: 'Profile', icon: User, requiresAuth: true },
         { name: 'Admin', page: 'AdminDashboard', icon: Shield, requiresAuth: 'admin' },
     ];

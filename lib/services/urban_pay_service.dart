@@ -129,10 +129,4 @@ class UrbanPayService {
       rethrow;
     }
   }
-
-  /// Generate QR code data for seller
-  /// QR code should link to: https://yourdomain.com/pay/{sellerId}
-  String generateQRCodeUrl(String sellerId) {
-    return '$apiBaseUrl/pay/$sellerId';
-  }
 }

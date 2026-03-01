@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { firebase } from '@/api/firebaseClient';
-import { Map, List, Tag, Search, Loader2, Heart, QrCode, TrendingUp } from 'lucide-react';
+import { Map, List, Tag, Search, Loader2, Heart, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Link } from 'react-router-dom';

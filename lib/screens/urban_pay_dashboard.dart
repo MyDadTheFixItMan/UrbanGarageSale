@@ -134,72 +134,44 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
-                      // QR Code Section
+                      // Tap to Pay Active Banner
                       Card(
-                        color: Colors.white,
+                        color: Colors.blue[50],
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.blue.shade200),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Column(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
                             children: [
-                              const Text(
-                                'Your Payment QR Code',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF001F3F),
-                                ),
+                              Icon(
+                                Icons.tap_and_play,
+                                color: Colors.blue.shade700,
+                                size: 28,
                               ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'QR code display coming soon',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.orange,
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  border: Border.all(
-                                    color: const Color(0xFF001F3F),
-                                    width: 2,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.all(16),
-                                child: Center(
-                                  child: Text(
-                                    'QR: $_sellerId',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                      fontFamily: 'Courier',
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Screenshot your QR code to share!',
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Tap to Pay Ready',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF001F3F),
                                       ),
                                     ),
-                                  );
-                                },
-                                icon: const Icon(Icons.info_outline),
-                                label: const Text(
-                                  'Tip: Screenshot to print or share',
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blueGrey,
-                                  foregroundColor: Colors.white,
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Use the Tap to Pay screen to accept contactless payments',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.blue.shade700,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],

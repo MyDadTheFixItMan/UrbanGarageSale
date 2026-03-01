@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { AlertCircle, QrCode } from 'lucide-react';
+import { AlertCircle, Smartphone } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -105,7 +105,7 @@ export default function UrbanPay() {
                 <Card className="max-w-2xl w-full">
                     <CardHeader className="text-center">
                         <div className="flex items-center justify-center gap-2 mb-2">
-                            <QrCode className="w-6 h-6 text-[#FF9500]" />
+                            <Smartphone className="w-6 h-6 text-[#FF9500]" />
                             <CardTitle className="text-2xl">Urban Pay</CardTitle>
                         </div>
                         <CardDescription>
@@ -125,20 +125,7 @@ export default function UrbanPay() {
                             </div>
                         </div>
 
-                        {/* QR Code Display */}
-                        <div className="bg-white border-2 border-dashed border-[#1e3a5f] rounded-lg p-6 text-center">
-                            <QrCode className="w-12 h-12 text-[#1e3a5f] mx-auto mb-3" />
-                            <p className="text-sm font-semibold text-[#1e3a5f]">Your Payment QR Code</p>
-                            <p className="text-xs text-slate-600 mt-1 mb-4">Buyers scan this to pay you directly</p>
-                            
-                            <div className="bg-slate-100 rounded-lg p-6 mb-4 flex items-center justify-center aspect-square">
-                                <div className="text-center">
-                                    <QrCode className="w-20 h-20 text-slate-400 mx-auto" />
-                                    <p className="text-xs text-slate-500 mt-2">QR Code would display here</p>
-                                </div>
-                            </div>
-                            <p className="text-xs text-slate-500">Seller ID: {user?.uid?.substring(0, 8)}...</p>
-                        </div>
+
 
                         {/* Quick Amount Buttons */}
                         <div>
@@ -180,9 +167,9 @@ export default function UrbanPay() {
 
                         {/* Urban Pay Info */}
                         <Alert className="border-blue-200 bg-blue-50">
-                            <QrCode className="w-4 h-4 text-blue-600" />
+                            <Smartphone className="w-4 h-4 text-blue-600" />
                             <AlertDescription className="text-sm text-blue-900">
-                                <strong>Urban Pay:</strong> Real-time payment processing for your garage sale. Accept card and cash payments with live earnings tracking.
+                                <strong>Urban Pay:</strong> Real-time payment processing with Tap to Pay. Accept contactless payments directly on your phone with live earnings tracking.
                             </AlertDescription>
                         </Alert>
 

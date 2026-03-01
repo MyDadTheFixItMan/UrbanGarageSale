@@ -43,9 +43,6 @@ dependencies:
   # Stripe Payment Integration
   flutter_stripe: ^10.0.0
   
-  # QR Code Generation
-  qr_flutter: ^4.1.0
-  
   # HTTP Requests
   http: ^1.1.0
   

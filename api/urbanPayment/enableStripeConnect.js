@@ -85,10 +85,6 @@ export default async (req, res) => {
         support_url: 'https://urbangaragesale.com/support',
         url: 'https://urbangaragesale.com',
       },
-      tos_acceptance: {
-        date: Math.floor(Date.now() / 1000),
-        ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress,
-      },
       settings: {
         payouts: {
           schedule: {

@@ -15,6 +15,9 @@ export default function UrbanPay() {
     const [sellerStats, setSellerStats] = useState({ totalEarnings: 0, totalSales: 0 });
     const [quickAmounts] = useState([5, 10, 20, 50, 100]);
     const [promoIndex, setPromoIndex] = useState(0);
+    const [cashAmount, setCashAmount] = useState('');
+    const [cashDescription, setCashDescription] = useState('');
+    const [isRecordingCash, setIsRecordingCash] = useState(false);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -37,6 +40,59 @@ export default function UrbanPay() {
         }, 5000);
         return () => clearInterval(interval);
     }, [allPromotions.length]);
+
+    async function recordCashSale() {
+        if (!cashAmount || parseFloat(cashAmount) <= 0) {
+            toast.error('Please enter a valid amount');
+            return;
+        }
+
+        if (!cashDescription.trim()) {
+            toast.error('Please enter a description');
+            return;
+        }
+
+        setIsRecordingCash(true);
+
+        try {
+            // Get current user and token
+            const user = firebase.auth.getCurrentUser();
+            if (!user) {
+                throw new Error('Not authenticated');
+            }
+
+            const token = await user.getIdToken();
+            const response = await fetch('https://urban-garage-sale.vercel.app/api/urbanPayment/recordSale', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount: parseFloat(cashAmount),
+                    description: cashDescription,
+                    paymentMethod: 'cash',
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to record cash sale');
+            }
+
+            toast.success(`Cash sale recorded! $${parseFloat(cashAmount).toFixed(2)}`);
+            
+            // Reset form
+            setCashAmount('');
+            setCashDescription('');
+            
+        } catch (error) {
+            console.error('Error recording cash sale:', error);
+            toast.error('Failed to record cash sale: ' + error.message);
+        } finally {
+            setIsRecordingCash(false);
+        }
+    }
 
     useEffect(() => {
         const init = async () => {
@@ -152,15 +208,24 @@ export default function UrbanPay() {
                                     type="number" 
                                     placeholder="Amount ($)" 
                                     className="w-full px-3 py-2 border rounded-lg text-sm"
-                                    defaultValue="0"
+                                    value={cashAmount}
+                                    onChange={(e) => setCashAmount(e.target.value)}
+                                    disabled={isRecordingCash}
                                 />
                                 <input 
                                     type="text" 
                                     placeholder="Item description" 
                                     className="w-full px-3 py-2 border rounded-lg text-sm"
+                                    value={cashDescription}
+                                    onChange={(e) => setCashDescription(e.target.value)}
+                                    disabled={isRecordingCash}
                                 />
-                                <Button className="w-full bg-green-600 hover:bg-green-700">
-                                    Record Cash Sale
+                                <Button 
+                                    onClick={recordCashSale}
+                                    disabled={isRecordingCash}
+                                    className="w-full bg-green-600 hover:bg-green-700"
+                                >
+                                    {isRecordingCash ? 'Recording...' : 'Record Cash Sale'}
                                 </Button>
                             </div>
                         </div>

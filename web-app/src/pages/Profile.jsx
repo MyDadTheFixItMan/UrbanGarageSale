@@ -441,10 +441,10 @@ export default function Profile() {
                 </div>
             )}
             
-            <section className="relative bg-[#f5f1e8] py-0 sm:py-8 md:py-16 px-4 sm:px-6 overflow-hidden -mt-2">
-                <div className="max-w-4xl mx-auto pt-24 sm:pt-2 md:pt-4 relative z-10">
+            <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+                <div className="max-w-4xl mx-auto pt-2 md:pt-4 relative z-10">
                 {/* Page Header */}
-                <div className="flex items-center gap-3 mb-12 sm:mb-8">
+                <div className="flex items-center gap-3 mb-8">
                     <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
                         <Pencil className="w-6 h-6 text-white" />
                     </div>
@@ -455,7 +455,7 @@ export default function Profile() {
                 </div>
 
                 {/* Profile Header */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 mb-8 shadow-sm mt-20 sm:mt-0">
+                <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 mb-8 shadow-sm">
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:justify-between">
                         <div className="flex items-center gap-4 flex-1">
                             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#1e3a5f] to-[#2d4a6f] flex items-center justify-center text-white text-2xl font-semibold">
@@ -706,7 +706,7 @@ export default function Profile() {
                 </section>
 
                 <section className="relative bg-[#f5f1e8]">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 relative z-10">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10 py-8 -mt-20 sm:mt-0 md:-mt-8">
 
                 {/* Listings */}
                 <div className="flex items-center justify-between mb-6">

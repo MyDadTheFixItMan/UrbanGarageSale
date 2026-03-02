@@ -232,13 +232,14 @@ export default function UrbanPay() {
                 <img
                     src="/Logo Webpage.png"
                     alt="watermark"
-                    className="fixed left-0 top-0 z-5 opacity-35"
+                    className="fixed left-0 top-0 opacity-40"
                     style={{
                         width: '1200px',
                         height: 'auto',
                         clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
-                        top: '35px',
-                        pointerEvents: 'none'
+                        top: '80px',
+                        pointerEvents: 'none',
+                        zIndex: 1
                     }}
                 />
 

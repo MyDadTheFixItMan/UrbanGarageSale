@@ -251,7 +251,7 @@ export default function UrbanPay() {
                     </div>
                 )}
                 
-                <section className="relative bg-[#f5f1e8] py-0 sm:py-8 md:py-16 px-4 sm:px-6 overflow-hidden -mt-2">
+                <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden -mt-2">
                     <div className="max-w-4xl mx-auto pt-0 md:pt-4 relative z-10">
                         {/* Page Header */}
                         <div className="flex items-center gap-3 mb-4 sm:mb-8">

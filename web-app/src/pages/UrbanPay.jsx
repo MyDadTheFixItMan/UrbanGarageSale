@@ -402,6 +402,7 @@ export default function UrbanPay() {
                         </div>
                     </div>
                 </div>
+                    </div>
                 </section>
             </div>
         </Layout>

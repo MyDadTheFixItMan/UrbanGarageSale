@@ -425,7 +425,7 @@ export default function Profile() {
                     width: '1200px',
                     height: 'auto',
                     clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
-                    top: '35px',
+                    top: '80px',
                     zIndex: 5,
                     opacity: 0.35,
                     objectFit: 'contain'

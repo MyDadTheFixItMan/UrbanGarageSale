@@ -7,7 +7,6 @@ import Layout from '../Layout';
 import { AlertCircle, Smartphone, RefreshCw, CreditCard } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function UrbanPay() {
@@ -228,19 +227,12 @@ export default function UrbanPay() {
 
     return (
         <Layout currentPageName="UrbanPay">
-            <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen flex flex-col overflow-hidden pb-24 md:pb-0">
+            <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen flex flex-col pb-24 md:pb-0">
                 {/* Watermark */}
-                <style>{`
-                    @media (min-width: 768px) {
-                        .watermark-page {
-                            top: -90px !important;
-                        }
-                    }
-                `}</style>
                 <img
                     src="/Logo Webpage.png"
                     alt="watermark"
-                    className="fixed left-0 top-0 z-5 opacity-35 watermark-page"
+                    className="fixed left-0 top-0 z-5 opacity-35"
                     style={{
                         width: '1200px',
                         height: 'auto',
@@ -249,22 +241,35 @@ export default function UrbanPay() {
                         pointerEvents: 'none'
                     }}
                 />
+
+                {/* Advertising Ribbon */}
+                {allPromotions.length > 0 && (
+                    <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                        <p className="text-sm sm:text-base font-semibold">
+                            {allPromotions[promoIndex]?.message}
+                        </p>
+                    </div>
+                )}
                 
-                <div className="flex-1 flex flex-col p-4 relative z-10">
-                    {/* Page Header */}
-                    <div className="flex items-center gap-3 mb-12 sm:mb-8">
-                        <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
-                            <Smartphone className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-bold text-[#1e3a5f]">Urban Pay</h2>
-                            <p className="text-slate-500">Accept payments from buyers during your garage sale</p>
+                <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+                    <div className="max-w-4xl mx-auto pt-2 md:pt-4 relative z-10">
+                        {/* Page Header */}
+                        <div className="flex items-center gap-3 mb-12 sm:mb-8">
+                            <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
+                                <Smartphone className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-[#1e3a5f]">Urban Pay</h2>
+                                <p className="text-slate-500">Accept payments from buyers during your garage sale</p>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div className="flex items-center justify-center flex-1">
-                <Card className="max-w-2xl w-full">
-                    <CardContent className="space-y-6 pt-6">
+                </section>
+
+                <section className="relative bg-[#f5f1e8]">
+                    <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10 py-8 -mt-20 sm:mt-0 md:-mt-8">
+                        <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 mb-8 shadow-sm">
+                            <div className="space-y-6">
                         {/* Seller Stats */}
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">
@@ -392,7 +397,6 @@ export default function UrbanPay() {
                                 </AlertDescription>
                             </Alert>
                         )}
-
                         <div className="flex gap-2">
                             <Link to={createPageUrl('Home')} className="flex-1">
                                 <Button variant="outline" className="w-full">
@@ -400,10 +404,10 @@ export default function UrbanPay() {
                                 </Button>
                             </Link>
                         </div>
-                    </CardContent>
-                    </Card>
                     </div>
                 </div>
+                    </div>
+                </section>
             </div>
         </Layout>
     );

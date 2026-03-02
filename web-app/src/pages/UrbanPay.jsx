@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import Layout from '../Layout';
 import { AlertCircle, Smartphone, RefreshCw, CreditCard } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -226,8 +225,7 @@ export default function UrbanPay() {
     }
 
     return (
-        <Layout currentPageName="UrbanPay">
-            <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen flex flex-col pb-24 md:pb-0">
+        <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen overflow-hidden pb-24 md:pb-0">
                 {/* Watermark */}
                 <img
                     src="/Logo Webpage.png"
@@ -410,6 +408,5 @@ export default function UrbanPay() {
                 </div>
                 </section>
             </div>
-        </Layout>
     );
 }

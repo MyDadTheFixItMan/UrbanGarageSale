@@ -264,7 +264,7 @@ export default function UrbanPay() {
                             </div>
                         </div>
                         
-                        <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 mb-8 shadow-sm mt-20 sm:mt-0">
+                        <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 mb-8 shadow-sm mt-0">
                             <div className="space-y-6">
                         {/* Seller Stats */}
                         <div className="space-y-2">

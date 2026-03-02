@@ -251,21 +251,25 @@ export default function UrbanPay() {
                     </div>
                 )}
                 
-                <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden -mt-2">
-                    <div className="max-w-4xl mx-auto pt-0 md:pt-4 relative z-10">
-                        {/* Page Header */}
-                        <div className="flex items-center gap-3 mb-4 sm:mb-8">
-                            <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
-                                <Smartphone className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-bold text-[#1e3a5f]">Urban Pay</h2>
-                                <p className="text-slate-500">Accept payments from buyers during your garage sale</p>
-                            </div>
+                <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+                <div className="max-w-4xl mx-auto pt-2 md:pt-4 relative z-10">
+                    {/* Header */}
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center flex-shrink-0">
+                            <Smartphone className="w-6 h-6 text-white" />
                         </div>
-                        
-                        <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 mb-8 shadow-sm mt-0">
-                            <div className="space-y-6">
+                        <div>
+                            <h1 className="text-2xl font-bold text-[#1e3a5f]">Urban Pay</h1>
+                            <p className="text-slate-500">Accept payments from buyers during your garage sale</p>
+                        </div>
+                    </div>
+                </div>
+                </section>
+
+                <section className="relative bg-[#f5f1e8]">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10 py-8 -mt-20 sm:mt-0 md:-mt-8">
+                    <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 relative z-20">
+                        <div className="space-y-6">
                         {/* Seller Stats */}
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">
@@ -400,9 +404,9 @@ export default function UrbanPay() {
                                 </Button>
                             </Link>
                         </div>
+                        </div>
                     </div>
                 </div>
-                    </div>
                 </section>
             </div>
         </Layout>

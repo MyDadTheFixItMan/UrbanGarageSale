@@ -10,10 +10,7 @@ import '../models/sale.dart';
 class TapToPayReader extends StatefulWidget {
   final String? stripeConnectId;
 
-  const TapToPayReader({
-    Key? key,
-    this.stripeConnectId,
-  }) : super(key: key);
+  const TapToPayReader({super.key, this.stripeConnectId});
 
   @override
   State<TapToPayReader> createState() => _TapToPayReaderState();
@@ -22,14 +19,14 @@ class TapToPayReader extends StatefulWidget {
 class _TapToPayReaderState extends State<TapToPayReader> {
   late TapToPayService _tapToPayService;
   late UrbanPayService _urbanPayService;
-  
+
   bool _isSupported = false;
   bool _isProcessing = false;
   bool _readerActive = false;
   double _currentAmount = 0;
   String? _lastTransactionId;
   bool _stripeValid = true;
-  
+
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _auth = FirebaseAuth.instance;
@@ -54,7 +51,7 @@ class _TapToPayReaderState extends State<TapToPayReader> {
 
       final userDoc = await _firestore.collection('users').doc(userId).get();
       final hasStripe = userDoc.data()?['stripeConnectId'] != null;
-      
+
       setState(() {
         _stripeValid = hasStripe;
       });
@@ -71,9 +68,9 @@ class _TapToPayReaderState extends State<TapToPayReader> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Tap to Pay not supported: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Tap to Pay not supported: $e')));
       }
     }
   }
@@ -81,7 +78,9 @@ class _TapToPayReaderState extends State<TapToPayReader> {
   Future<void> _activateReader() async {
     if (!_isSupported) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tap to Pay is not supported on this device')),
+        const SnackBar(
+          content: Text('Tap to Pay is not supported on this device'),
+        ),
       );
       return;
     }
@@ -91,7 +90,7 @@ class _TapToPayReaderState extends State<TapToPayReader> {
     try {
       await _tapToPayService.initializeTapToPayReader();
       setState(() => _readerActive = true);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -151,16 +150,18 @@ class _TapToPayReaderState extends State<TapToPayReader> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Payment successful! \$${amount.toStringAsFixed(2)} received'),
+            content: Text(
+              'Payment successful! \$${amount.toStringAsFixed(2)} received',
+            ),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Payment failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Payment failed: $e')));
       }
     } finally {
       setState(() => _isProcessing = false);
@@ -169,9 +170,9 @@ class _TapToPayReaderState extends State<TapToPayReader> {
 
   Future<void> _processCustomAmount() async {
     if (_amountController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter an amount')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter an amount')));
       return;
     }
 
@@ -286,9 +287,9 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _isSupported 
-                          ? 'Your device supports Tap to Pay'
-                          : 'Tap to Pay is not supported on this device',
+                        _isSupported
+                            ? 'Your device supports Tap to Pay'
+                            : 'Tap to Pay is not supported on this device',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.grey),
                       ),
@@ -312,8 +313,7 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                   ),
                 ),
 
-              if (!_readerActive)
-                const SizedBox(height: 24),
+              if (!_readerActive) const SizedBox(height: 24),
 
               if (_readerActive) ...[
                 // Quick Amount Buttons
@@ -329,20 +329,20 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                   mainAxisSpacing: 8,
                   crossAxisSpacing: 8,
                   children: [5, 10, 20, 50, 100, 250]
-                      .map((amount) => ElevatedButton(
-                            onPressed: _isProcessing
-                                ? null
-                                : () => _processQuickAmount(amount.toDouble()),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF1e3a5f),
-                              side: const BorderSide(
-                                color: Color(0xFF1e3a5f),
-                              ),
-                              disabledBackgroundColor: Colors.grey[200],
-                            ),
-                            child: Text('\$$amount'),
-                          ))
+                      .map(
+                        (amount) => ElevatedButton(
+                          onPressed: _isProcessing
+                              ? null
+                              : () => _processQuickAmount(amount.toDouble()),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF1e3a5f),
+                            side: const BorderSide(color: Color(0xFF1e3a5f)),
+                            disabledBackgroundColor: Colors.grey[200],
+                          ),
+                          child: Text('\$$amount'),
+                        ),
+                      )
                       .toList(),
                 ),
                 const SizedBox(height: 24),
@@ -355,7 +355,9 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _amountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Enter amount (\$)',
                     filled: true,
@@ -410,7 +412,9 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Text('Amount: \$${_currentAmount.toStringAsFixed(2)}'),
+                          Text(
+                            'Amount: \$${_currentAmount.toStringAsFixed(2)}',
+                          ),
                           Text('ID: $_lastTransactionId'),
                           const SizedBox(height: 8),
                           const Text(

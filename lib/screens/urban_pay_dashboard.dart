@@ -144,11 +144,15 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                     children: [
                       // Stripe Status Card
                       Card(
-                        color: _stripeConnected ? Colors.green[50] : Colors.orange[50],
+                        color: _stripeConnected
+                            ? Colors.green[50]
+                            : Colors.orange[50],
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
-                            color: _stripeConnected ? Colors.green.shade200 : Colors.orange.shade200,
+                            color: _stripeConnected
+                                ? Colors.green.shade200
+                                : Colors.orange.shade200,
                           ),
                         ),
                         child: Padding(
@@ -157,7 +161,9 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                             children: [
                               Icon(
                                 Icons.credit_card,
-                                color: _stripeConnected ? Colors.green.shade700 : Colors.orange.shade700,
+                                color: _stripeConnected
+                                    ? Colors.green.shade700
+                                    : Colors.orange.shade700,
                                 size: 28,
                               ),
                               const SizedBox(width: 12),
@@ -166,11 +172,17 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      _stripeConnected ? 'Card Payments Enabled' : 'Card Payments Not Enabled',
+                                      _stripeConnected
+                                          ? 'Card Payments Enabled'
+                                          : 'Card Payments Not Enabled',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
-                                        color: Color(_stripeConnected ? 0xFF001F3F : 0xFF1F3F2F),
+                                        color: Color(
+                                          _stripeConnected
+                                              ? 0xFF001F3F
+                                              : 0xFF1F3F2F,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(height: 4),
@@ -180,7 +192,9 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                                           : 'Enable card payments in your profile to accept Tap to Pay',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: _stripeConnected ? Colors.green.shade700 : Colors.orange.shade700,
+                                        color: _stripeConnected
+                                            ? Colors.green.shade700
+                                            : Colors.orange.shade700,
                                       ),
                                     ),
                                   ],
@@ -212,7 +226,8 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         'Tap to Pay Ready',

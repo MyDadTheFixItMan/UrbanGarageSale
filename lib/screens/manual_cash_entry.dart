@@ -14,7 +14,7 @@ class _ManualCashEntryScreenState extends State<ManualCashEntryScreen> {
   final _urbanPayService = UrbanPayService();
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
-  
+
   double _selectedAmount = 0;
   bool _isProcessing = false;
   String? _error;
@@ -156,7 +156,9 @@ class _ManualCashEntryScreenState extends State<ManualCashEntryScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _amountController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         decoration: InputDecoration(
                           prefixText: '\$ ',
                           hintText: '0.00',
@@ -231,10 +233,7 @@ class _ManualCashEntryScreenState extends State<ManualCashEntryScreen> {
                       const SizedBox(height: 8),
                       const Text(
                         'Brief description of items sold',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -292,7 +291,9 @@ class _ManualCashEntryScreenState extends State<ManualCashEntryScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : Text(

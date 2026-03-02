@@ -7,7 +7,7 @@ import 'urban_pay_dashboard.dart';
 import 'tap_to_pay_reader.dart';
 
 class UrbanPayHome extends StatefulWidget {
-  const UrbanPayHome({Key? key}) : super(key: key);
+  const UrbanPayHome({super.key});
 
   @override
   State<UrbanPayHome> createState() => _UrbanPayHomeState();
@@ -38,7 +38,7 @@ class _UrbanPayHomeState extends State<UrbanPayHome> {
       final userDoc = await _firestore.collection('users').doc(userId).get();
       final stripeId = userDoc.data()?['stripeConnectId'];
       final hasStripe = stripeId != null;
-      
+
       setState(() {
         _stripeConnected = hasStripe;
         _stripeConnectId = stripeId;
@@ -134,11 +134,7 @@ class _UrbanPayHomeState extends State<UrbanPayHome> {
               const Text(
                 'To accept card payments with Tap to Pay, you need to enable card payments in your profile first.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                  height: 1.5,
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.5),
               ),
               const SizedBox(height: 32),
               ElevatedButton.icon(

@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
-import 'package:firebase_auth/firebase_auth.dart';
 import '../services/urban_pay_service.dart';
 
 class UrbanPayPaymentScreen extends StatefulWidget {

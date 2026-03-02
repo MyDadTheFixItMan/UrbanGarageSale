@@ -22,8 +22,8 @@ class TapToPayService {
   /// Check if device supports Tap to Pay
   Future<bool> isSupported() async {
     try {
-      return await Stripe.instance.isApplePaySupported || 
-             await Stripe.instance.isGooglePaySupported;
+      return await Stripe.instance.isApplePaySupported ||
+          Stripe.instance.isGooglePaySupported;
     } catch (e) {
       return false;
     }
@@ -35,17 +35,14 @@ class TapToPayService {
     try {
       final token = await _getAuthToken();
       final user = _auth.currentUser;
-      
+
       final response = await http.post(
         Uri.parse('$apiBaseUrl/urbanPayment/initializeTapToPayReader'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'sellerId': user?.uid,
-          'sellerEmail': user?.email,
-        }),
+        body: jsonEncode({'sellerId': user?.uid, 'sellerEmail': user?.email}),
       );
 
       if (response.statusCode == 200) {
@@ -122,9 +119,7 @@ class TapToPayService {
             currencyCode: 'AUD',
             merchantCountryCode: 'AU',
           ),
-          applePay: const PaymentSheetApplePay(
-            merchantCountryCode: 'AU',
-          ),
+          applePay: const PaymentSheetApplePay(merchantCountryCode: 'AU'),
         ),
       );
     } catch (e) {
@@ -140,9 +135,7 @@ class TapToPayService {
 
       final response = await http.get(
         Uri.parse('$apiBaseUrl/urbanPayment/sellerStats?sellerId=${user?.uid}'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
@@ -150,7 +143,8 @@ class TapToPayService {
         return SellerStats(
           totalEarnings: (data['totalEarnings'] as num?)?.toDouble() ?? 0.0,
           totalSales: data['totalSales'] ?? 0,
-          tapToPayEarnings: (data['tapToPayEarnings'] as num?)?.toDouble() ?? 0.0,
+          tapToPayEarnings:
+              (data['tapToPayEarnings'] as num?)?.toDouble() ?? 0.0,
           tapToPayTransactions: data['tapToPayTransactions'] ?? 0,
         );
       } else {

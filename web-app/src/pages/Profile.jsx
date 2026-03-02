@@ -625,9 +625,12 @@ export default function Profile() {
                         <Button 
                             onClick={cardPaymentsEnabled ? undefined : handleEnableCardPayments}
                             disabled={cardPaymentsLoading || cardPaymentsEnabled}
-                            variant={cardPaymentsEnabled ? "outline" : "default"}
                             size="sm" 
-                            className={`gap-2 flex-1 ${cardPaymentsEnabled ? 'bg-green-50 border-green-300 text-green-700 cursor-not-allowed opacity-75' : ''}`}
+                            className={`gap-2 flex-1 font-medium ${
+                                cardPaymentsEnabled 
+                                ? 'bg-green-100 border border-green-300 text-green-700 hover:bg-green-100 cursor-not-allowed opacity-75' 
+                                : 'bg-[#1e3a5f] text-white hover:bg-[#152a45]'
+                            }`}
                         >
                             {cardPaymentsLoading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -635,9 +638,7 @@ export default function Profile() {
                                 <>
                                     <CreditCard className="w-4 h-4" />
                                     {cardPaymentsEnabled ? (
-                                        <>
-                                            Card Payments <span className="text-lg">✓</span>
-                                        </>
+                                        <>Card Payments <span className="text-lg ml-0.5">✓</span></>
                                     ) : (
                                         'Enable Card Payments'
                                     )}

@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { AlertCircle, Smartphone, RefreshCw } from 'lucide-react';
+import Layout from '../Layout';
+import { AlertCircle, Smartphone, RefreshCw, CreditCard } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -19,6 +20,10 @@ export default function UrbanPay() {
     const [cashDescription, setCashDescription] = useState('');
     const [isRecordingCash, setIsRecordingCash] = useState(false);
     const [isRefreshingStats, setIsRefreshingStats] = useState(false);
+    const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
+    const [cardAmount, setCardAmount] = useState('');
+    const [cardDescription, setCardDescription] = useState('');
+    const [isProcessingCard, setIsProcessingCard] = useState(false);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -62,6 +67,65 @@ export default function UrbanPay() {
         }, 5000);
         return () => clearInterval(interval);
     }, [allPromotions.length]);
+
+    async function recordCardPayment() {
+        if (!cardAmount || parseFloat(cardAmount) <= 0) {
+            toast.error('Please enter a valid amount');
+            return;
+        }
+
+        if (!cardDescription || !cardDescription.trim()) {
+            toast.error('Please enter a description');
+            return;
+        }
+
+        setIsProcessingCard(true);
+
+        try {
+            const currentUser = firebase.auth.getCurrentUser();
+            if (!currentUser) {
+                throw new Error('Not authenticated');
+            }
+
+            const token = await currentUser.getIdToken();
+            
+            // Create payment intent
+            const response = await fetch('https://urban-garage-sale.vercel.app/api/urbanPayment/createPaymentIntent', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount: parseFloat(cardAmount),
+                    description: cardDescription.trim(),
+                    sellerId: currentUser.uid,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create payment');
+            }
+
+            const data = await response.json();
+            
+            // Log the payment intent for testing
+            console.log('Payment intent created:', data.paymentIntentId);
+            toast.success(`Payment intent created: ${data.paymentIntentId}`);
+            
+            // Reset form
+            setCardAmount('');
+            setCardDescription('');
+            
+            // Refresh stats
+            refreshSellerStats();
+        } catch (error) {
+            console.error('Card payment error:', error);
+            toast.error(error.message || 'Failed to process card payment');
+        } finally {
+            setIsProcessingCard(false);
+        }
+    }
 
     async function recordCashSale() {
         if (!cashAmount || parseFloat(cashAmount) <= 0) {
@@ -144,10 +208,12 @@ export default function UrbanPay() {
         init();
     }, []);
 
-    // Load seller stats when user is available
+    // Load seller stats and card payments status when user is available
     useEffect(() => {
         if (user) {
             refreshSellerStats();
+            // Check if card payments are enabled
+            setCardPaymentsEnabled(user.stripeConnectId ? true : false);
         }
     }, [user]);
 
@@ -161,38 +227,37 @@ export default function UrbanPay() {
     }
 
     return (
-        <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen flex flex-col overflow-hidden pb-24 md:pb-0">
-            {/* Watermark */}
-            <style>{`
-                @media (min-width: 768px) {
-                    .watermark-page {
-                        top: -90px !important;
+        <Layout currentPageName="UrbanPay">
+            <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen flex flex-col overflow-hidden pb-24 md:pb-0">
+                {/* Watermark */}
+                <style>{`
+                    @media (min-width: 768px) {
+                        .watermark-page {
+                            top: -90px !important;
+                        }
                     }
-                }
-            `}</style>
-            <img
-                src="/Logo Webpage.png"
-                alt="watermark"
-                className="fixed left-0 top-0 z-5 opacity-35 watermark-page"
-                style={{
-                    width: '1200px',
-                    height: 'auto',
-                    clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
-                    top: '35px',
-                    pointerEvents: 'none'
-                }}
-            />
-
-            {/* Advertising Ribbon */}
-            {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
-                    <p className="text-sm sm:text-base font-semibold">
-                        {allPromotions[promoIndex]?.message}
-                    </p>
-                </div>
-            )}
-            
-            <div className="flex-1 flex items-center justify-center p-4 pt-32 md:pt-4 relative z-10">
+                `}</style>
+                <img
+                    src="/Logo Webpage.png"
+                    alt="watermark"
+                    className="fixed left-0 top-0 z-5 opacity-35 watermark-page"
+                    style={{
+                        width: '1200px',
+                        height: 'auto',
+                        clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
+                        top: '35px',
+                        pointerEvents: 'none'
+                    }}
+                />
+                
+                <div className="flex-1 flex flex-col p-4 relative z-10">
+                    {/* Page Header */}
+                    <div className="mb-6">
+                        <h1 className="text-4xl font-bold text-[#1e3a5f] mb-2">Urban Pay</h1>
+                        <p className="text-slate-600">Accept payments from buyers during your garage sale</p>
+                    </div>
+                    
+                    <div className="flex items-center justify-center flex-1">
                 <Card className="max-w-2xl w-full">
                     <CardHeader className="text-center">
                         <div className="flex items-center justify-center gap-2 mb-2">
@@ -289,13 +354,48 @@ export default function UrbanPay() {
                             </AlertDescription>
                         </Alert>
 
+                        {/* Card Payments Section */}
+                        {cardPaymentsEnabled && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <p className="text-sm font-semibold text-blue-900 mb-2">Tap to Pay / Card Payments</p>
+                                <p className="text-xs text-blue-800 mb-3">Charge a card from your phone using Tap to Pay reader</p>
+                                <div className="space-y-2">
+                                    <input 
+                                        type="number" 
+                                        placeholder="Amount ($)" 
+                                        className="w-full px-3 py-2 border rounded-lg text-sm"
+                                        value={cardAmount}
+                                        onChange={(e) => setCardAmount(e.target.value)}
+                                        disabled={isProcessingCard}
+                                    />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Item description" 
+                                        className="w-full px-3 py-2 border rounded-lg text-sm"
+                                        value={cardDescription}
+                                        onChange={(e) => setCardDescription(e.target.value)}
+                                        disabled={isProcessingCard}
+                                    />
+                                    <Button 
+                                        onClick={recordCardPayment}
+                                        disabled={isProcessingCard}
+                                        className="w-full bg-blue-600 hover:bg-blue-700"
+                                    >
+                                        {isProcessingCard ? 'Processing...' : 'Process Card Payment'}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Card Payments Info */}
-                        <Alert className="border-purple-200 bg-purple-50">
-                            <AlertCircle className="w-4 h-4 text-purple-600" />
-                            <AlertDescription className="text-sm text-purple-900">
-                                <strong>Credit Card Payments:</strong> To accept debit and credit card payments, you'll need to enable Stripe processing in your seller profile. This allows buyers to pay with cards during checkout.
-                            </AlertDescription>
-                        </Alert>
+                        {!cardPaymentsEnabled && (
+                            <Alert className="border-purple-200 bg-purple-50">
+                                <CreditCard className="w-4 h-4 text-purple-600" />
+                                <AlertDescription className="text-sm text-purple-900">
+                                    <strong>Card Payments Disabled:</strong> Go to <Link to={createPageUrl('Profile')} className="underline font-semibold">Profile Settings</Link> and click "Enable Card Payments" to accept Tap to Pay and card payments.
+                                </AlertDescription>
+                            </Alert>
+                        )}
 
                         <div className="flex gap-2">
                             <Link to={createPageUrl('Home')} className="flex-1">
@@ -305,8 +405,10 @@ export default function UrbanPay() {
                             </Link>
                         </div>
                     </CardContent>
-                </Card>
+                    </Card>
+                    </div>
+                </div>
             </div>
-        </div>
+        </Layout>
     );
 }

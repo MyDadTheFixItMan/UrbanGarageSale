@@ -252,23 +252,19 @@ export default function UrbanPay() {
                 
                 <div className="flex-1 flex flex-col p-4 relative z-10">
                     {/* Page Header */}
-                    <div className="mb-6">
-                        <h1 className="text-4xl font-bold text-[#1e3a5f] mb-2">Urban Pay</h1>
-                        <p className="text-slate-600">Accept payments from buyers during your garage sale</p>
+                    <div className="flex items-center gap-3 mb-12 sm:mb-8">
+                        <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
+                            <Smartphone className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-bold text-[#1e3a5f]">Urban Pay</h2>
+                            <p className="text-slate-500">Accept payments from buyers during your garage sale</p>
+                        </div>
                     </div>
                     
                     <div className="flex items-center justify-center flex-1">
                 <Card className="max-w-2xl w-full">
-                    <CardHeader className="text-center">
-                        <div className="flex items-center justify-center gap-2 mb-2">
-                            <Smartphone className="w-6 h-6 text-[#FF9500]" />
-                            <CardTitle className="text-2xl">Urban Pay</CardTitle>
-                        </div>
-                        <CardDescription>
-                            Accept payments from buyers during your garage sale
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
+                    <CardContent className="space-y-6 pt-6">
                         {/* Seller Stats */}
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">

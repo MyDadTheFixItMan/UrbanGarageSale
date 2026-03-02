@@ -622,7 +622,7 @@ export default function CreateListing() {
                     zIndex: 5,
                     objectFit: 'contain',
                     clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
-                    top: '35px'
+                    top: '60px'
                 }}
             />
 

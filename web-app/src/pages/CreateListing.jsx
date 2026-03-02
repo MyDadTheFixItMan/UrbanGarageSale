@@ -120,6 +120,17 @@ export default function CreateListing() {
                 return;
             }
             const userData = await firebase.auth.me();
+            
+            // Enforce 2FA - redirect if not enabled
+            const is2FAEnabled = await firebase.auth.is2FAEnabled();
+            if (!is2FAEnabled) {
+                toast.error('Two-Factor Authentication is required. Please complete setup on your Profile page.');
+                setTimeout(() => {
+                    window.location.href = '/profile';
+                }, 2000);
+                return;
+            }
+            
             setUser(userData);
 
             if (editId) {

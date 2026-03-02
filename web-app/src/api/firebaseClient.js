@@ -90,6 +90,20 @@ export const firebaseAuth = {
       console.log('Firebase sign up attempt with email:', email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       console.log('Firebase sign up successful');
+      
+      // Auto-enable 2FA for new users
+      try {
+        const userRef = doc(db, 'users', userCredential.user.uid);
+        await updateDoc(userRef, {
+          two_fa_enabled: true,
+          two_fa_enabled_date: new Date().toISOString()
+        });
+        console.log('✓ 2FA automatically enabled for new user');
+      } catch (twoFAError) {
+        console.error('Warning: Could not auto-enable 2FA:', twoFAError.message);
+        // Don't fail signup if 2FA auto-enable fails, but log it
+      }
+      
       return userCredential.user;
     } catch (error) {
       console.error('Firebase sign up error code:', error.code);

@@ -237,7 +237,7 @@ export default function UrbanPay() {
                         width: '1200px',
                         height: 'auto',
                         clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
-                        top: '80px',
+                        top: '60px',
                         pointerEvents: 'none',
                         zIndex: 1
                     }}

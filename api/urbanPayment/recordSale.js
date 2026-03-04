@@ -1,14 +1,19 @@
-// Record Cash Sale - Simple endpoint to log cash payments to Firestore
+// Record Cash Sale endpoint
 import admin from 'firebase-admin';
 
-// Initialize Firebase Admin inline
+// Initialize Firebase Admin - works in Vercel with application default credentials
 let adminApp = null;
 const getFirebaseAdmin = () => {
-  if (!adminApp) {
+  if (adminApp === null) {
     if (admin.apps.length === 0) {
-      adminApp = admin.initializeApp({
-        projectId: process.env.FIREBASE_PROJECT_ID || 'urban-garage-sale-2024',
-      });
+      try {
+        adminApp = admin.initializeApp({
+          projectId: 'urban-garage-sale-2024',
+        });
+      } catch (error) {
+        console.error('Failed to initialize Firebase Admin:', error);
+        adminApp = admin.app(); // Use existing app
+      }
     } else {
       adminApp = admin.app();
     }
@@ -18,8 +23,8 @@ const getFirebaseAdmin = () => {
 
 // Verify Firebase ID token and extract UID
 async function extractUserIdFromToken(idToken) {
-  const adminApp = getFirebaseAdmin();
   try {
+    const adminApp = getFirebaseAdmin();
     const decodedToken = await adminApp.auth().verifyIdToken(idToken);
     const uid = decodedToken.uid;
     
@@ -27,6 +32,7 @@ async function extractUserIdFromToken(idToken) {
       throw new Error(`Invalid UID format: ${uid}`);
     }
     
+    console.log(`✓ Token verified, UID: ${uid}`);
     return uid;
   } catch (error) {
     console.error('Token verification failed:', error.message);
@@ -48,14 +54,18 @@ async function recordSale(userId, amount, description, paymentMethod) {
   };
 
   try {
+    console.log('[recordSale] Adding sale document:', saleData);
+    
     // Add sale to sales collection
     const docRef = await db.collection('sales').add(saleData);
+    console.log(`✓ Sale recorded: ${docRef.id}`);
 
     // Update seller stats
     const statsRef = db.collection('sellerStats').doc(userId);
     const statsDoc = await statsRef.get();
 
     if (statsDoc.exists) {
+      console.log('[recordSale] Updating existing stats');
       // Update existing stats
       await statsRef.update({
         totalEarnings: admin.firestore.FieldValue.increment(amount),
@@ -65,6 +75,7 @@ async function recordSale(userId, amount, description, paymentMethod) {
         lastSaleDate: new Date().toISOString(),
       });
     } else {
+      console.log('[recordSale] Creating new stats document');
       // Create new stats document
       await statsRef.set({
         totalEarnings: amount,
@@ -76,13 +87,15 @@ async function recordSale(userId, amount, description, paymentMethod) {
         lastSaleDate: new Date().toISOString(),
       });
     }
+    
+    console.log('✓ Seller stats updated');
 
     return {
       saleId: docRef.id,
       success: true,
     };
   } catch (error) {
-    console.error('Firestore write failed:', error.message);
+    console.error('Firestore write failed:', error.message, error.code);
     throw new Error(`Failed to record sale: ${error.message}`);
   }
 }

@@ -1,37 +1,29 @@
-// Record Cash Sale endpoint
-import admin from 'firebase-admin';
+// Record Cash Sale - Uses Firestore REST API so no Admin SDK credentials needed
+const projectId = 'urban-garage-sale-2024';
+const databaseId = '(default)';
 
-// Initialize Firebase Admin - works in Vercel with application default credentials
-let adminApp = null;
-const getFirebaseAdmin = () => {
-  if (adminApp === null) {
-    if (admin.apps.length === 0) {
-      try {
-        adminApp = admin.initializeApp({
-          projectId: 'urban-garage-sale-2024',
-        });
-      } catch (error) {
-        console.error('Failed to initialize Firebase Admin:', error);
-        adminApp = admin.app(); // Use existing app
-      }
-    } else {
-      adminApp = admin.app();
-    }
-  }
-  return adminApp;
-};
-
-// Verify Firebase ID token and extract UID
-async function extractUserIdFromToken(idToken) {
+// Verify Firebase ID token via Firebase REST API
+async function verifyTokenAndGetUID(idToken) {
   try {
-    const adminApp = getFirebaseAdmin();
-    const decodedToken = await adminApp.auth().verifyIdToken(idToken);
-    const uid = decodedToken.uid;
-    
-    if (!uid || typeof uid !== 'string' || uid.length > 128) {
-      throw new Error(`Invalid UID format: ${uid}`);
+    const response = await fetch(
+      'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=AIzaSyDKjEhQMGLKuThIhQN7rfRlqgJZSNg4pNw',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Invalid token');
     }
-    
+
+    const data = await response.json();
+    if (!data.users || !data.users[0]) {
+      throw new Error('No user found');
+    }
+
+    const uid = data.users[0].localId;
     console.log(`✓ Token verified, UID: ${uid}`);
     return uid;
   } catch (error) {
@@ -40,63 +32,114 @@ async function extractUserIdFromToken(idToken) {
   }
 }
 
-async function recordSale(userId, amount, description, paymentMethod) {
-  const adminApp = getFirebaseAdmin();
-  const db = adminApp.firestore();
-
-  const saleData = {
-    sellerId: userId,
-    amount: parseFloat(amount),
-    description: description.trim(),
-    paymentMethod: paymentMethod,
-    status: 'completed', // Cash sales are immediately completed
-    createdAt: new Date().toISOString(),
-  };
-
+// Record sale to Firestore using REST API with user's ID token
+async function recordSale(userId, amount, description, paymentMethod, idToken) {
   try {
-    console.log('[recordSale] Adding sale document:', saleData);
-    
-    // Add sale to sales collection
-    const docRef = await db.collection('sales').add(saleData);
-    console.log(`✓ Sale recorded: ${docRef.id}`);
-
-    // Update seller stats
-    const statsRef = db.collection('sellerStats').doc(userId);
-    const statsDoc = await statsRef.get();
-
-    if (statsDoc.exists) {
-      console.log('[recordSale] Updating existing stats');
-      // Update existing stats
-      await statsRef.update({
-        totalEarnings: admin.firestore.FieldValue.increment(amount),
-        completedEarnings: admin.firestore.FieldValue.increment(amount),
-        totalSales: admin.firestore.FieldValue.increment(1),
-        completedSales: admin.firestore.FieldValue.increment(1),
-        lastSaleDate: new Date().toISOString(),
-      });
-    } else {
-      console.log('[recordSale] Creating new stats document');
-      // Create new stats document
-      await statsRef.set({
-        totalEarnings: amount,
-        completedEarnings: amount,
-        pendingEarnings: 0,
-        totalSales: 1,
-        completedSales: 1,
-        pendingSales: 0,
-        lastSaleDate: new Date().toISOString(),
-      });
-    }
-    
-    console.log('✓ Seller stats updated');
-
-    return {
-      saleId: docRef.id,
-      success: true,
+    // Step 1: Create the sale document
+    console.log('[recordSale] Creating sale document...');
+    const salePayload = {
+      fields: {
+        sellerId: { stringValue: userId },
+        amount: { doubleValue: parseFloat(amount) },
+        description: { stringValue: description.trim() },
+        paymentMethod: { stringValue: paymentMethod },
+        status: { stringValue: 'completed' },
+        createdAt: { stringValue: new Date().toISOString() },
+      },
     };
+
+    const saleResponse = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/sales?access_token=${idToken}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(salePayload),
+      }
+    );
+
+    if (!saleResponse.ok) {
+      const error = await saleResponse.json();
+      console.error('Sale creation error:', error);
+      throw new Error(`Failed to create sale: ${error.error?.message || saleResponse.status}`);
+    }
+
+    const saleResult = await saleResponse.json();
+    const saleId = saleResult.name.split('/').pop();
+    console.log(`✓ Sale recorded: ${saleId}`);
+
+    // Step 2: Update seller stats
+    console.log('[recordSale] Updating seller stats...');
+    
+    // First try to get existing stats
+    const statsGetResponse = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/sellerStats/${userId}?access_token=${idToken}`,
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+
+    let statsPayload;
+    let statsFetchSuccess = false;
+
+    if (statsGetResponse.ok) {
+      // Stats exist - increment existing values
+      const existingStats = await statsGetResponse.json();
+      const fields = existingStats.fields || {};
+      
+      const currentEarnings = parseFloat(fields.totalEarnings?.doubleValue || 0);
+      const currentCompleted = parseFloat(fields.completedEarnings?.doubleValue || 0);
+      const currentSales = parseInt(fields.totalSales?.integerValue || 0);
+      const currentCompletedSales = parseInt(fields.completedSales?.integerValue || 0);
+
+      statsPayload = {
+        fields: {
+          ...fields,
+          totalEarnings: { doubleValue: currentEarnings + parseFloat(amount) },
+          completedEarnings: { doubleValue: currentCompleted + parseFloat(amount) },
+          totalSales: { integerValue: String(currentSales + 1) },
+          completedSales: { integerValue: String(currentCompletedSales + 1) },
+          lastSaleDate: { stringValue: new Date().toISOString() },
+        },
+      };
+      statsFetchSuccess = true;
+    } else {
+      // Stats don't exist - create new
+      statsPayload = {
+        fields: {
+          totalEarnings: { doubleValue: parseFloat(amount) },
+          completedEarnings: { doubleValue: parseFloat(amount) },
+          pendingEarnings: { doubleValue: 0 },
+          totalSales: { integerValue: '1' },
+          completedSales: { integerValue: '1' },
+          pendingSales: { integerValue: '0' },
+          lastSaleDate: { stringValue: new Date().toISOString() },
+        },
+      };
+    }
+
+    const statsResponse = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/sellerStats/${userId}?access_token=${idToken}`,
+      {
+        method: statsFetchSuccess ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(statsPayload),
+      }
+    );
+
+    if (!statsResponse.ok) {
+      const error = await statsResponse.json();
+      console.error('Stats update error:', error);
+      // Don't throw - sale was already recorded
+      console.warn('Failed to update stats but sale was recorded');
+    } else {
+      console.log('✓ Seller stats updated');
+    }
+
+    return { saleId, success: true };
   } catch (error) {
-    console.error('Firestore write failed:', error.message, error.code);
-    throw new Error(`Failed to record sale: ${error.message}`);
+    console.error('Error recording sale:', error.message);
+    throw error;
   }
 }
 
@@ -153,14 +196,15 @@ export default async (req, res) => {
     }
 
     // Extract and verify user ID from token
-    const userId = await extractUserIdFromToken(idToken);
+    const userId = await verifyTokenAndGetUID(idToken);
 
-    // Record the sale
+    // Record the sale (pass idToken for Firestore REST API auth)
     const result = await recordSale(
       userId,
       body.amount,
       body.description,
-      body.paymentMethod || 'cash'
+      body.paymentMethod || 'cash',
+      idToken
     );
 
     return res.status(200).json({

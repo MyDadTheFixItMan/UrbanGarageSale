@@ -45,5 +45,18 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Stripe Terminal Bluetooth Permissions -->
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>We need Bluetooth to connect to payment readers and accept card payments</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>We need Bluetooth to connect to payment readers and accept card payments</string>
+	<key>NSBluetoothCentralUsageDescription</key>
+	<string>We need Bluetooth to connect to payment readers</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>We need local network access to connect to payment readers</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_stripe_terminal._tcp</string>
+	</array>
 </dict>
 </plist>

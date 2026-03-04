@@ -38,7 +38,10 @@ android {
         }
     }
 }
-
+dependencies {
+    // Stripe Terminal for payment readers
+    implementation("com.stripe:stripeterminal:3.2.0")
+}
 flutter {
     source = "../.."
 }

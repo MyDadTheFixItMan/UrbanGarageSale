@@ -110,10 +110,13 @@ export default async function handler(req, res) {
 
     console.log("Payment Intent Status:", paymentIntent.status);
 
-    if (paymentIntent.status !== 'succeeded') {
-      console.error('Payment intent not succeeded, status:', paymentIntent.status);
+    // Allow payments that are processing or have succeeded
+    // Status values: requires_payment_method, requires_confirmation, requires_action, processing, succeeded
+    const allowedStatuses = ['succeeded', 'processing', 'requires_action', 'requires_confirmation'];
+    if (!allowedStatuses.includes(paymentIntent.status)) {
+      console.error('Payment intent in invalid status:', paymentIntent.status);
       return res.status(400).json({
-        error: 'Payment intent not succeeded',
+        error: 'Payment intent in invalid status for recording',
         status: paymentIntent.status,
       });
     }
@@ -121,8 +124,6 @@ export default async function handler(req, res) {
     // Save to Firestore using Admin SDK
     const adminApp = getFirebaseAdmin();
     const db = adminApp.firestore();
-    const transactionFee = amount * 0.029 + 0.30;
-    const netEarnings = amount - transactionFee;
     const timestamp = adminApp.firestore.Timestamp.now();
 
     const saleRecord = {
@@ -131,11 +132,14 @@ export default async function handler(req, res) {
       description: description?.substring(0, 100) || 'Card Payment',
       paymentIntentId: paymentIntentId,
       paymentMethod: 'tap_to_pay',
-      status: 'completed',
+      status: paymentIntent.status === 'succeeded' ? 'completed' : 'pending',
+      paymentIntentStatus: paymentIntent.status,
       currency: currency.toUpperCase(),
       timestamp: timestamp,
-      transactionFee: Math.round(transactionFee * 100) / 100,
-      netEarnings: Math.round(netEarnings * 100) / 100,
+      transactionFee: Math.round((amount * 0.029 + 0.30) * 100) / 100,
+      netEarnings: paymentIntent.status === 'succeeded' 
+        ? Math.round((amount - (amount * 0.029 + 0.30)) * 100) / 100 
+        : 0, // 0 until payment succeeds
     };
 
     // 1. Record the sale
@@ -143,31 +147,46 @@ export default async function handler(req, res) {
     const docRef = await db.collection('sales').add(saleRecord);
     console.log("✓ Sale recorded:", docRef.id);
 
-    // 2. Update seller stats - increment totalEarnings and totalSales
+    // 2. Update seller stats - only increment if payment succeeded, otherwise track pending
     console.log("Updating seller stats...");
     const statsRef = db.collection('sellerStats').doc(sellerId);
-    await statsRef.set({
-      sellerId: sellerId,
-      totalEarnings: adminApp.firestore.FieldValue.increment(amount),
-      totalSales: adminApp.firestore.FieldValue.increment(1),
-      lastUpdated: timestamp,
-    }, { merge: true });
+    
+    if (paymentIntent.status === 'succeeded') {
+      // Payment is complete - increment earnings
+      await statsRef.set({
+        sellerId: sellerId,
+        totalEarnings: adminApp.firestore.FieldValue.increment(amount),
+        totalSales: adminApp.firestore.FieldValue.increment(1),
+        lastUpdated: timestamp,
+      }, { merge: true });
+    } else {
+      // Payment is pending - track pending transaction
+      await statsRef.set({
+        sellerId: sellerId,
+        pendingEarnings: adminApp.firestore.FieldValue.increment(amount),
+        pendingTransactions: adminApp.firestore.FieldValue.increment(1),
+        lastUpdated: timestamp,
+      }, { merge: true });
+    }
     console.log("✓ Seller stats updated");
 
     return res.status(200).json({
       success: true,
-      message: 'Tap to Pay sale recorded successfully',
+      message: paymentIntent.status === 'succeeded' 
+        ? 'Card payment completed successfully' 
+        : 'Payment recorded, awaiting confirmation',
       saleId: docRef.id,
+      paymentStatus: paymentIntent.status,
       saleData: {
         amount,
         description,
         paymentIntentId,
         paymentMethod: 'tap_to_pay',
-        status: 'completed',
+        status: paymentIntent.status === 'succeeded' ? 'completed' : 'pending',
         currency: currency.toUpperCase(),
         timestamp: new Date().toISOString(),
-        transactionFee: transactionFee.toFixed(2),
-        netEarnings: netEarnings.toFixed(2),
+        transactionFee: (amount * 0.029 + 0.30).toFixed(2),
+        netEarnings: paymentIntent.status === 'succeeded' ? (amount - (amount * 0.029 + 0.30)).toFixed(2) : '0.00',
       },
     });
   } catch (error) {

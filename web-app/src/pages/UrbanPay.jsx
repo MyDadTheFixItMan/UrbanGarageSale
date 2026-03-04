@@ -151,8 +151,15 @@ export default function UrbanPay() {
 
             const saleData = await recordSaleResponse.json();
             console.log('Sale recorded:', saleData.saleId);
+            console.log('Payment status:', saleData.paymentStatus);
             
-            toast.success('Card payment processed successfully!');
+            if (saleData.paymentStatus === 'succeeded') {
+              toast.success('Card payment processed successfully!');
+            } else if (saleData.paymentStatus === 'requires_action') {
+              toast.success('Payment is awaiting confirmation. You may see it shortly.');
+            } else {
+              toast.success(`Payment recorded with status: ${saleData.paymentStatus}`);
+            }
             
             // Reset form
             setCardAmount('');

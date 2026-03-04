@@ -110,13 +110,13 @@ export default async function handler(req, res) {
 
     console.log("Payment Intent Status:", paymentIntent.status);
 
-    // Allow payments that are processing or have succeeded
-    // Status values: requires_payment_method, requires_confirmation, requires_action, processing, succeeded
-    const allowedStatuses = ['succeeded', 'processing', 'requires_action', 'requires_confirmation'];
-    if (!allowedStatuses.includes(paymentIntent.status)) {
-      console.error('Payment intent in invalid status:', paymentIntent.status);
+    // Allow all valid payment intent statuses - record the sale regardless of payment completion
+    // Status values: requires_payment_method, requires_confirmation, requires_action, processing, succeeded, canceled, etc.
+    const disallowedStatuses = ['canceled'];
+    if (disallowedStatuses.includes(paymentIntent.status)) {
+      console.error('Payment intent in cancelled status:', paymentIntent.status);
       return res.status(400).json({
-        error: 'Payment intent in invalid status for recording',
+        error: 'Payment intent was cancelled',
         status: paymentIntent.status,
       });
     }

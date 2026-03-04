@@ -2,32 +2,27 @@
 const projectId = 'urban-garage-sale-2024';
 const databaseId = '(default)';
 
-// Verify Firebase ID token via Firebase REST API
-async function verifyTokenAndGetUID(idToken) {
+// Decode JWT token to extract UID (without needing external API calls)
+function decodeJWT(token) {
   try {
-    const response = await fetch(
-      'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=AIzaSyDKjEhQMGLKuThIhQN7rfRlqgJZSNg4pNw',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error('Invalid token');
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Invalid JWT format');
     }
 
-    const data = await response.json();
-    if (!data.users || !data.users[0]) {
-      throw new Error('No user found');
+    // Decode the payload (middle part)
+    const payload = parts[1];
+    const decodedPayload = Buffer.from(payload, 'base64').toString('utf-8');
+    const claims = JSON.parse(decodedPayload);
+
+    if (!claims.sub || typeof claims.sub !== 'string') {
+      throw new Error('No sub (user ID) in token');
     }
 
-    const uid = data.users[0].localId;
-    console.log(`✓ Token verified, UID: ${uid}`);
-    return uid;
+    console.log(`✓ Token decoded, UID: ${claims.sub}`);
+    return claims.sub;
   } catch (error) {
-    console.error('Token verification failed:', error.message);
+    console.error('JWT decode failed:', error.message);
     throw new Error('Invalid or expired authentication token');
   }
 }
@@ -195,8 +190,8 @@ export default async (req, res) => {
       return res.status(400).json({ error: 'Missing amount or description' });
     }
 
-    // Extract and verify user ID from token
-    const userId = await verifyTokenAndGetUID(idToken);
+    // Extract user ID from token by decoding JWT
+    const userId = decodeJWT(idToken);
 
     // Record the sale (pass idToken for Firestore REST API auth)
     const result = await recordSale(

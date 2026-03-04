@@ -219,11 +219,6 @@ export default function SavedListings() {
                         </Button>
                     )}
                 </div>
-            </div>
-            </section>
-
-            <section className="relative bg-[#f5f1e8]">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10 py-8 -mt-20 sm:mt-0 md:-mt-8">
 
                 {savedSales.length === 0 ? (
                     <div className="text-center py-16 bg-white rounded-2xl border relative z-20">

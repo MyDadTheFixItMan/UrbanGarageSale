@@ -1051,7 +1051,7 @@ export default function AdminDashboard() {
                 </section>
 
                 <section className="relative bg-[#f5f1e8]">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 py-8 -mt-20 sm:mt-0 md:-mt-8">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10 py-8 -mt-20 sm:mt-0 md:-mt-8">
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                     <TabsList className="bg-white border border-slate-200 rounded-lg p-1 w-full justify-start overflow-x-auto md:overflow-visible md:flex-wrap">

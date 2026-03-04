@@ -646,8 +646,8 @@ export default function CreateListing() {
                 </div>
             )}
 
-            <section className="relative bg-[#f5f1e8] py-0 sm:py-8 md:py-16 px-4 sm:px-6 overflow-hidden -mt-2 pt-24 sm:pt-0">
-            <div className="max-w-3xl mx-auto pt-0 sm:pt-2 md:pt-4 relative z-20">
+            <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+            <div className="max-w-4xl mx-auto pt-2 md:pt-4 relative z-10">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-1 sm:mb-8">
                     <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
@@ -665,12 +665,6 @@ export default function CreateListing() {
                         Listings are <strong>$10</strong> to publish. Drafts are free and will be saved for 2 days.
                     </AlertDescription>
                 </Alert>
-
-                </div>
-            </section>
-
-            <section className="relative bg-[#f5f1e8]">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 relative z-20 py-8 md:-mt-12">
 
                 <div className="space-y-8">
                     {/* Basic Info */}

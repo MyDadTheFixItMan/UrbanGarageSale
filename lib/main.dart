@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'screens/urban_pay_home.dart';
 import 'firebase_options.dart';
+import 'services/stripe_terminal_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +14,16 @@ void main() async {
 
   // Initialize Stripe with your publishable key
   Stripe.publishableKey = 'pk_live_OlSbCxeHrHkFwobGROFX32Md';
+
+  // Initialize Stripe Terminal
+  try {
+    await StripeTerminalService.initializeTerminal(
+      'pk_live_OlSbCxeHrHkFwobGROFX32Md',
+    );
+    print('✓ Stripe Terminal ready');
+  } catch (e) {
+    print('⚠️ Terminal init: $e');
+  }
 
   runApp(const MyApp());
 }

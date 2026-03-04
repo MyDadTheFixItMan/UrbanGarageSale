@@ -49,20 +49,29 @@ export default function UrbanPay() {
 
     // Fetch seller stats from Firestore
     async function refreshSellerStats() {
-        if (!user || !user.id) return;
+        if (!user || !user.id) {
+            console.warn('refreshSellerStats: No user or user.id');
+            return;
+        }
         
+        console.log('Refreshing seller stats for user:', user.id);
         setIsRefreshingStats(true);
         try {
             const statsDoc = await firebase.firestore.collection('sellerStats').doc(user.id).get();
+            console.log('Stats doc exists:', statsDoc.exists);
+            
             if (statsDoc.exists) {
-                setSellerStats(statsDoc.data());
+                const data = statsDoc.data();
+                console.log('Seller stats data:', data);
+                setSellerStats(data);
             } else {
+                console.log('No stats document yet, initializing with zeros');
                 // If document doesn't exist yet, initialize with zeros
                 setSellerStats({ totalEarnings: 0, totalSales: 0 });
             }
         } catch (error) {
-            console.error('Error fetching seller stats:', error);
-            toast.error('Failed to load seller stats');
+            console.error('Error fetching seller stats:', error.message, error.code);
+            toast.error(`Failed to load seller stats: ${error.message}`);
         } finally {
             setIsRefreshingStats(false);
         }
@@ -353,14 +362,15 @@ export default function UrbanPay() {
                                     <RefreshCw className={`w-4 h-4 ${isRefreshingStats ? 'animate-spin' : ''}`} />
                                 </Button>
                             </div>
+                            {console.log('Current sellerStats state:', sellerStats)}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
                                     <p className="text-xs text-slate-600 font-semibold">Total Earnings</p>
-                                    <p className="text-2xl font-bold text-[#1e3a5f] mt-1">${sellerStats.totalEarnings.toFixed(2)}</p>
+                                    <p className="text-2xl font-bold text-[#1e3a5f] mt-1">${typeof sellerStats.totalEarnings === 'number' ? sellerStats.totalEarnings.toFixed(2) : '0.00'}</p>
                                 </div>
                                 <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
                                     <p className="text-xs text-slate-600 font-semibold">Total Sales</p>
-                                    <p className="text-2xl font-bold text-green-600 mt-1">{sellerStats.totalSales}</p>
+                                    <p className="text-2xl font-bold text-green-600 mt-1">{typeof sellerStats.totalSales === 'number' ? sellerStats.totalSales : 0}</p>
                                 </div>
                             </div>
                         </div>

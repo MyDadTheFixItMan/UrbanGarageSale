@@ -128,7 +128,7 @@ export default async function handler(req, res) {
 
     const saleRecord = {
       sellerId: sellerId,
-      amount: amount,
+      amount: Math.round(amount * 100) / 100,
       description: description?.substring(0, 100) || 'Card Payment',
       paymentIntentId: paymentIntentId,
       paymentMethod: 'tap_to_pay',
@@ -136,10 +136,6 @@ export default async function handler(req, res) {
       paymentIntentStatus: paymentIntent.status,
       currency: currency.toUpperCase(),
       timestamp: timestamp,
-      transactionFee: Math.round((amount * 0.029 + 0.30) * 100) / 100,
-      netEarnings: paymentIntent.status === 'succeeded' 
-        ? Math.round((amount - (amount * 0.029 + 0.30)) * 100) / 100 
-        : 0, // 0 until payment succeeds
     };
 
     // 1. Record the sale
@@ -147,28 +143,22 @@ export default async function handler(req, res) {
     const docRef = await db.collection('sales').add(saleRecord);
     console.log("✓ Sale recorded:", docRef.id);
 
-    // 2. Update seller stats - only increment if payment succeeded, otherwise track pending
-    console.log("Updating seller stats...");
+    // 2. Update seller stats - always increment for tracking
+    console.log("Updating seller stats for user:", sellerId);
     const statsRef = db.collection('sellerStats').doc(sellerId);
     
-    if (paymentIntent.status === 'succeeded') {
-      // Payment is complete - increment earnings
+    try {
       await statsRef.set({
         sellerId: sellerId,
         totalEarnings: adminApp.firestore.FieldValue.increment(amount),
         totalSales: adminApp.firestore.FieldValue.increment(1),
         lastUpdated: timestamp,
       }, { merge: true });
-    } else {
-      // Payment is pending - track pending transaction
-      await statsRef.set({
-        sellerId: sellerId,
-        pendingEarnings: adminApp.firestore.FieldValue.increment(amount),
-        pendingTransactions: adminApp.firestore.FieldValue.increment(1),
-        lastUpdated: timestamp,
-      }, { merge: true });
+      console.log("✓ Seller stats updated successfully");
+    } catch (statsError) {
+      console.error("⚠️ Stats update error (sale still recorded):", statsError.message);
+      // Don't fail the entire request if stats update fails
     }
-    console.log("✓ Seller stats updated");
 
     return res.status(200).json({
       success: true,

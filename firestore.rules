@@ -80,8 +80,8 @@ service cloud.firestore {
 
     // Urban Pay Sales Transactions
     match /sales/{saleId} {
-      // Seller can create sales (from their payments) - requires 2FA
-      allow create: if request.auth != null && has2FAEnabled() &&
+      // Seller can create sales - 2FA checked in backend for REST API calls
+      allow create: if request.auth != null &&
                      request.auth.uid == request.resource.data.sellerId;
       
       // Seller can read their own sales

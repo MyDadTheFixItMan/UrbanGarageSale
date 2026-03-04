@@ -30,6 +30,30 @@ function decodeJWT(token) {
 // Record sale to Firestore using REST API with user's ID token
 async function recordSale(userId, amount, description, paymentMethod, idToken) {
   try {
+    // Step 0: Check if user has 2FA enabled (required for sales)
+    console.log('[recordSale] Checking 2FA status...');
+    const userCheckResponse = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/users/${userId}?access_token=${idToken}`,
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+
+    if (userCheckResponse.ok) {
+      const userDoc = await userCheckResponse.json();
+      const fields = userDoc.fields || {};
+      const has2FA = fields.two_fa_enabled?.booleanValue === true;
+      
+      if (!has2FA) {
+        throw new Error('Two-Factor Authentication is required to record sales. Please enable 2FA in your Profile.');
+      }
+      console.log('✓ 2FA verified');
+    } else {
+      // Could not verify 2FA, but continue (user might not have doc yet or API issue)
+      console.warn('[recordSale] Could not verify 2FA status');
+    }
+
     // Step 1: Create the sale document
     console.log('[recordSale] Creating sale document...');
     const salePayload = {

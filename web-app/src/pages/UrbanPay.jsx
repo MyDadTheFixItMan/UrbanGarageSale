@@ -218,18 +218,21 @@ export default function UrbanPay() {
                     amount: parseFloat(cashAmount),
                     description: cashDescription.trim(),
                     paymentMethod: 'cash',
-                    sellerId: currentUser.uid,
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
+                console.error('Record Cash Sale Error:', errorData);
                 throw new Error(errorData.error || `Failed: ${response.status}`);
             }
 
+            const saleData = await response.json();
+            console.log('Cash sale recorded:', saleData);
+            
             toast.success(`Cash sale recorded! $${parseFloat(cashAmount).toFixed(2)}`);
             
-            // Reset form to empty strings (not undefined)
+            // Reset form to empty strings
             setCashAmount('');
             setCashDescription('');
             

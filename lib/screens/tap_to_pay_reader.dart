@@ -3,9 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/tap_to_pay_service.dart';
-import '../services/urban_pay_service.dart';
-import '../models/sale.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../services/stripe_terminal_service.dart';
+import '../widgets/reader_selection_dialog.dart';
+import 'terminal_payment_screen.dart';
 
 class TapToPayReader extends StatefulWidget {
   final String? stripeConnectId;
@@ -17,28 +19,22 @@ class TapToPayReader extends StatefulWidget {
 }
 
 class _TapToPayReaderState extends State<TapToPayReader> {
-  late TapToPayService _tapToPayService;
-  late UrbanPayService _urbanPayService;
-
-  bool _isSupported = false;
-  bool _isProcessing = false;
-  bool _readerActive = false;
-  double _currentAmount = 0;
-  String? _lastTransactionId;
-  bool _stripeValid = true;
-
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
 
+  bool _isProcessing = false;
+  bool _stripeValid = true;
+  String? _connectedReaderId;
+  String? _connectedReaderLabel;
+  Map<String, dynamic>? _readerStatus;
+
   @override
   void initState() {
     super.initState();
-    _tapToPayService = TapToPayService();
-    _urbanPayService = UrbanPayService();
     _verifyStripeStatus();
-    _checkTapToPaySupport();
+    _checkReaderStatus();
   }
 
   Future<void> _verifyStripeStatus() async {
@@ -52,141 +48,175 @@ class _TapToPayReaderState extends State<TapToPayReader> {
       final userDoc = await _firestore.collection('users').doc(userId).get();
       final hasStripe = userDoc.data()?['stripeConnectId'] != null;
 
-      setState(() {
-        _stripeValid = hasStripe;
-      });
+      setState(() => _stripeValid = hasStripe);
     } catch (e) {
       setState(() => _stripeValid = false);
     }
   }
 
-  Future<void> _checkTapToPaySupport() async {
+  Future<void> _checkReaderStatus() async {
     try {
-      final isSupported = await _tapToPayService.isSupported();
-      setState(() {
-        _isSupported = isSupported;
-      });
+      final status = await StripeTerminalService.getReaderStatus();
+      setState(() => _readerStatus = status);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Tap to Pay not supported: $e')));
-      }
+      print('Error checking reader status: $e');
     }
   }
 
-  Future<void> _activateReader() async {
-    if (!_isSupported) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tap to Pay is not supported on this device'),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-
-    try {
-      await _tapToPayService.initializeTapToPayReader();
-      setState(() => _readerActive = true);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Reader activated! Ready to accept payments'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to activate reader: $e')),
-        );
-      }
-    } finally {
-      setState(() => _isProcessing = false);
-    }
+  Future<void> _selectAndConnectReader() async {
+    showDialog(
+      context: context,
+      builder: (context) => ReaderSelectionDialog(
+        onReaderSelected: (reader) {
+          setState(() {
+            _connectedReaderId = reader['id'] as String;
+            _connectedReaderLabel = reader['label'] as String?;
+          });
+          _showMessage('Connected to ${reader['label']}');
+        },
+      ),
+    );
   }
 
-  Future<void> _processQuickAmount(double amount) async {
-    if (!_readerActive) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please activate the reader first')),
-      );
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-
-    try {
-      // Create payment intent first
-      final paymentIntent = await _urbanPayService.createPaymentIntent(
-        amount: amount,
-        description: 'Quick Tap to Pay Sale - \$${amount.toStringAsFixed(2)}',
-      );
-
-      // Prepare payment sheet
-      await _tapToPayService.preparePaymentSheet(
-        clientSecret: paymentIntent.clientSecret,
-        merchantDisplayName: 'Urban Pay Seller',
-        amount: (amount * 100).toStringAsFixed(0),
-        currency: 'AUD',
-      );
-
-      // Process the payment
-      final result = await _tapToPayService.processTapToPayPayment(
-        amount: amount,
-        description: 'Quick Sale',
-        paymentIntentId: paymentIntent.paymentIntentId,
-      );
-
-      setState(() {
-        _lastTransactionId = paymentIntent.paymentIntentId;
-        _currentAmount = amount;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Payment successful! \$${amount.toStringAsFixed(2)} received',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Payment failed: $e')));
-      }
-    } finally {
-      setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _processCustomAmount() async {
-    if (_amountController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please enter an amount')));
-      return;
-    }
-
+  Future<void> _processPayment() async {
     final amount = double.tryParse(_amountController.text);
+    final description = _descriptionController.text.trim();
+
     if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid amount')),
-      );
+      _showMessage('Please enter a valid amount');
       return;
     }
 
-    await _processQuickAmount(amount);
-    _amountController.clear();
-    _descriptionController.clear();
+    if (description.isEmpty) {
+      _showMessage('Please enter a description');
+      return;
+    }
+
+    if (_connectedReaderId == null) {
+      _showMessage('Please select and connect a reader first');
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+
+    try {
+      // Step 1: Create payment intent on backend
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('Not authenticated');
+
+      final idToken = await user.getIdToken();
+      
+      final response = await http.post(
+        Uri.parse('https://urban-garage-sale.vercel.app/api/urbanPayment/createPaymentIntent'),
+        headers: {
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'amount': amount,
+          'description': description,
+          'currency': 'aud',
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to create payment intent');
+      }
+
+      final paymentData = jsonDecode(response.body);
+      final paymentIntentId = paymentData['paymentIntentId'] as String;
+
+      // Step 2: Show payment screen with reader
+      if (mounted) {
+        // Navigate to terminal payment screen
+        final result = await Navigator.push<Map<String, dynamic>>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TerminalPaymentScreen(
+              amount: amount,
+              description: description,
+              paymentIntentId: paymentIntentId,
+              onPaymentComplete: (result) {
+                Navigator.pop(context, result);
+              },
+              onPaymentError: (error) {
+                _showMessage('Payment error: $error');
+              },
+            ),
+          ),
+        );
+
+        if (result != null) {
+          // Payment was successful - record it
+          await _recordPaymentInDatabase(
+            amount,
+            description,
+            paymentIntentId,
+            result,
+          );
+
+          // Clear form
+          _amountController.clear();
+          _descriptionController.clear();
+
+          _showMessage('Payment recorded successfully!');
+        }
+      }
+    } catch (e) {
+      _showMessage('Error: $e');
+    } finally {
+      setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _recordPaymentInDatabase(
+    double amount,
+    String description,
+    String paymentIntentId,
+    Map<String, dynamic> paymentResult,
+  ) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final idToken = await user.getIdToken();
+
+      await http.post(
+        Uri.parse('https://urban-garage-sale.vercel.app/api/urbanPayment/recordTapToPaySale'),
+        headers: {
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'amount': amount,
+          'description': description,
+          'paymentIntentId': paymentIntentId,
+          'currency': 'aud',
+          'paymentMethod': 'tap_to_pay',
+        }),
+      );
+    } catch (e) {
+      print('Error recording payment: $e');
+    }
+  }
+
+  Future<void> _disconnectReader() async {
+    try {
+      await StripeTerminalService.disconnectReader();
+      setState(() {
+        _connectedReaderId = null;
+        _connectedReaderLabel = null;
+      });
+      _showMessage('Reader disconnected');
+    } catch (e) {
+      _showMessage('Error disconnecting: $e');
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -198,13 +228,13 @@ class _TapToPayReaderState extends State<TapToPayReader> {
 
   @override
   Widget build(BuildContext context) {
-    // If Stripe is not valid, show error screen
     if (!_stripeValid) {
       return Scaffold(
+        backgroundColor: const Color(0xFFF5F1E8),
         appBar: AppBar(
           title: const Text('Tap to Pay'),
           backgroundColor: const Color(0xFF1e3a5f),
-          foregroundColor: Colors.white,
+          elevation: 0,
         ),
         body: Center(
           child: SingleChildScrollView(
@@ -237,13 +267,9 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'To use Tap to Pay, please enable card payments in your profile settings first.',
+                  'To accept card payments with Tap to Pay, you need to enable card payments in your profile first.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                    height: 1.5,
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.5),
                 ),
               ],
             ),
@@ -253,187 +279,219 @@ class _TapToPayReaderState extends State<TapToPayReader> {
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F1E8),
       appBar: AppBar(
-        title: const Text('Tap to Pay Reader'),
+        title: const Text('Tap to Pay Terminal'),
         backgroundColor: const Color(0xFF1e3a5f),
-        foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Reader Status Card
-              Card(
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Icon(
-                        _readerActive ? Icons.tap_and_play : Icons.smartphone,
-                        size: 48,
-                        color: _readerActive ? Colors.green : Colors.orange,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Reader Connection Status
+            Card(
+              margin: const EdgeInsets.only(bottom: 24),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Reader Status',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1e3a5f),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _readerActive ? 'Reader Active' : 'Reader Inactive',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: _readerActive ? Colors.green : Colors.orange,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _isSupported
-                            ? 'Your device supports Tap to Pay'
-                            : 'Tap to Pay is not supported on this device',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Activate Reader Button
-              if (!_readerActive)
-                ElevatedButton.icon(
-                  onPressed: _isProcessing ? null : _activateReader,
-                  icon: const Icon(Icons.power_settings_new),
-                  label: const Text('Activate Reader'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1e3a5f),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    disabledBackgroundColor: Colors.grey,
-                  ),
-                ),
-
-              if (!_readerActive) const SizedBox(height: 24),
-
-              if (_readerActive) ...[
-                // Quick Amount Buttons
-                Text(
-                  'Quick Amounts',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 12),
-                GridView.count(
-                  crossAxisCount: 3,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                  children: [5, 10, 20, 50, 100, 250]
-                      .map(
-                        (amount) => ElevatedButton(
-                          onPressed: _isProcessing
-                              ? null
-                              : () => _processQuickAmount(amount.toDouble()),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF1e3a5f),
-                            side: const BorderSide(color: Color(0xFF1e3a5f)),
-                            disabledBackgroundColor: Colors.grey[200],
-                          ),
-                          child: Text('\$$amount'),
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: 24),
-
-                // Custom Amount Section
-                Text(
-                  'Custom Amount',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _amountController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Enter amount (\$)',
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
                     ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _descriptionController,
-                  decoration: InputDecoration(
-                    hintText: 'Item description (optional)',
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: _isProcessing ? null : _processCustomAmount,
-                  icon: const Icon(Icons.tap_and_play),
-                  label: const Text('Accept Payment'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    disabledBackgroundColor: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Last Transaction
-                if (_lastTransactionId != null)
-                  Card(
-                    color: Colors.green[50],
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
+                    const SizedBox(height: 12),
+                    if (_connectedReaderId != null)
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Last Transaction',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                          Row(
+                            children: [
+                              const Icon(Icons.check_circle, color: Colors.green),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Connected: $_connectedReaderLabel',
+                                  style: const TextStyle(color: Colors.green),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: _disconnectReader,
+                              child: const Text('Disconnect Reader'),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Amount: \$${_currentAmount.toStringAsFixed(2)}',
+                        ],
+                      )
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.bluetooth_disabled, color: Colors.red),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'No reader connected',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ],
                           ),
-                          Text('ID: $_lastTransactionId'),
-                          const SizedBox(height: 8),
-                          const Text(
-                            '✓ Payment confirmed',
-                            style: TextStyle(color: Colors.green),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _selectAndConnectReader,
+                              icon: const Icon(Icons.bluetooth_connected),
+                              label: const Text('Select & Connect Reader'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1e3a5f),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
                           ),
                         ],
                       ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Payment Form
+            Card(
+              margin: const EdgeInsets.only(bottom: 24),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Payment Amount',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1e3a5f),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _amountController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        prefixText: '\$ ',
+                        hintText: '0.00',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Description',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1e3a5f),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _descriptionController,
+                      decoration: InputDecoration(
+                        hintText: 'What is being purchased?',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Process Button
+            ElevatedButton(
+              onPressed: _isProcessing || _connectedReaderId == null
+                  ? null
+                  : _processPayment,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1e3a5f),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                disabledBackgroundColor: Colors.grey,
+              ),
+              child: _isProcessing
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'Collect Payment',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Info Box
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'How Tap to Pay Works:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1e3a5f),
                     ),
                   ),
-              ],
-
-              if (_isProcessing)
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: CircularProgressIndicator(),
-                ),
-            ],
-          ),
+                  SizedBox(height: 8),
+                  Text(
+                    '1. Select and connect a payment reader\n'
+                    '2. Enter the payment amount\n'
+                    '3. Add a description\n'
+                    '4. Tap "Collect Payment"\n'
+                    '5. Customer taps their card/phone',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

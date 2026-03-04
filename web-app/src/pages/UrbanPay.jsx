@@ -188,6 +188,8 @@ export default function UrbanPay() {
     }
 
     async function recordCashSale() {
+        console.log('[recordCashSale] Starting...');
+        
         if (!cashAmount || parseFloat(cashAmount) <= 0) {
             toast.error('Please enter a valid amount');
             return;
@@ -201,45 +203,64 @@ export default function UrbanPay() {
         setIsRecordingCash(true);
 
         try {
-            // Get current user and token
-            const currentUser = firebase.auth.getCurrentUser();
-            if (!currentUser) {
-                throw new Error('Not authenticated');
+            console.log('[recordCashSale] User:', user?.id);
+            
+            if (!user || !user.id) {
+                throw new Error('User not authenticated');
             }
 
-            const token = await currentUser.getIdToken();
-            const response = await fetch('https://urban-garage-sale.vercel.app/api/urbanPayment/recordSale', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    amount: parseFloat(cashAmount),
-                    description: cashDescription.trim(),
-                    paymentMethod: 'cash',
-                }),
-            });
+            // Use Firestore Web SDK directly
+            const saleData = {
+                sellerId: user.id,
+                amount: parseFloat(cashAmount),
+                description: cashDescription.trim(),
+                paymentMethod: 'cash',
+                status: 'completed',
+                createdAt: new Date(),
+            };
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                console.error('Record Cash Sale Error:', errorData);
-                throw new Error(errorData.error || `Failed: ${response.status}`);
+            console.log('[recordCashSale] Creating sale document:', saleData);
+            
+            // Create the sale document
+            const saleRef = await firebase.firestore.collection('sales').add(saleData);
+            console.log('[recordCashSale] Sale created:', saleRef.id);
+
+            // Update seller stats
+            console.log('[recordCashSale] Updating seller stats...');
+            const statsRef = firebase.firestore.collection('sellerStats').doc(user.id);
+            const statsDoc = await statsRef.get();
+
+            if (statsDoc.exists) {
+                const currentStats = statsDoc.data();
+                await statsRef.update({
+                    totalEarnings: (currentStats.totalEarnings || 0) + parseFloat(cashAmount),
+                    completedEarnings: (currentStats.completedEarnings || 0) + parseFloat(cashAmount),
+                    totalSales: (currentStats.totalSales || 0) + 1,
+                    completedSales: (currentStats.completedSales || 0) + 1,
+                    lastSaleDate: new Date(),
+                });
+            } else {
+                await statsRef.set({
+                    totalEarnings: parseFloat(cashAmount),
+                    completedEarnings: parseFloat(cashAmount),
+                    pendingEarnings: 0,
+                    totalSales: 1,
+                    completedSales: 1,
+                    pendingSales: 0,
+                    lastSaleDate: new Date(),
+                });
             }
 
-            const saleData = await response.json();
-            console.log('Cash sale recorded:', saleData);
+            console.log('[recordCashSale] Stats updated');
             
             toast.success(`Cash sale recorded! $${parseFloat(cashAmount).toFixed(2)}`);
             
-            // Reset form to empty strings
+            // Reset form
             setCashAmount('');
             setCashDescription('');
-            
-            // Close modal
             setShowCashModal(false);
             
-            // Refresh seller stats after successful sale
+            // Refresh stats
             await refreshSellerStats();
             
         } catch (error) {

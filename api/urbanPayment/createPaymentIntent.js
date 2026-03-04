@@ -1,71 +1,73 @@
 // Create Payment Intent endpoint for Vercel
-const projectId = process.env.FIREBASE_PROJECT_ID || "";
+import Stripe from 'stripe';
+import admin from 'firebase-admin';
+
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "";
+const projectId = process.env.FIREBASE_PROJECT_ID || "urbangaragesale";
+
+// Initialize Firebase Admin
+function getFirebaseAdmin() {
+  if (!admin.apps.length) {
+    try {
+      let credentials = undefined;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+        try {
+          credentials = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+        } catch (e) {
+          console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON');
+        }
+      }
+      
+      const options = { projectId };
+      if (credentials) {
+        options.credential = admin.credential.cert(credentials);
+      }
+      
+      admin.initializeApp(options);
+      console.log('✓ Firebase Admin initialized');
+    } catch (error) {
+      console.error('Firebase Admin init error:', error.message);
+      throw error;
+    }
+  }
+  return admin;
+}
+
+// Verify token and extract user ID
+async function extractUserIdFromToken(idToken) {
+  try {
+    const adminApp = getFirebaseAdmin();
+    const decodedToken = await adminApp.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+    
+    if (!uid || typeof uid !== 'string' || uid.length > 128) {
+      throw new Error(`Invalid UID format: ${uid}`);
+    }
+    
+    console.log('✓ Token verified, UID:', uid);
+    return uid;
+  } catch (error) {
+    console.error('Token verification error:', error.message);
+    throw new Error(`Authentication failed: ${error.message}`);
+  }
+}
 
 let stripe = null;
 const getStripe = async () => {
-  if (!stripe && stripeSecretKey) {
-    try {
-      const StripeModule = await import("stripe");
-      const Stripe = StripeModule.default;
-      stripe = new Stripe(stripeSecretKey);
-    } catch (error) {
-      console.error("Failed to initialize Stripe:", error.message);
+  if (!stripe) {
+    if (!stripeSecretKey) {
+      throw new Error("Stripe not configured - missing STRIPE_SECRET_KEY");
     }
+    stripe = new Stripe(stripeSecretKey);
   }
   return stripe;
 };
 
-async function getBody(req) {
-  if (req.method === "GET") return null;
-  
-  let body = "";
-  return new Promise((resolve, reject) => {
-    req.on("data", (chunk) => {
-      body += chunk.toString();
-    });
-    req.on("end", () => {
-      try {
-        resolve(body ? JSON.parse(body) : {});
-      } catch (e) {
-        reject(new Error("Invalid JSON in request body"));
-      }
-    });
-    req.on("error", reject);
-  });
-}
-
-async function createPaymentIntent(userId, amount, description, currency = "aud") {
-  const stripe = await getStripe();
-  if (!stripe) {
-    throw new Error("Stripe not configured - missing STRIPE_SECRET_KEY");
-  }
-
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(amount * 100), // Convert to cents
-    currency: currency,
-    description: `Urban Pay Sale - ${description}`,
-    metadata: {
-      sellerId: userId,
-      saleDescription: description,
-    },
-  });
-
-  return {
-    clientSecret: paymentIntent.client_secret || "",
-    paymentIntentId: paymentIntent.id,
-  };
-}
-
-function setCorsHeaders(res) {
+export default async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Content-Type", "application/json");
-}
-
-export default async (req, res) => {
-  setCorsHeaders(res);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -76,33 +78,75 @@ export default async (req, res) => {
   }
 
   try {
+    console.log("=== Card Payment Request ===");
+    
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Missing authorization token" });
+      console.error("Missing auth header");
+      return res.status(401).json({ error: "Missing authorization header" });
     }
 
-    const body = await getBody(req);
-    if (!body.amount) {
+    // Parse request body
+    let body = {};
+    try {
+      const bodyStr = await new Promise((resolve, reject) => {
+        let data = "";
+        req.on("data", chunk => data += chunk);
+        req.on("end", () => resolve(data));
+        req.on("error", reject);
+      });
+      body = bodyStr ? JSON.parse(bodyStr) : {};
+    } catch (e) {
+      console.error("Invalid JSON:", e.message);
+      return res.status(400).json({ error: "Invalid request body" });
+    }
+
+    const { amount, description, currency = "aud" } = body;
+    if (!amount) {
       return res.status(400).json({ error: "Missing amount field" });
     }
 
-    const userId = authHeader.substring(7); // Remove "Bearer " prefix
-    const result = await createPaymentIntent(
-      userId,
-      body.amount,
-      body.description || "Urban Pay Sale",
-      body.currency || "aud"
-    );
+    console.log("Amount:", amount, "Description:", description);
+
+    // Extract and verify user ID from token
+    const idToken = authHeader.substring(7);
+    let userId;
+    
+    try {
+      userId = await extractUserIdFromToken(idToken);
+    } catch (tokenError) {
+      console.error("Token error:", tokenError.message);
+      return res.status(401).json({ error: tokenError.message });
+    }
+
+    console.log("Creating payment intent for user:", userId);
+
+    // Create Stripe payment intent
+    const stripe = await getStripe();
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100),
+      currency: currency,
+      description: `Urban Pay Sale - ${description?.substring(0, 50)}`,
+      metadata: {
+        sellerId: userId,
+        saleDescription: description?.substring(0, 50) || "Urban Pay Sale",
+      },
+    });
+
+    console.log("✓ Payment intent created:", paymentIntent.id);
 
     return res.status(200).json({
       success: true,
-      ...result,
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
     });
+    
   } catch (error) {
-    console.error("Payment Intent Error:", error);
+    console.error("Fatal error:", error.message);
+    console.error("Stack:", error.stack);
     return res.status(500).json({
-      error: error.message || "Failed to create payment intent",
-      type: error.constructor?.name || "Unknown",
+      error: error.message || "Internal server error",
+      type: error.constructor?.name,
     });
   }
 };

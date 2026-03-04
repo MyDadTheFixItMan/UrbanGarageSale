@@ -3,10 +3,19 @@ import { useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { AlertCircle, Smartphone, RefreshCw, CreditCard } from 'lucide-react';
+import { AlertCircle, Smartphone, RefreshCw, CreditCard, DollarSign, Smartphone as SmartphoneIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function UrbanPay() {
     const [user, setUser] = useState(null);
@@ -22,6 +31,8 @@ export default function UrbanPay() {
     const [cardAmount, setCardAmount] = useState('');
     const [cardDescription, setCardDescription] = useState('');
     const [isProcessingCard, setIsProcessingCard] = useState(false);
+    const [showCashModal, setShowCashModal] = useState(false);
+    const [showCardModal, setShowCardModal] = useState(false);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -102,18 +113,53 @@ export default function UrbanPay() {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to create payment');
+                const errorData = await response.json().catch(() => ({}));
+                console.error('API Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    data: errorData
+                });
+                throw new Error(errorData.error || `Failed to create payment (${response.status})`);
             }
 
             const data = await response.json();
             
             // Log the payment intent for testing
             console.log('Payment intent created:', data.paymentIntentId);
-            toast.success(`Payment intent created: ${data.paymentIntentId}`);
+            
+            // Now record the sale in Firestore
+            const recordSaleResponse = await fetch('https://urban-garage-sale.vercel.app/api/urbanPayment/recordTapToPaySale', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount: parseFloat(cardAmount),
+                    description: cardDescription.trim(),
+                    paymentIntentId: data.paymentIntentId,
+                    currency: 'aud',
+                    paymentMethod: 'tap_to_pay',
+                }),
+            });
+
+            if (!recordSaleResponse.ok) {
+                const errorData = await recordSaleResponse.json().catch(() => ({}));
+                console.error('Record Sale Error:', errorData);
+                throw new Error(errorData.error || 'Failed to record sale in database');
+            }
+
+            const saleData = await recordSaleResponse.json();
+            console.log('Sale recorded:', saleData.saleId);
+            
+            toast.success('Card payment processed successfully!');
             
             // Reset form
             setCardAmount('');
             setCardDescription('');
+            
+            // Close modal
+            setShowCardModal(false);
             
             // Refresh stats
             refreshSellerStats();
@@ -170,6 +216,9 @@ export default function UrbanPay() {
             // Reset form to empty strings (not undefined)
             setCashAmount('');
             setCashDescription('');
+            
+            // Close modal
+            setShowCashModal(false);
             
             // Refresh seller stats after successful sale
             await refreshSellerStats();
@@ -237,17 +286,25 @@ export default function UrbanPay() {
     return (
         <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen overflow-hidden pb-24 md:pb-0">
                 {/* Watermark */}
+                <style>{`
+                    @media (min-width: 768px) {
+                        .watermark-page {
+                            top: -90px !important;
+                        }
+                    }
+                `}</style>
                 <img
                     src="/Logo Webpage.png"
                     alt="watermark"
-                    className="fixed left-0 top-0 opacity-40"
+                    className="fixed left-0 pointer-events-none watermark-page"
                     style={{
                         width: '1200px',
                         height: 'auto',
                         clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
                         top: '60px',
-                        pointerEvents: 'none',
-                        zIndex: 1
+                        zIndex: 1,
+                        opacity: 0.4,
+                        objectFit: 'contain'
                     }}
                 />
 
@@ -272,12 +329,8 @@ export default function UrbanPay() {
                             <p className="text-slate-500">Accept payments from buyers during your garage sale</p>
                         </div>
                     </div>
-                </div>
-                </section>
 
-                <section className="relative bg-[#f5f1e8]">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10 py-8 -mt-20 sm:mt-0 md:-mt-8">
-                    <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 relative z-20">
+                    <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 relative z-20 mt-8">
                         <div className="space-y-6">
                         {/* Seller Stats */}
                         <div className="space-y-2">
@@ -307,54 +360,169 @@ export default function UrbanPay() {
 
 
 
-                        {/* Quick Amount Buttons */}
-                        <div>
-                            <p className="text-sm font-semibold text-slate-700 mb-2">Quick Amounts</p>
-                            <div className="grid grid-cols-5 gap-2">
-                                {quickAmounts.map(amount => (
-                                    <Button 
-                                        key={amount}
-                                        variant="outline"
-                                        className="text-sm font-semibold hover:bg-[#1e3a5f] hover:text-white"
-                                        onClick={() => setCashAmount(amount.toString())}
-                                        disabled={isRecordingCash}
-                                    >
-                                        ${amount}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Manual Entry */}
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                            <p className="text-sm font-semibold text-amber-900 mb-2">Manual Sale Entry</p>
-                            <p className="text-xs text-amber-800 mb-3">For cash payments - enter amount and description</p>
-                            <div className="space-y-2">
-                                <input 
-                                    type="number" 
-                                    placeholder="Amount ($)" 
-                                    className="w-full px-3 py-2 border rounded-lg text-sm"
-                                    value={cashAmount}
-                                    onChange={(e) => setCashAmount(e.target.value)}
-                                    disabled={isRecordingCash}
-                                />
-                                <input 
-                                    type="text" 
-                                    placeholder="Item description" 
-                                    className="w-full px-3 py-2 border rounded-lg text-sm"
-                                    value={cashDescription}
-                                    onChange={(e) => setCashDescription(e.target.value)}
-                                    disabled={isRecordingCash}
-                                />
+                        {/* Cash Sale & Card Payments - Side by Side */}
+                        <div className="grid grid-cols-2 gap-4 sm:gap-6">
+                            {/* Cash Sale Box */}
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 sm:p-6 flex flex-col">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                                        <DollarSign className="w-5 h-5 text-amber-700" />
+                                    </div>
+                                    <h3 className="text-base sm:text-lg font-semibold text-amber-900">Cash Sale</h3>
+                                </div>
+                                <p className="text-xs sm:text-sm text-amber-800 mb-6 flex-1">Record cash payments from your customers right away.</p>
                                 <Button 
-                                    onClick={recordCashSale}
-                                    disabled={isRecordingCash}
-                                    className="w-full bg-green-600 hover:bg-green-700"
+                                    onClick={() => setShowCashModal(true)}
+                                    className="w-full bg-green-600 hover:bg-green-700 text-sm sm:text-base"
                                 >
-                                    {isRecordingCash ? 'Recording...' : 'Record Cash Sale'}
+                                    Add Cash Sale
                                 </Button>
                             </div>
+
+                            {/* Card Payments Box */}
+                            {cardPaymentsEnabled ? (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6 flex flex-col">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                            <CreditCard className="w-5 h-5 text-blue-700" />
+                                        </div>
+                                        <h3 className="text-base sm:text-lg font-semibold text-blue-900">Tap to Pay</h3>
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-blue-800 mb-6 flex-1">Process card payments using your phone with Tap to Pay.</p>
+                                    <Button 
+                                        onClick={() => setShowCardModal(true)}
+                                        className="w-full bg-blue-600 hover:bg-blue-700 text-sm sm:text-base"
+                                    >
+                                        Add Card Payment
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 sm:p-6 flex flex-col">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                                            <CreditCard className="w-5 h-5 text-purple-700" />
+                                        </div>
+                                        <h3 className="text-base sm:text-lg font-semibold text-purple-900">Tap to Pay</h3>
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-purple-800 mb-6 flex-1">Enable card payments in your <Link to={createPageUrl('Profile')} className="underline font-semibold">Profile Settings</Link> to accept Tap to Pay.</p>
+                                    <Button 
+                                        disabled
+                                        variant="outline"
+                                        className="w-full opacity-50 cursor-not-allowed text-sm sm:text-base"
+                                    >
+                                        Disabled
+                                    </Button>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Cash Sale Modal */}
+                        <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Record Cash Sale</DialogTitle>
+                                    <DialogDescription>
+                                        Enter the amount and item description for this cash transaction.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Amount ($)</label>
+                                        <input 
+                                            type="number" 
+                                            placeholder="0.00" 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                            value={cashAmount}
+                                            onChange={(e) => setCashAmount(e.target.value)}
+                                            disabled={isRecordingCash}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Item Description</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="e.g., Vintage lamp, Books bundle, Furniture" 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                            value={cashDescription}
+                                            onChange={(e) => setCashDescription(e.target.value)}
+                                            disabled={isRecordingCash}
+                                        />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={() => setShowCashModal(false)}
+                                        disabled={isRecordingCash}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button 
+                                        onClick={() => {
+                                            recordCashSale();
+                                        }}
+                                        disabled={isRecordingCash}
+                                        className="bg-green-600 hover:bg-green-700"
+                                    >
+                                        {isRecordingCash ? 'Recording...' : 'Record Sale'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        {/* Card Payment Modal */}
+                        <Dialog open={showCardModal} onOpenChange={setShowCardModal}>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Process Card Payment</DialogTitle>
+                                    <DialogDescription>
+                                        Enter the amount and item description for this card transaction.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Amount ($)</label>
+                                        <input 
+                                            type="number" 
+                                            placeholder="0.00" 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            value={cardAmount}
+                                            onChange={(e) => setCardAmount(e.target.value)}
+                                            disabled={isProcessingCard}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Item Description</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="e.g., Vintage lamp, Books bundle, Furniture" 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            value={cardDescription}
+                                            onChange={(e) => setCardDescription(e.target.value)}
+                                            disabled={isProcessingCard}
+                                        />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={() => setShowCardModal(false)}
+                                        disabled={isProcessingCard}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button 
+                                        onClick={() => {
+                                            recordCardPayment();
+                                        }}
+                                        disabled={isProcessingCard}
+                                        className="bg-blue-600 hover:bg-blue-700"
+                                    >
+                                        {isProcessingCard ? 'Processing...' : 'Process Payment'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
 
                         {/* Urban Pay Info */}
                         <Alert className="border-blue-200 bg-blue-50">
@@ -363,49 +531,6 @@ export default function UrbanPay() {
                                 <strong>Urban Pay:</strong> Real-time payment processing with Tap to Pay. Accept contactless payments directly on your phone with live earnings tracking.
                             </AlertDescription>
                         </Alert>
-
-                        {/* Card Payments Section */}
-                        {cardPaymentsEnabled && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <p className="text-sm font-semibold text-blue-900 mb-2">Tap to Pay / Card Payments</p>
-                                <p className="text-xs text-blue-800 mb-3">Charge a card from your phone using Tap to Pay reader</p>
-                                <div className="space-y-2">
-                                    <input 
-                                        type="number" 
-                                        placeholder="Amount ($)" 
-                                        className="w-full px-3 py-2 border rounded-lg text-sm"
-                                        value={cardAmount}
-                                        onChange={(e) => setCardAmount(e.target.value)}
-                                        disabled={isProcessingCard}
-                                    />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Item description" 
-                                        className="w-full px-3 py-2 border rounded-lg text-sm"
-                                        value={cardDescription}
-                                        onChange={(e) => setCardDescription(e.target.value)}
-                                        disabled={isProcessingCard}
-                                    />
-                                    <Button 
-                                        onClick={recordCardPayment}
-                                        disabled={isProcessingCard}
-                                        className="w-full bg-blue-600 hover:bg-blue-700"
-                                    >
-                                        {isProcessingCard ? 'Processing...' : 'Process Card Payment'}
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Card Payments Info */}
-                        {!cardPaymentsEnabled && (
-                            <Alert className="border-purple-200 bg-purple-50">
-                                <CreditCard className="w-4 h-4 text-purple-600" />
-                                <AlertDescription className="text-sm text-purple-900">
-                                    <strong>Card Payments Disabled:</strong> Go to <Link to={createPageUrl('Profile')} className="underline font-semibold">Profile Settings</Link> and click "Enable Card Payments" to accept Tap to Pay and card payments.
-                                </AlertDescription>
-                            </Alert>
-                        )}
                         <div className="flex gap-2">
                             <Link to={createPageUrl('Home')} className="flex-1">
                                 <Button variant="outline" className="w-full">
@@ -416,7 +541,7 @@ export default function UrbanPay() {
                         </div>
                     </div>
                 </div>
-                </section>
-            </div>
+            </section>
+        </div>
     );
 }

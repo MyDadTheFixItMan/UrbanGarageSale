@@ -27,9 +27,39 @@ function decodeJWT(token) {
   }
 }
 
-// Record sale to Firestore using REST API with user's ID token
+// Exchange ID token for access token (required for Firestore REST API v1)
+async function getAccessToken(idToken) {
+  try {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:id_token',
+        assertion: idToken,
+        audience: 'https://firestore.googleapis.com/',
+      }).toString(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Token exchange failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  } catch (error) {
+    console.error('Access token exchange failed:', error.message);
+    throw new Error('Failed to get access token for Firestore');
+  }
+}
+
+// Record sale to Firestore using REST API with user's access token
 async function recordSale(userId, amount, description, paymentMethod, idToken) {
   try {
+    // Get access token from ID token (Firestore REST API v1 requires access token)
+    console.log('[recordSale] Exchanging ID token for access token...');
+    const accessToken = await getAccessToken(idToken);
+    console.log('✓ Access token obtained');
+
     // Step 0: Check if user has 2FA enabled (required for sales)
     console.log('[recordSale] Checking 2FA status...');
     const userCheckResponse = await fetch(
@@ -38,7 +68,7 @@ async function recordSale(userId, amount, description, paymentMethod, idToken) {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
+          'Authorization': `Bearer ${accessToken}`,
         },
       }
     );
@@ -76,7 +106,7 @@ async function recordSale(userId, amount, description, paymentMethod, idToken) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify(salePayload),
       }
@@ -102,7 +132,7 @@ async function recordSale(userId, amount, description, paymentMethod, idToken) {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
+          'Authorization': `Bearer ${accessToken}`,
         },
       }
     );
@@ -152,7 +182,7 @@ async function recordSale(userId, amount, description, paymentMethod, idToken) {
         method: statsFetchSuccess ? 'PATCH' : 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify(statsPayload),
       }

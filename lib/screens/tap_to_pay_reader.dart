@@ -28,13 +28,11 @@ class _TapToPayReaderState extends State<TapToPayReader> {
   bool _stripeValid = true;
   String? _connectedReaderId;
   String? _connectedReaderLabel;
-  Map<String, dynamic>? _readerStatus;
 
   @override
   void initState() {
     super.initState();
     _verifyStripeStatus();
-    _checkReaderStatus();
   }
 
   Future<void> _verifyStripeStatus() async {
@@ -51,15 +49,6 @@ class _TapToPayReaderState extends State<TapToPayReader> {
       setState(() => _stripeValid = hasStripe);
     } catch (e) {
       setState(() => _stripeValid = false);
-    }
-  }
-
-  Future<void> _checkReaderStatus() async {
-    try {
-      final status = await StripeTerminalService.getReaderStatus();
-      setState(() => _readerStatus = status);
-    } catch (e) {
-      print('Error checking reader status: $e');
     }
   }
 

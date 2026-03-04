@@ -362,7 +362,6 @@ export default function UrbanPay() {
                                     <RefreshCw className={`w-4 h-4 ${isRefreshingStats ? 'animate-spin' : ''}`} />
                                 </Button>
                             </div>
-                            {console.log('Current sellerStats state:', sellerStats)}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
                                     <p className="text-xs text-slate-600 font-semibold">Total Earnings</p>

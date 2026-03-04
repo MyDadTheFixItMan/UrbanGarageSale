@@ -33,10 +33,13 @@ async function recordSale(userId, amount, description, paymentMethod, idToken) {
     // Step 0: Check if user has 2FA enabled (required for sales)
     console.log('[recordSale] Checking 2FA status...');
     const userCheckResponse = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/users/${userId}?access_token=${idToken}`,
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/users/${userId}`,
       {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
       }
     );
 
@@ -68,10 +71,13 @@ async function recordSale(userId, amount, description, paymentMethod, idToken) {
     };
 
     const saleResponse = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/sales?access_token=${idToken}`,
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/sales`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify(salePayload),
       }
     );
@@ -91,10 +97,13 @@ async function recordSale(userId, amount, description, paymentMethod, idToken) {
     
     // First try to get existing stats
     const statsGetResponse = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/sellerStats/${userId}?access_token=${idToken}`,
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/sellerStats/${userId}`,
       {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
       }
     );
 
@@ -138,10 +147,13 @@ async function recordSale(userId, amount, description, paymentMethod, idToken) {
     }
 
     const statsResponse = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/sellerStats/${userId}?access_token=${idToken}`,
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/sellerStats/${userId}`,
       {
         method: statsFetchSuccess ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify(statsPayload),
       }
     );

@@ -122,8 +122,14 @@ export default function CreateListing() {
             const userData = await firebase.auth.me();
             
             // Enforce 2FA - redirect if not enabled
-            // Note: 2FA is optional for creating listings
-            // Users can enable it on their Profile page for extra security
+            const is2FAEnabled = await firebase.auth.is2FAEnabled();
+            if (!is2FAEnabled) {
+                toast.error('Two-Factor Authentication is required. Please enable 2FA on your Profile page.');
+                setTimeout(() => {
+                    window.location.href = '/profile';
+                }, 2000);
+                return;
+            }
             
             setUser(userData);
 

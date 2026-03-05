@@ -154,9 +154,16 @@ export default function UrbanPay() {
         `;
         
         salesList.forEach(sale => {
-            const date = sale.createdAt instanceof Date 
-                ? sale.createdAt.toLocaleString() 
-                : new Date(sale.createdAt).toLocaleString();
+            // Convert Firestore Timestamp to Date
+            let dateObj = sale.createdAt;
+            if (sale.createdAt && typeof sale.createdAt.toDate === 'function') {
+                dateObj = sale.createdAt.toDate();
+            } else if (sale.createdAt instanceof Date) {
+                dateObj = sale.createdAt;
+            } else if (typeof sale.createdAt === 'string') {
+                dateObj = new Date(sale.createdAt);
+            }
+            const date = dateObj instanceof Date ? dateObj.toLocaleString() : 'Invalid Date';
             const type = sale.paymentMethod === 'cash' ? 'Cash' : 'Card';
             html += `
                         <tr>
@@ -725,9 +732,16 @@ export default function UrbanPay() {
                                                 </thead>
                                                 <tbody>
                                                     {salesList.map((sale, idx) => {
-                                                        const date = sale.createdAt instanceof Date 
-                                                            ? sale.createdAt.toLocaleString() 
-                                                            : new Date(sale.createdAt).toLocaleString();
+                                                        // Convert Firestore Timestamp to Date
+                                                        let dateObj = sale.createdAt;
+                                                        if (sale.createdAt && typeof sale.createdAt.toDate === 'function') {
+                                                            dateObj = sale.createdAt.toDate();
+                                                        } else if (sale.createdAt instanceof Date) {
+                                                            dateObj = sale.createdAt;
+                                                        } else if (typeof sale.createdAt === 'string') {
+                                                            dateObj = new Date(sale.createdAt);
+                                                        }
+                                                        const date = dateObj instanceof Date ? dateObj.toLocaleString() : 'Invalid Date';
                                                         const type = sale.paymentMethod === 'cash' ? '💵 Cash' : '💳 Card';
                                                         
                                                         return (

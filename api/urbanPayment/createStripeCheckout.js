@@ -3,6 +3,11 @@
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+const isDevelopment = !stripeSecretKey || stripeSecretKey.includes('YOUR_STRIPE_SECRET_KEY');
+
+console.log('📌 createStripeCheckout module loaded');
+console.log('   Stripe configured:', stripeSecretKey && !isDevelopment);
+console.log('   Development mode:', isDevelopment);
 
 // Lazy load Stripe
 let stripeInstance = null;
@@ -11,23 +16,37 @@ async function initStripe() {
   if (!stripeInstance) {
     try {
       const Stripe = (await import('stripe')).default;
-      if (!stripeSecretKey) {
-        throw new Error('STRIPE_SECRET_KEY is not set in environment variables');
+      if (!stripeSecretKey || isDevelopment) {
+        console.warn('⚠️  STRIPE_SECRET_KEY not set - using development/mock mode');
+        return null;
       }
       stripeInstance = new Stripe(stripeSecretKey);
       console.log('✅ Stripe client initialized');
     } catch (error) {
       console.error('❌ Failed to initialize Stripe:', error.message);
-      throw error;
+      if (!isDevelopment) {
+        throw error;
+      }
+      return null;
     }
   }
   return stripeInstance;
 }
 
+// Create a mock checkout session for development
+function createMockCheckoutSession(saleId, saleTitle) {
+  console.log('🧪 Using MOCK checkout session (development mode)');
+  const mockUrl = `${frontendUrl}/payment-success?sale_id=${saleId}&session_id=mock_session_${Date.now()}`;
+  return {
+    id: `mock_session_${Date.now()}`,
+    url: mockUrl,
+  };
+}
+
 export default async function handler(req, res) {
   console.log('\n📌 createStripeCheckout handler invoked');
   console.log('   Method:', req.method);
-  console.log('   Body:', JSON.stringify(req.body));
+  console.log('   Data:', JSON.stringify(req.body));
 
   if (req.method !== 'POST') {
     console.log('❌ Invalid method:', req.method);
@@ -44,8 +63,23 @@ export default async function handler(req, res) {
 
     console.log('📋 Processing payment for sale:', saleId);
 
-    // Initialize Stripe
+    // Use development mock if Stripe is not configured
+    if (isDevelopment) {
+      console.log('⚠️  DEVELOPMENT MODE: Using mock Stripe checkout');
+      const mockSession = createMockCheckoutSession(saleId, saleTitle);
+      return res.status(200).json({
+        url: mockSession.url,
+        sessionId: mockSession.id,
+        mode: 'development',
+        message: 'This is a development/test checkout. In production, real Stripe payments would be processed.',
+      });
+    }
+
+    // Use real Stripe in production
     const stripe = await initStripe();
+    if (!stripe) {
+      throw new Error('Stripe not initialized');
+    }
 
     // Create Stripe checkout session
     console.log('🔄 Creating Stripe checkout session...');

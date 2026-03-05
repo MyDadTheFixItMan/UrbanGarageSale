@@ -6,6 +6,8 @@ import Home from './pages/Home';
 import ListingDetails from './pages/ListingDetails';
 import Login from './pages/Login';
 import Payment from './pages/Payment';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentCancelled from './pages/PaymentCancelled';
 import Privacy from './pages/Privacy';
 import Profile from './pages/Profile';
 import ResetPassword from './pages/ResetPassword';
@@ -25,6 +27,8 @@ export const PAGES = {
     "ListingDetails": ListingDetails,
     "Login": Login,
     "Payment": Payment,
+    "PaymentSuccess": PaymentSuccess,
+    "PaymentCancelled": PaymentCancelled,
     "Privacy": Privacy,
     "Profile": Profile,
     "ResetPassword": ResetPassword,

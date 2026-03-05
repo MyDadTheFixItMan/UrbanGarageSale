@@ -91,18 +91,11 @@ export default function UrbanPay() {
         try {
             console.log('[loadSalesList] Fetching sales for user:', user.id);
             
-            // Get all sales docs from collection
-            console.log('[loadSalesList] Calling getDocs()...');
-            const allSales = await firebase.firestore.collection('sales').getDocs();
-            console.log('[loadSalesList] getDocs returned:', allSales.length, 'documents');
-            
-            // Filter to only user's sales
-            console.log('[loadSalesList] Filtering sales for user...');
-            const userSales = allSales.filter(sale => {
-                console.log('[loadSalesList] Checking sale:', sale.id, 'sellerId:', sale.sellerId, 'userId:', user.id);
-                return sale.sellerId === user.id;
-            });
-            console.log('[loadSalesList] Found', userSales.length, 'user sales');
+            // Get sales for this user using a where query
+            // This respects Firestore security rules that only allow reading own sales
+            console.log('[loadSalesList] Calling queryDocs with where clause...');
+            const userSales = await firebase.firestore.collection('sales').queryDocs('sellerId', '==', user.id);
+            console.log('[loadSalesList] queryDocs returned:', userSales.length, 'documents');
             
             // Sort by date descending (newest first)
             userSales.sort((a, b) => {
@@ -111,7 +104,7 @@ export default function UrbanPay() {
                 return dateB - dateA;
             });
             
-            console.log('[loadSalesList] Loaded', userSales.length, 'sales');
+            console.log('[loadSalesList] Sorted', userSales.length, 'sales');
             setSalesList(userSales);
             setShowSalesListModal(true);
         } catch (error) {

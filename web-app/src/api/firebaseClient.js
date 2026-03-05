@@ -1137,6 +1137,21 @@ export const firebaseFirestore = {
           throw error;
         }
       },
+      // Query documents with where clause
+      queryDocs: async (whereField, operator, value) => {
+        try {
+          const collectionRef = collection(db, collectionName);
+          const q = query(collectionRef, where(whereField, operator, value));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(docSnap => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          }));
+        } catch (error) {
+          console.error('Error querying documents:', error);
+          throw error;
+        }
+      },
     };
   },
 };

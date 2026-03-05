@@ -485,15 +485,8 @@ export default function UrbanPay() {
                     return;
                 }
 
-                // Enforce 2FA - redirect if not enabled
-                const is2FAEnabled = await firebase.auth.is2FAEnabled();
-                if (!is2FAEnabled) {
-                    toast.error('Two-Factor Authentication is required. Please complete setup on your Profile page.');
-                    setTimeout(() => {
-                        window.location.href = '/profile';
-                    }, 2000);
-                    return;
-                }
+                // Note: 2FA is recommended for Urban Pay but not required
+                // Users can enable it on their Profile page for extra security
 
                 const userData = await firebase.auth.me();
                 setUser(userData);

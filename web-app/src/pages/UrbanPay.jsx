@@ -36,6 +36,9 @@ export default function UrbanPay() {
     const [showSalesListModal, setShowSalesListModal] = useState(false);
     const [salesList, setSalesList] = useState([]);
     const [isLoadingSales, setIsLoadingSales] = useState(false);
+    const [garageSales, setGarageSales] = useState([]);
+    const [selectedGarageSaleId, setSelectedGarageSaleId] = useState('');
+    const [isLoadingGarageSales, setIsLoadingGarageSales] = useState(false);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -77,6 +80,30 @@ export default function UrbanPay() {
             toast.error(`Failed to load seller stats: ${error.message}`);
         } finally {
             setIsRefreshingStats(false);
+        }
+    }
+
+    // Load user's garage sales
+    async function loadGarageSales() {
+        if (!user || !user.id) {
+            return;
+        }
+
+        setIsLoadingGarageSales(true);
+        try {
+            console.log('[loadGarageSales] Fetching garage sales for user:', user.id);
+            const sales = await firebase.firestore.collection('garageSales').queryDocs('user_id', '==', user.id);
+            console.log('[loadGarageSales] Loaded', sales.length, 'garage sales');
+            setGarageSales(sales);
+            
+            // Auto-select first garage sale if available
+            if (sales.length > 0 && !selectedGarageSaleId) {
+                setSelectedGarageSaleId(sales[0].id);
+            }
+        } catch (error) {
+            console.error('Error loading garage sales:', error);
+        } finally {
+            setIsLoadingGarageSales(false);
         }
     }
 
@@ -314,6 +341,11 @@ export default function UrbanPay() {
             return;
         }
 
+        if (!selectedGarageSaleId) {
+            toast.error('Please select a garage sale');
+            return;
+        }
+
         setIsRecordingCash(true);
 
         try {
@@ -326,6 +358,7 @@ export default function UrbanPay() {
             // Use Firestore Web SDK directly
             const saleData = {
                 sellerId: user.id,
+                garageSaleId: selectedGarageSaleId,
                 amount: parseFloat(cashAmount),
                 description: cashDescription.trim(),
                 paymentMethod: 'cash',
@@ -339,7 +372,7 @@ export default function UrbanPay() {
             const saleId = await firebase.firestore.collection('sales').add(saleData);
             console.log('[recordCashSale] Sale created:', saleId);
 
-            // Update seller stats
+            // Update seller stats (lifetime)
             console.log('[recordCashSale] Updating seller stats...');
             const statsRef = firebase.firestore.collection('sellerStats').doc(user.id);
             const statsDoc = await statsRef.get();
@@ -356,6 +389,35 @@ export default function UrbanPay() {
                 }, { merge: true });
             } else {
                 await statsRef.set({
+                    totalEarnings: parseFloat(cashAmount),
+                    completedEarnings: parseFloat(cashAmount),
+                    pendingEarnings: 0,
+                    totalSales: 1,
+                    completedSales: 1,
+                    pendingSales: 0,
+                    lastSaleDate: new Date(),
+                });
+            }
+
+            // Update sale-specific stats
+            console.log('[recordCashSale] Updating sale stats for garage sale:', selectedGarageSaleId);
+            const saleStatsRef = firebase.firestore.collection('saleStats').doc(selectedGarageSaleId);
+            const saleStatsDoc = await saleStatsRef.get();
+
+            if (saleStatsDoc.exists) {
+                const currentSaleStats = saleStatsDoc.data();
+                await saleStatsRef.set({
+                    ...currentSaleStats,
+                    totalEarnings: (currentSaleStats.totalEarnings || 0) + parseFloat(cashAmount),
+                    completedEarnings: (currentSaleStats.completedEarnings || 0) + parseFloat(cashAmount),
+                    totalSales: (currentSaleStats.totalSales || 0) + 1,
+                    completedSales: (currentSaleStats.completedSales || 0) + 1,
+                    lastSaleDate: new Date(),
+                }, { merge: true });
+            } else {
+                await saleStatsRef.set({
+                    garageSaleId: selectedGarageSaleId,
+                    sellerId: user.id,
                     totalEarnings: parseFloat(cashAmount),
                     completedEarnings: parseFloat(cashAmount),
                     pendingEarnings: 0,
@@ -424,6 +486,7 @@ export default function UrbanPay() {
     useEffect(() => {
         if (user) {
             refreshSellerStats();
+            loadGarageSales();
             // Check if card payments are enabled
             setCardPaymentsEnabled(user.stripeConnectId ? true : false);
         }
@@ -594,6 +657,25 @@ export default function UrbanPay() {
                                 </DialogHeader>
                                 <div className="space-y-4 py-4">
                                     <div>
+                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Garage Sale</label>
+                                        <select 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                            value={selectedGarageSaleId}
+                                            onChange={(e) => setSelectedGarageSaleId(e.target.value)}
+                                            disabled={isRecordingCash || isLoadingGarageSales}
+                                        >
+                                            <option value="">-- Select a garage sale --</option>
+                                            {garageSales.map(sale => (
+                                                <option key={sale.id} value={sale.id}>
+                                                    {sale.title || 'Untitled'} {sale.date ? `(${new Date(sale.date instanceof Date ? sale.date : new Date(sale.date)).toLocaleDateString()})` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {garageSales.length === 0 && (
+                                            <p className="text-xs text-amber-600 mt-1">No garage sales found. Create one first.</p>
+                                        )}
+                                    </div>
+                                    <div>
                                         <label className="text-sm font-medium text-slate-700 mb-1 block">Amount ($)</label>
                                         <input 
                                             type="number" 
@@ -724,10 +806,11 @@ export default function UrbanPay() {
                                             <table className="w-full text-sm">
                                                 <thead>
                                                     <tr className="border-b border-slate-200 bg-slate-50">
-                                                        <th className="text-left py-2 px-3 font-semibold">Date</th>
-                                                        <th className="text-left py-2 px-3 font-semibold">Type</th>
-                                                        <th className="text-left py-2 px-3 font-semibold">Description</th>
-                                                        <th className="text-right py-2 px-3 font-semibold">Amount</th>
+                                                        <th className="text-left py-2 px-3 font-semibold text-xs">Date</th>
+                                                        <th className="text-left py-2 px-3 font-semibold text-xs">Type</th>
+                                                        <th className="text-left py-2 px-3 font-semibold text-xs">Garage Sale</th>
+                                                        <th className="text-left py-2 px-3 font-semibold text-xs">Description</th>
+                                                        <th className="text-right py-2 px-3 font-semibold text-xs">Amount</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -744,12 +827,17 @@ export default function UrbanPay() {
                                                         const date = dateObj instanceof Date ? dateObj.toLocaleString() : 'Invalid Date';
                                                         const type = sale.paymentMethod === 'cash' ? '💵 Cash' : '💳 Card';
                                                         
+                                                        // Find garage sale name
+                                                        const garageSale = garageSales.find(gs => gs.id === sale.garageSaleId);
+                                                        const garageSaleName = garageSale?.title || 'Unknown Sale';
+                                                        
                                                         return (
                                                             <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
-                                                                <td className="py-2 px-3 text-xs text-slate-700">{date}</td>
+                                                                <td className="py-2 px-3 text-xs text-slate-700 whitespace-nowrap">{date}</td>
                                                                 <td className="py-2 px-3">{type}</td>
-                                                                <td className="py-2 px-3 text-slate-700">{sale.description || '-'}</td>
-                                                                <td className="py-2 px-3 text-right font-semibold text-slate-900">${(sale.amount || 0).toFixed(2)}</td>
+                                                                <td className="py-2 px-3 text-xs text-slate-700">{garageSaleName}</td>
+                                                                <td className="py-2 px-3 text-slate-700 max-w-xs truncate">{sale.description || '-'}</td>
+                                                                <td className="py-2 px-3 text-right font-semibold text-slate-900 whitespace-nowrap">${(sale.amount || 0).toFixed(2)}</td>
                                                             </tr>
                                                         );
                                                     })}

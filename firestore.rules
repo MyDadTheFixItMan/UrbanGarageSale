@@ -99,7 +99,7 @@ service cloud.firestore {
       allow delete: if request.auth != null && isAdmin();
     }
 
-    // Urban Pay Seller Statistics
+    // Urban Pay Seller Statistics (lifetime)
     match /sellerStats/{sellerId} {
       // User can read and write their own stats
       allow read: if request.auth != null && request.auth.uid == sellerId;
@@ -110,6 +110,23 @@ service cloud.firestore {
       
       // Admins can update stats
       allow update: if request.auth != null && isAdmin();
+      
+      // Only admins can delete
+      allow delete: if request.auth != null && isAdmin();
+    }
+
+    // Urban Pay Sale Statistics (per garage sale)
+    match /saleStats/{garageSaleId} {
+      // User can read and write stats for their own garage sales
+      allow read, write: if request.auth != null && 
+                          request.auth.uid == resource.data.sellerId;
+      
+      // Allow creating new sale stats for authenticated sellers
+      allow create: if request.auth != null &&
+                     request.auth.uid == request.resource.data.sellerId;
+      
+      // Admins can read and update all sale stats
+      allow read, update: if request.auth != null && isAdmin();
       
       // Only admins can delete
       allow delete: if request.auth != null && isAdmin();

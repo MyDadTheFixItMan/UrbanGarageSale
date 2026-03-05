@@ -92,10 +92,17 @@ export default function UrbanPay() {
             console.log('[loadSalesList] Fetching sales for user:', user.id);
             
             // Get all sales docs from collection
+            console.log('[loadSalesList] Calling getDocs()...');
             const allSales = await firebase.firestore.collection('sales').getDocs();
+            console.log('[loadSalesList] getDocs returned:', allSales.length, 'documents');
             
             // Filter to only user's sales
-            const userSales = allSales.filter(sale => sale.sellerId === user.id);
+            console.log('[loadSalesList] Filtering sales for user...');
+            const userSales = allSales.filter(sale => {
+                console.log('[loadSalesList] Checking sale:', sale.id, 'sellerId:', sale.sellerId, 'userId:', user.id);
+                return sale.sellerId === user.id;
+            });
+            console.log('[loadSalesList] Found', userSales.length, 'user sales');
             
             // Sort by date descending (newest first)
             userSales.sort((a, b) => {

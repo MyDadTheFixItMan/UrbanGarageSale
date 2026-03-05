@@ -221,9 +221,9 @@ export default function UrbanPay() {
 
             console.log('[recordCashSale] Creating sale document:', saleData);
             
-            // Create the sale document
-            const saleRef = await firebase.firestore.collection('sales').add(saleData);
-            console.log('[recordCashSale] Sale created:', saleRef.id);
+            // Create the sale document - add() returns the document ID
+            const saleId = await firebase.firestore.collection('sales').add(saleData);
+            console.log('[recordCashSale] Sale created:', saleId);
 
             // Update seller stats
             console.log('[recordCashSale] Updating seller stats...');
@@ -232,13 +232,14 @@ export default function UrbanPay() {
 
             if (statsDoc.exists) {
                 const currentStats = statsDoc.data();
-                await statsRef.update({
+                await statsRef.set({
+                    ...currentStats,
                     totalEarnings: (currentStats.totalEarnings || 0) + parseFloat(cashAmount),
                     completedEarnings: (currentStats.completedEarnings || 0) + parseFloat(cashAmount),
                     totalSales: (currentStats.totalSales || 0) + 1,
                     completedSales: (currentStats.completedSales || 0) + 1,
                     lastSaleDate: new Date(),
-                });
+                }, { merge: true });
             } else {
                 await statsRef.set({
                     totalEarnings: parseFloat(cashAmount),

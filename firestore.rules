@@ -31,10 +31,10 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null && isAdmin();
     }
 
-    // Garage sales listings (public read, authenticated create with 2FA, own/admin update)
+    // Garage sales listings (public read, authenticated create, own/admin update)
     match /garageSales/{document=**} {
       allow read: if true;
-      allow create: if request.auth != null && has2FAEnabled();
+      allow create: if request.auth != null;
       allow update: if request.auth != null && (
         request.auth.uid == resource.data.user_id || isAdmin()
       );
@@ -49,12 +49,12 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == request.resource.data.user_id;
     }
 
-    // Payment records (user can read own, admin can read all, 2FA required for create)
+    // Payment records (user can read own, admin can read all)
     match /payments/{document=**} {
       allow read: if request.auth != null && (
         request.auth.uid == resource.data.user_id || isAdmin()
       );
-      allow create: if request.auth != null && has2FAEnabled();
+      allow create: if request.auth != null;
       allow update: if request.auth != null && isAdmin();
       allow delete: if request.auth != null && isAdmin();
     }

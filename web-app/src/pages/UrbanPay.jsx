@@ -144,8 +144,18 @@ export default function UrbanPay() {
 
     // Print sales list
     function printSalesList() {
-        const printWindow = window.open('', '', 'width=800,height=600');
+        const printWindow = window.open('', '', 'width=1000,height=600');
         const total = salesList.reduce((sum, sale) => sum + (sale.amount || 0), 0);
+        
+        // Group sales by garage sale
+        const salesByGarageSale = {};
+        salesList.forEach(sale => {
+            const garageSaleId = sale.garageSaleId || 'unknown';
+            if (!salesByGarageSale[garageSaleId]) {
+                salesByGarageSale[garageSaleId] = [];
+            }
+            salesByGarageSale[garageSaleId].push(sale);
+        });
         
         let html = `
             <html>
@@ -154,63 +164,80 @@ export default function UrbanPay() {
                 <style>
                     body { font-family: Arial, sans-serif; margin: 20px; }
                     h1 { color: #1e3a5f; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    h2 { color: #2d5a8a; margin-top: 30px; border-bottom: 2px solid #1e3a5f; padding-bottom: 10px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
                     th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
                     th { background-color: #1e3a5f; color: white; }
                     tr:nth-child(even) { background-color: #f5f1e8; }
                     .total-row { font-weight: bold; background-color: #e8f0f8; }
+                    .subtotal-row { font-weight: bold; background-color: #f0f5fa; }
                     .date { color: #666; font-size: 0.9em; }
+                    .sale-total { color: #1e3a5f; }
                 </style>
             </head>
             <body>
-                <h1>Sales Report</h1>
+                <h1>Urban Garage Sale - Sales Report</h1>
                 <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
-                <p><strong>Total Sales:</strong> ${salesList.length}</p>
-                <p><strong>Total Amount:</strong> $${total.toFixed(2)}</p>
-                
+                <p><strong>Total Sales Transactions:</strong> ${salesList.length}</p>
+                <p><strong>Grand Total:</strong> <span class="sale-total"><strong>$${total.toFixed(2)}</strong></span></p>
+        `;
+        
+        // Generate report for each garage sale
+        Object.entries(salesByGarageSale).forEach(([garageSaleId, salesToReport]) => {
+            const garageSale = garageSales.find(gs => gs.id === garageSaleId);
+            const garageSaleName = garageSale?.title || 'Unknown Sale';
+            const garageSaleTotal = salesToReport.reduce((sum, sale) => sum + (sale.amount || 0), 0);
+            
+            html += `<h2>${garageSaleName}</h2>`;
+            html += `
                 <table>
                     <thead>
                         <tr>
                             <th>Date</th>
                             <th>Type</th>
                             <th>Description</th>
-                            <th>Amount</th>
+                            <th style="text-align: right;">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
-        `;
-        
-        salesList.forEach(sale => {
-            // Convert Firestore Timestamp to Date
-            let dateObj = sale.createdAt;
-            if (sale.createdAt && typeof sale.createdAt.toDate === 'function') {
-                dateObj = sale.createdAt.toDate();
-            } else if (sale.createdAt instanceof Date) {
-                dateObj = sale.createdAt;
-            } else if (typeof sale.createdAt === 'string') {
-                dateObj = new Date(sale.createdAt);
-            }
-            const date = dateObj instanceof Date ? dateObj.toLocaleString() : 'Invalid Date';
-            const type = sale.paymentMethod === 'cash' ? 'Cash' : 'Card';
-            html += `
+            `;
+            
+            salesToReport.forEach(sale => {
+                // Convert Firestore Timestamp to Date
+                let dateObj = sale.createdAt;
+                if (sale.createdAt && typeof sale.createdAt.toDate === 'function') {
+                    dateObj = sale.createdAt.toDate();
+                } else if (sale.createdAt instanceof Date) {
+                    dateObj = sale.createdAt;
+                } else if (typeof sale.createdAt === 'string') {
+                    dateObj = new Date(sale.createdAt);
+                }
+                const date = dateObj instanceof Date ? dateObj.toLocaleString() : 'Invalid Date';
+                const type = sale.paymentMethod === 'cash' ? 'Cash' : 'Card';
+                html += `
                         <tr>
                             <td class="date">${date}</td>
                             <td>${type}</td>
                             <td>${sale.description || '-'}</td>
-                            <td>$${(sale.amount || 0).toFixed(2)}</td>
+                            <td style="text-align: right;">$${(sale.amount || 0).toFixed(2)}</td>
                         </tr>
+                `;
+            });
+            
+            html += `
+                        <tr class="subtotal-row">
+                            <td colspan="3" style="text-align: right;">Garage Sale Total:</td>
+                            <td style="text-align: right;">$${garageSaleTotal.toFixed(2)}</td>
+                        </tr>
+                    </tbody>
+                </table>
             `;
         });
         
         html += `
-                    </tbody>
-                    <tfoot>
-                        <tr class="total-row">
-                            <td colspan="3">TOTAL</td>
-                            <td>$${total.toFixed(2)}</td>
-                        </tr>
-                    </tfoot>
-                </table>
+                <div style="margin-top: 40px; padding-top: 20px; border-top: 3px solid #1e3a5f;">
+                    <p style="font-size: 16px;"><strong>GRAND TOTAL:</strong> <span style="color: #1e3a5f; font-size: 20px;">$${total.toFixed(2)}</span></p>
+                </div>
             </body>
             </html>
         `;
@@ -219,6 +246,7 @@ export default function UrbanPay() {
         printWindow.document.close();
         printWindow.print();
     }
+
     useEffect(() => {
         if (allPromotions.length === 0) return;
         const interval = setInterval(() => {

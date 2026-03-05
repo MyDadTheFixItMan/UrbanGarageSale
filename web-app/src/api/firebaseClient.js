@@ -640,7 +640,7 @@ export const firebaseEntities = {
         created_by: user.email,
         user_id: user.uid,
         created_at: new Date(),
-        status: 'draft'
+        status: data.status || 'draft'
       });
       
       return { id: docRef.id, ...data };

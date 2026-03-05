@@ -4,7 +4,7 @@
   "description": "UrbanGarageSale - Garage sale finder app",
   "type": "module",
   "scripts": {
-    "dev:api": "node API/server.js",
+    "dev:api": "node server.js",
     "dev:web": "cd web-app && npm run dev",
     "dev": "npm run dev:api & npm run dev:web"
   },

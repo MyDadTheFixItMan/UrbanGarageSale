@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { AlertCircle, Smartphone, RefreshCw, CreditCard, DollarSign, Smartphone as SmartphoneIcon } from 'lucide-react';
+import { AlertCircle, Smartphone, RefreshCw, CreditCard, DollarSign, Smartphone as SmartphoneIcon, FileText, Printer } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -33,6 +33,9 @@ export default function UrbanPay() {
     const [isProcessingCard, setIsProcessingCard] = useState(false);
     const [showCashModal, setShowCashModal] = useState(false);
     const [showCardModal, setShowCardModal] = useState(false);
+    const [showSalesListModal, setShowSalesListModal] = useState(false);
+    const [salesList, setSalesList] = useState([]);
+    const [isLoadingSales, setIsLoadingSales] = useState(false);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -77,7 +80,111 @@ export default function UrbanPay() {
         }
     }
 
-    // Rotate promotional messages every 5 seconds
+    // Fetch sales list for the current user
+    async function loadSalesList() {
+        if (!user || !user.id) {
+            toast.error('User not authenticated');
+            return;
+        }
+
+        setIsLoadingSales(true);
+        try {
+            console.log('[loadSalesList] Fetching sales for user:', user.id);
+            
+            // Get all sales docs from collection
+            const allSales = await firebase.firestore.collection('sales').getDocs();
+            
+            // Filter to only user's sales
+            const userSales = allSales.filter(sale => sale.sellerId === user.id);
+            
+            // Sort by date descending (newest first)
+            userSales.sort((a, b) => {
+                const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+                const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+                return dateB - dateA;
+            });
+            
+            console.log('[loadSalesList] Loaded', userSales.length, 'sales');
+            setSalesList(userSales);
+            setShowSalesListModal(true);
+        } catch (error) {
+            console.error('Error loading sales list:', error);
+            toast.error('Failed to load sales list: ' + error.message);
+        } finally {
+            setIsLoadingSales(false);
+        }
+    }
+
+    // Print sales list
+    function printSalesList() {
+        const printWindow = window.open('', '', 'width=800,height=600');
+        const total = salesList.reduce((sum, sale) => sum + (sale.amount || 0), 0);
+        
+        let html = `
+            <html>
+            <head>
+                <title>Sales Report</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1 { color: #1e3a5f; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+                    th { background-color: #1e3a5f; color: white; }
+                    tr:nth-child(even) { background-color: #f5f1e8; }
+                    .total-row { font-weight: bold; background-color: #e8f0f8; }
+                    .date { color: #666; font-size: 0.9em; }
+                </style>
+            </head>
+            <body>
+                <h1>Sales Report</h1>
+                <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+                <p><strong>Total Sales:</strong> ${salesList.length}</p>
+                <p><strong>Total Amount:</strong> $${total.toFixed(2)}</p>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        salesList.forEach(sale => {
+            const date = sale.createdAt instanceof Date 
+                ? sale.createdAt.toLocaleString() 
+                : new Date(sale.createdAt).toLocaleString();
+            const type = sale.paymentMethod === 'cash' ? 'Cash' : 'Card';
+            html += `
+                        <tr>
+                            <td class="date">${date}</td>
+                            <td>${type}</td>
+                            <td>${sale.description || '-'}</td>
+                            <td>$${(sale.amount || 0).toFixed(2)}</td>
+                        </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td colspan="3">TOTAL</td>
+                            <td>$${total.toFixed(2)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </body>
+            </html>
+        `;
+        
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.print();
+    }
     useEffect(() => {
         if (allPromotions.length === 0) return;
         const interval = setInterval(() => {
@@ -377,15 +484,27 @@ export default function UrbanPay() {
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-sm font-semibold text-slate-700">Your Earnings</h3>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={refreshSellerStats}
-                                    disabled={isRefreshingStats}
-                                    className="h-8 w-8 p-0"
-                                >
-                                    <RefreshCw className={`w-4 h-4 ${isRefreshingStats ? 'animate-spin' : ''}`} />
-                                </Button>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => loadSalesList()}
+                                        disabled={isLoadingSales}
+                                        className="h-8 px-2"
+                                        title="View sales list"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={refreshSellerStats}
+                                        disabled={isRefreshingStats}
+                                        className="h-8 w-8 p-0"
+                                    >
+                                        <RefreshCw className={`w-4 h-4 ${isRefreshingStats ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
@@ -561,6 +680,87 @@ export default function UrbanPay() {
                                     >
                                         {isProcessingCard ? 'Processing...' : 'Process Payment'}
                                     </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        {/* Sales List Modal */}
+                        <Dialog open={showSalesListModal} onOpenChange={setShowSalesListModal}>
+                            <DialogContent className="max-w-2xl max-h-96 overflow-y-auto">
+                                <DialogHeader>
+                                    <DialogTitle>Sales History</DialogTitle>
+                                    <DialogDescription>
+                                        All your sales transactions
+                                    </DialogDescription>
+                                </DialogHeader>
+                                
+                                {salesList.length === 0 ? (
+                                    <div className="py-8 text-center">
+                                        <p className="text-slate-600">No sales recorded yet.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+                                            <div>
+                                                <p className="text-xs text-slate-600 font-semibold">Total Sales</p>
+                                                <p className="text-xl font-bold text-slate-900">{salesList.length}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-slate-600 font-semibold">Total Amount</p>
+                                                <p className="text-xl font-bold text-green-600">
+                                                    ${salesList.reduce((sum, sale) => sum + (sale.amount || 0), 0).toFixed(2)}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="max-h-64 overflow-y-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b border-slate-200 bg-slate-50">
+                                                        <th className="text-left py-2 px-3 font-semibold">Date</th>
+                                                        <th className="text-left py-2 px-3 font-semibold">Type</th>
+                                                        <th className="text-left py-2 px-3 font-semibold">Description</th>
+                                                        <th className="text-right py-2 px-3 font-semibold">Amount</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {salesList.map((sale, idx) => {
+                                                        const date = sale.createdAt instanceof Date 
+                                                            ? sale.createdAt.toLocaleString() 
+                                                            : new Date(sale.createdAt).toLocaleString();
+                                                        const type = sale.paymentMethod === 'cash' ? '💵 Cash' : '💳 Card';
+                                                        
+                                                        return (
+                                                            <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                                                                <td className="py-2 px-3 text-xs text-slate-700">{date}</td>
+                                                                <td className="py-2 px-3">{type}</td>
+                                                                <td className="py-2 px-3 text-slate-700">{sale.description || '-'}</td>
+                                                                <td className="py-2 px-3 text-right font-semibold text-slate-900">${(sale.amount || 0).toFixed(2)}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <DialogFooter className="gap-2">
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={() => setShowSalesListModal(false)}
+                                    >
+                                        Close
+                                    </Button>
+                                    {salesList.length > 0 && (
+                                        <Button 
+                                            onClick={printSalesList}
+                                            className="bg-blue-600 hover:bg-blue-700 gap-2"
+                                        >
+                                            <Printer className="w-4 h-4" />
+                                            Print Report
+                                        </Button>
+                                    )}
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>

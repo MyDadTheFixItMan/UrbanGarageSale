@@ -1,4 +1,4 @@
-name: urbangarageSale
+name: urban_garage_sale
 description: "Urban Garage Sale - A mobile and web platform for listing and discovering local garage sales with integrated payment processing."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.

@@ -88,7 +88,8 @@ class TapToPayService {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        // Parse response (data available for inspection if needed)
+        jsonDecode(response.body);
         return PaymentIntentResponse(
           clientSecret: paymentIntentId,
           paymentIntentId: paymentIntentId,

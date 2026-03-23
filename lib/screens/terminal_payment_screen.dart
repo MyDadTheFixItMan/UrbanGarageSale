@@ -1,5 +1,4 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../services/stripe_terminal_service.dart';
 
 class TerminalPaymentScreen extends StatefulWidget {
@@ -81,25 +80,26 @@ class _TerminalPaymentScreenState extends State<TerminalPaymentScreen> {
       await StripeTerminalService.disconnectReader();
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        if (isProcessing) {
+    return PopScope(
+      canPop: !isProcessing,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && isProcessing) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Cannot close while processing payment'),
             ),
           );
-          return false;
         }
-        return true;
       },
       child: Scaffold(
         appBar: AppBar(

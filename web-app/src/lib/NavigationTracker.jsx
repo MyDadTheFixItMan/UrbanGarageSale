@@ -12,6 +12,9 @@ export default function NavigationTracker() {
 
     // Log user activity when navigating to a page
     useEffect(() => {
+        // Scroll to top when route changes
+        window.scrollTo(0, 0);
+
         // Extract page name from pathname
         const pathname = location.pathname;
         let pageName;

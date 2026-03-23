@@ -1,47 +1,29 @@
-# UrbanGarageSale Live Testing Setup Guide
+⚠️ **DEPRECATED - This document references outdated Deno deployment options**
 
-## Overview
-This guide sets up the UrbanGarageSale garage sale platform for live testing with real Stripe integration and Deno API edge functions.
+# UrbanGarageSale Live Testing Setup Guide - ARCHIVED
 
-## Prerequisites
+**Status**: OUTDATED (March 22, 2026)  
+**Reason**: This guide referenced Deno Deploy, which is no longer used. The project now uses Node.js backend deployed to Vercel.
 
-### 1. Stripe Account
-- Create a Stripe account at https://stripe.com
-- Get your API keys from the Stripe Dashboard (Developers > API Keys)
-- You'll need:
-  - Publishable Key (starts with `pk_test_` or `pk_live_`)
-  - Secret Key (starts with `sk_test_` or `sk_live_`)
+## ⚠️ Use This Instead
 
-### 2. Deno Deployment Option (Choose One)
+🚀 **See [LIVE_TESTING_ACTIVE.md](LIVE_TESTING_ACTIVE.md)** for current setup instructions with Node.js backend.
 
-#### Option A: Deno Deploy (Recommended for beginners)
-1. Go to https://deno.com/deploy
-2. Sign up for a free account
-3. Create a new project
-4. Note your deployment URL (e.g., `https://your-project.deno.dev`)
+---
 
-#### Option B: Self-Hosted (Node.js Alternative)
-1. Install Node.js 18+
-2. Create a backend server using the API functions
-3. Host on services like Vercel, Netlify, or Railway
+## Archive: Original Content (for reference only)
 
-#### Option C: Local Testing (For development)
-1. Run Deno locally: `deno run --allow-all API/createStripeCheckout.ts`
-2. Use `http://localhost:8000` as your API base URL
+### What Changed
+- **OLD**: Deno Deploy edge functions
+- **NEW**: Node.js Express server on Vercel (API/server.js)
+- **OLD**: BASE44_APP_ID environment variable
+- **NEW**: Firebase authentication (migration complete)
 
-## Configuration
+### Original Setup Instructions (Outdated)
 
-### Step 1: Update Environment Variables
-
-**For Web App (.env.local)**
+Environment variables from original guide (no longer valid):
 ```
-VITE_GOOGLE_PLACES_API_KEY=your-google-places-key
-VITE_STRIPE_PUBLIC_KEY=pk_test_YOUR_PUBLISHABLE_KEY
-VITE_API_BASE_URL=http://localhost:3000
-```
-
-**For API Backend (.env or deployment platform)**
-```
+# DEPRECATED - DO NOT USE
 STRIPE_SECRET_KEY=sk_test_YOUR_SECRET_KEY
 BASE44_APP_ID=your-urbangarageSale-app-id
 ```

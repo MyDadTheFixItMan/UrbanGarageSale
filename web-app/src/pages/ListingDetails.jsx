@@ -5,13 +5,21 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import {
     MapPin, Clock, Calendar, Heart, Navigation, ChevronLeft,
-    Share2, Tag, Loader2, ImageIcon
+    Share2, Tag, Loader2, ImageIcon, Printer
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format, parseISO, differenceInDays } from 'date-fns';
 import SaleMap from '../components/map/SaleMap';
+import { printListingPoster, paperSizes } from '../utils/printGarageSaleSign';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 const saleTypeLabels = {
     garage_sale: 'Garage Sale',
@@ -33,6 +41,8 @@ export default function ListingDetails() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [promoIndex, setPromoIndex] = useState(0);
+    const [printDialogOpen, setPrintDialogOpen] = useState(false);
+    const [selectedPrintSize, setSelectedPrintSize] = useState('A4');
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -150,6 +160,15 @@ export default function ListingDetails() {
         } else {
             navigator.clipboard.writeText(window.location.href);
             toast.success('Link copied to clipboard');
+        }
+    };
+
+    const handlePrintSignConfirm = () => {
+        if (sale) {
+            printListingPoster(sale);
+            setPrintDialogOpen(false);
+            setSelectedPrintSize('A4');
+            toast.success('Opening print poster window...');
         }
     };
 
@@ -390,6 +409,16 @@ export default function ListingDetails() {
                     >
                         <Share2 className="w-5 h-5" />
                     </Button>
+
+                    <Button
+                        variant="outline"
+                        onClick={() => setPrintDialogOpen(true)}
+                        className="flex-shrink-0"
+                        aria-label="Print garage sale sign"
+                        title="Print this garage sale sign"
+                    >
+                        <Printer className="w-5 h-5" />
+                    </Button>
                     
                     <Button
                         onClick={handleGetDirections}
@@ -400,6 +429,47 @@ export default function ListingDetails() {
                     </Button>
                 </div>
             </div>
+
+            {/* Print Size Selection Dialog */}
+            <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Print Garage Sale Sign</DialogTitle>
+                        <DialogDescription>
+                            Select the paper size for your garage sale sign
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-3">
+                            {Object.entries(paperSizes).map(([key, size]) => (
+                                <label key={key} className="flex items-center p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="paper-size"
+                                        value={key}
+                                        checked={selectedPrintSize === key}
+                                        onChange={(e) => setSelectedPrintSize(e.target.value)}
+                                        className="w-4 h-4"
+                                    />
+                                    <span className="ml-3 font-medium text-slate-700">{size.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex gap-3 justify-end">
+                        <Button variant="outline" onClick={() => setPrintDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            className="bg-[#1e3a5f] hover:bg-[#152a45]"
+                            onClick={handlePrintSignConfirm}
+                        >
+                            <Printer className="w-4 h-4 mr-2" />
+                            Print Sign
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

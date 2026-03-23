@@ -42,6 +42,10 @@ import {
   uploadBytes,
   getDownloadURL
 } from 'firebase/storage';
+import {
+  getFunctions,
+  httpsCallable as functionsHttpsCallable
+} from 'firebase/functions';
 
 // Firebase configuration
 // TODO: Replace with your Firebase config from Google Cloud Console
@@ -59,6 +63,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
+const functions = getFunctions(app);
 
 // Configure app verification for Phone Authentication
 // For development: disable app verification to allow testing
@@ -209,19 +214,24 @@ export const firebaseAuth = {
       throw new Error('No authenticated user');
     }
     
-    // Get user profile from Firestore
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    
-    if (userSnap.exists()) {
-      return {
-        id: user.uid,
-        email: user.email,
-        ...userSnap.data()
-      };
+    try {
+      // Get user profile from Firestore
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        return {
+          id: user.uid,
+          email: user.email,
+          ...userSnap.data()
+        };
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not fetch user profile from Firestore:', error.message);
+      // Fall through to return minimal data if Firestore is temporarily unavailable
     }
     
-    // If user doesn't exist in Firestore yet, return minimal auth user data
+    // If user doesn't exist in Firestore yet or Firestore is offline, return minimal auth user data
     // Do NOT auto-create empty profiles - this prevents "No Name" users
     return {
       id: user.uid,
@@ -734,7 +744,12 @@ export const firebaseEntities = {
         });
       }
 
-      return results;
+      // Deduplicate results by ID
+      const uniqueResults = Array.from(
+        new Map(results.map(item => [item.id, item])).values()
+      );
+
+      return uniqueResults;
     },
 
     update: async (id, data) => {
@@ -1023,27 +1038,10 @@ export const firebaseStorage = {
 export const firebaseFunctions = {
   invoke: async (functionName, data) => {
     try {
-      // Use local API server instead of Firebase Cloud Functions to avoid CORS issues
-      const apiUrl = `http://localhost:3000/${functionName}`;
-      
-      console.log(`Calling local API: ${apiUrl}`);
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken()}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `API error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result;
+      // Call Firebase Cloud Function using the Firebase SDK
+      const response = await functionsHttpsCallable(functions, functionName)(data);
+      console.log(`Cloud Function ${functionName} result:`, response.data);
+      return response.data;
     } catch (error) {
       console.error(`Function call failed:`, error);
       throw new Error(`Function call failed: ${error.message}`);
@@ -1165,6 +1163,10 @@ export const firebase = {
   firestore: firebaseFirestore,
   asServiceRole: {
     entities: firebaseEntities
+  },
+  // Get current authenticated user
+  get currentUser() {
+    return auth.currentUser;
   },
   // Seed sample listings
   seedSampleListings: async () => {
@@ -1408,77 +1410,49 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c; // Distance in kilometers
 }
 
-// Suburb to coordinates mapping (Melbourne VIC suburbs)
-const SUBURB_COORDS = {
-  // Melbourne CBD
-  'melbourne': { lat: -37.8136, lng: 144.9631, name: 'Melbourne' },
-  '3000': { lat: -37.8136, lng: 144.9631, name: 'Melbourne' },
-  
-  // Inner suburbs
-  'fitzroy': { lat: -37.8019, lng: 144.9766, name: 'Fitzroy' },
-  '3065': { lat: -37.8019, lng: 144.9766, name: 'Fitzroy' },
-  'prahran': { lat: -37.8606, lng: 145.0039, name: 'Prahran' },
-  '3181': { lat: -37.8606, lng: 145.0039, name: 'Prahran' },
-  'south yarra': { lat: -37.8468, lng: 145.0164, name: 'South Yarra' },
-  '3141': { lat: -37.8468, lng: 145.0164, name: 'South Yarra' },
-  'southbank': { lat: -37.8267, lng: 144.9769, name: 'Southbank' },
-  '3006': { lat: -37.8267, lng: 144.9769, name: 'Southbank' },
-  
-  // Outer suburbs
-  'brunswick': { lat: -37.7667, lng: 144.9833, name: 'Brunswick' },
-  '3056': { lat: -37.7667, lng: 144.9833, name: 'Brunswick' },
-  'box hill': { lat: -37.8236, lng: 145.1061, name: 'Box Hill' },
-  '3128': { lat: -37.8236, lng: 145.1061, name: 'Box Hill' },
-  'footscray': { lat: -37.8078, lng: 144.9014, name: 'Footscray' },
-  '3011': { lat: -37.8078, lng: 144.9014, name: 'Footscray' },
-  'ringwood': { lat: -37.8286, lng: 145.2292, name: 'Ringwood' },
-  '3134': { lat: -37.8286, lng: 145.2292, name: 'Ringwood' },
-};
-
-// Helper function to get coordinates for a suburb/postcode
+// Helper function to get coordinates for a suburb/postcode using Google Geocoding API
 async function getSuburbCoordinates(suburbOrPostcode) {
   if (!suburbOrPostcode) return null;
   
-  const searchTerm = suburbOrPostcode.toLowerCase().trim();
-  
-  // First try hardcoded lookup (Melbourne suburbs)
-  const hardcodedResult = SUBURB_COORDS[searchTerm];
-  if (hardcodedResult) {
-    console.log(`✓ Found suburb "${suburbOrPostcode}" in hardcoded coordinates`);
-    return hardcodedResult;
-  }
-  
-  // Fallback to Google Places API for other suburbs/postcodes
-  console.log(`📍 Suburb "${suburbOrPostcode}" not in hardcoded list, trying Google Places API...`);
   try {
-    const response = await fetch('http://localhost:3000/getPrincipalCoordinates', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        locationQuery: suburbOrPostcode,
-        country: 'Australia'
-      })
-    });
+    const searchTerm = suburbOrPostcode.trim();
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(searchTerm)}&country=AU&key=AIzaSyCmAD0m-2Z_-WomxpDvREimaPSp2CtjmEY`
+    );
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data.latitude !== undefined && data.longitude !== undefined) {
-        console.log(`✓ Found coordinates via API: lat=${data.latitude}, lng=${data.longitude}`);
-        return {
-          lat: data.latitude,
-          lng: data.longitude,
-          name: data.name || suburbOrPostcode
-        };
-      }
+    if (!response.ok) {
+      throw new Error(`Geocoding API error: ${response.status}`);
     }
+
+    const data = await response.json();
+    
+    if (data.results && data.results.length > 0) {
+      const result = data.results[0];
+      const location = result.geometry.location;
+      
+      // Extract suburb/locality from address components
+      let suburbName = suburbOrPostcode;
+      const addressComponents = result.address_components || [];
+      addressComponents.forEach((component) => {
+        if (component.types.includes('locality')) {
+          suburbName = component.long_name;
+        }
+      });
+      
+      console.log(`✓ Found coordinates via Google Geocoding API: ${suburbOrPostcode} -> lat=${location.lat}, lng=${location.lng}`);
+      return {
+        lat: location.lat,
+        lng: location.lng,
+        name: suburbName
+      };
+    }
+    
+    console.log(`✗ No results found for "${suburbOrPostcode}" in Google Geocoding API`);
+    return null;
   } catch (error) {
-    console.warn(`⚠️  Google Places lookup failed for "${suburbOrPostcode}":`, error.message);
+    console.warn(`⚠️ Google Geocoding API lookup failed for "${suburbOrPostcode}":`, error.message);
+    return null;
   }
-  
-  console.log(`✗ Could not find coordinates for "${suburbOrPostcode}"`);
-  return null;
 }
 
 // Export utility function to window for easy access in components

@@ -21,9 +21,10 @@ export const AuthProvider = ({ children }) => {
           setUser(userData);
           setIsAuthenticated(true);
         } catch (error) {
-          console.error('Failed to get user:', error);
-          setIsAuthenticated(false);
-          setUser(null);
+          console.warn('⚠️ Failed to get user profile:', error.message);
+          // Still consider user authenticated even if profile fetch fails
+          setUser({ id: authUser.uid, email: authUser.email });
+          setIsAuthenticated(true);
         }
       } else {
         setIsAuthenticated(false);
@@ -49,9 +50,16 @@ export const AuthProvider = ({ children }) => {
           setUser(currentUser);
           setIsAuthenticated(true);
         } catch (error) {
-          console.error('Failed to get user:', error);
-          setIsAuthenticated(false);
-          setUser(null);
+          console.warn('⚠️ Failed to get user profile:', error.message);
+          // Still set authenticated if we have a current user in auth system
+          const authUser = firebase.currentUser;
+          if (authUser) {
+            setUser({ id: authUser.uid, email: authUser.email });
+            setIsAuthenticated(true);
+          } else {
+            setIsAuthenticated(false);
+            setUser(null);
+          }
         }
       } else {
         setIsAuthenticated(false);
@@ -61,13 +69,11 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingPublicSettings(false);
       setIsLoadingAuth(false);
     } catch (error) {
-      console.error('Unexpected error:', error);
-      setAuthError({
-        type: 'unknown',
-        message: error.message || 'An unexpected error occurred'
-      });
+      console.warn('⚠️ Error checking app state:', error.message);
+      // Don't block the app on errors - allow it to continue
       setIsLoadingPublicSettings(false);
       setIsLoadingAuth(false);
+      setAuthError(null); // Don't show error UI for transient issues
     }
   };
 

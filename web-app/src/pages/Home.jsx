@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import { firebase } from '@/api/firebaseClient';
-import { Map, List, Tag, Search, Loader2, Heart, TrendingUp } from 'lucide-react';
+import { Map, List, Tag, Search, Loader2, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import SaleMap from '../components/map/SaleMap';
 
 export default function Home() {
     const queryClient = useQueryClient();
+    const [isPending, startTransition] = useTransition();
     const [viewMode, setViewMode] = useState('list');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [user, setUser] = useState(null);
@@ -40,7 +42,17 @@ export default function Home() {
         
         if (savedResults) {
             try {
-                setSearchResults(JSON.parse(savedResults));
+                const results = JSON.parse(savedResults);
+                // Filter out past-dated listings from cached results
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+                const activeListing = results.filter(sale => {
+                    if (!sale.end_date) return true;
+                    let endDate = new Date(sale.end_date);
+                    endDate.setHours(23, 59, 59, 999);
+                    return endDate >= now;
+                });
+                setSearchResults(activeListing);
             } catch (error) {
                 console.error('Error parsing saved results:', error);
             }
@@ -57,8 +69,13 @@ export default function Home() {
                 return [];
             }
         },
-        staleTime: 1000 * 60 * 5, // 5 minutes
+        staleTime: 1000 * 60 * 30, // 30 minutes
+        gcTime: 1000 * 60 * 60, // 60 minutes cache
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
     });
+
+    const [enableSavedListingsQuery, setEnableSavedListingsQuery] = useState(false);
 
     const { data: savedListings = [] } = useQuery({
         queryKey: ['savedListings', user?.email],
@@ -67,7 +84,13 @@ export default function Home() {
             const results = await firebase.entities.SavedListing.filter({ user_email: user.email });
             return results;
         },
-        enabled: !!user?.email,
+        enabled: enableSavedListingsQuery && !!user?.email,
+        staleTime: 1000 * 60 * 30, // Keep data fresh for 30 minutes before refetching
+        gcTime: 1000 * 60 * 60, // Keep in cache for 60 minutes
+        throwOnError: false,
+        suspense: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
     });
 
     const [lastWasSaved, setLastWasSaved] = useState(false);
@@ -97,8 +120,13 @@ export default function Home() {
         },
         onSuccess: () => {
             console.log('Save mutation succeeded, invalidating query');
-            queryClient.invalidateQueries({ queryKey: ['savedListings', user?.email] });
-            toast.success(lastWasSaved ? 'Removed from favourites' : 'Saved to favourites');
+            // Defer the query update to avoid blocking the message handler
+            startTransition(() => {
+                setTimeout(() => {
+                    queryClient.invalidateQueries({ queryKey: ['savedListings', user?.email] });
+                }, 0);
+                toast.success(lastWasSaved ? 'Removed from favourites' : 'Saved to favourites');
+            });
         },
         onError: (error) => {
             console.error('Save mutation failed:', error);
@@ -120,22 +148,16 @@ export default function Home() {
             }
         };
         checkAuth();
-
-        // Try to get user's geolocation
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    setUserLocation({
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                    });
-                },
-                (error) => {
-                    console.log('Geolocation permission denied or unavailable:', error);
-                }
-            );
-        }
     }, []);
+
+    // Defer SavedListings query to avoid blocking on initial page load
+    useEffect(() => {
+        if (!user?.email) return;
+        const timer = setTimeout(() => {
+            setEnableSavedListingsQuery(true);
+        }, 2000); // Wait 2 seconds before enabling the query to let page render
+        return () => clearTimeout(timer);
+    }, [user?.email]);
 
     // Rotate promotional messages every 5 seconds
     useEffect(() => {
@@ -168,14 +190,6 @@ export default function Home() {
         }
     }, [searchResults]);
 
-    // Auto-search when user location is available
-    useEffect(() => {
-        if (userLocation && !isSearching && searchResults.length === 0) {
-            console.log('User location detected, performing automatic search within 25km');
-            performSearch(userLocation);
-        }
-    }, [userLocation]);
-
     const performSearch = async (location = userLocation, searchFilters = {}) => {
         if (!location) {
             toast.error('Location not available. Please enable location access or enter a suburb.');
@@ -191,12 +205,8 @@ export default function Home() {
                 userLongitude: location.longitude,
             };
 
-            console.log('Search filters:', filters);
-
             // Fetch filtered sales
             const results = await firebase.entities.GarageSale.filter(filters);
-            
-            console.log('Search results:', results);
             
             if (results.length === 0) {
                 toast.info('No listings found in your search area');
@@ -213,73 +223,106 @@ export default function Home() {
         }
     };
 
+    const requestGeolocation = () => {
+        return new Promise((resolve) => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        setUserLocation({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                        });
+                        resolve({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                        });
+                    },
+                    (error) => {
+                        console.log('Geolocation permission denied or unavailable:', error);
+                        resolve(null);
+                    }
+                );
+            } else {
+                resolve(null);
+            }
+        });
+    };
+
     const handleSearch = async () => {
-        console.log('Search button clicked!');
-        console.log('Filters:', filters);
-        console.log('User Location:', userLocation);
+        let location = userLocation;
         
-        if (!filters.postcode && !userLocation) {
+        if (!filters.postcode && !location) {
+            // Request geolocation when user clicks search without entering a postcode
+            toast.loading('Requesting your location...');
+            location = await requestGeolocation();
+        }
+        
+        if (!filters.postcode && !location) {
             toast.error('Please enter a suburb/postcode or enable location access');
             return;
         }
 
-        setIsSearching(true);
-        try {
-            // Build filter object
-            const searchFilters = {
-                saleType: filters.saleType !== 'all' ? filters.saleType : undefined,
-                distance: filters.distance,
-            };
+        // Set searching immediately
+        startTransition(() => setIsSearching(true));
+        
+        // Defer the actual search work to avoid blocking the event handler
+        setTimeout(async () => {
+            try {
+                // Build filter object
+                const searchFilters = {
+                    saleType: filters.saleType !== 'all' ? filters.saleType : undefined,
+                    distance: filters.distance,
+                };
 
-            // Try to get coordinates from suburb/postcode input
-            let searchLatitude = userLocation?.latitude;
-            let searchLongitude = userLocation?.longitude;
+                // Try to get coordinates from suburb/postcode input
+                let searchLatitude = location?.latitude;
+                let searchLongitude = location?.longitude;
 
-            if (filters.postcode) {
-                // Use the suburb lookup function (which now supports async geocoding)
-                try {
-                    const suburbData = await window.firebaseSuburbLookup?.(filters.postcode);
-                    if (suburbData) {
-                        searchLatitude = suburbData.lat;
-                        searchLongitude = suburbData.lng;
-                        console.log(`✓ Found suburb coordinates: ${filters.postcode} -> lat=${searchLatitude}, lng=${searchLongitude}`);
-                    } else {
-                        console.log(`✗ Suburb "${filters.postcode}" not found in lookup, using user location or defaulting to search by postcode`);
+                if (filters.postcode) {
+                    // Use the suburb lookup function (which now supports async geocoding)
+                    try {
+                        const suburbData = await window.firebaseSuburbLookup?.(filters.postcode);
+                        if (suburbData) {
+                            searchLatitude = suburbData.lat;
+                            searchLongitude = suburbData.lng;
+                            console.log(`✓ Found suburb coordinates: ${filters.postcode} -> lat=${searchLatitude}, lng=${searchLongitude}`);
+                        } else {
+                            console.log(`✗ Suburb "${filters.postcode}" not found in lookup, using user location or defaulting to search by postcode`);
+                            searchFilters.postcode = filters.postcode;
+                        }
+                    } catch (error) {
+                        console.warn(`⚠️  Error looking up suburb "${filters.postcode}":`, error.message);
+                        // Fallback to postcode search
                         searchFilters.postcode = filters.postcode;
                     }
-                } catch (error) {
-                    console.warn(`⚠️  Error looking up suburb "${filters.postcode}":`, error.message);
-                    // Fallback to postcode search
-                    searchFilters.postcode = filters.postcode;
                 }
-            }
 
-            // Add coordinates if available
-            if (searchLatitude !== undefined && searchLongitude !== undefined) {
-                searchFilters.userLatitude = searchLatitude;
-                searchFilters.userLongitude = searchLongitude;
-            }
+                // Add coordinates if available
+                if (searchLatitude !== undefined && searchLongitude !== undefined) {
+                    searchFilters.userLatitude = searchLatitude;
+                    searchFilters.userLongitude = searchLongitude;
+                }
 
-            console.log('Search filters:', searchFilters);
-
-            // Fetch filtered sales
-            const results = await firebase.entities.GarageSale.filter(searchFilters);
-            
-            console.log('Search results:', results);
-            
-            if (results.length === 0) {
-                toast.info('No listings found in your search area');
-            } else {
-                toast.success(`Found ${results.length} listing${results.length !== 1 ? 's' : ''}`);
+                // Fetch filtered sales
+                const results = await firebase.entities.GarageSale.filter(searchFilters);
+                
+                // Defer state update to prevent blocking the UI
+                startTransition(() => {
+                    if (results.length === 0) {
+                        toast.info('No listings found in your search area');
+                    } else {
+                        toast.success(`Found ${results.length} listing${results.length !== 1 ? 's' : ''}`);
+                    }
+                    
+                    setSearchResults(results);
+                });
+            } catch (error) {
+                console.error('Search error:', error);
+                toast.error('Failed to search listings');
+            } finally {
+                startTransition(() => setIsSearching(false));
             }
-            
-            setSearchResults(results);
-        } catch (error) {
-            console.error('Search error:', error);
-            toast.error('Failed to search listings');
-        } finally {
-            setIsSearching(false);
-        }
+        }, 0);
     };
 
     return (
@@ -339,13 +382,13 @@ export default function Home() {
                                         placeholder="Start typing..."
                                         className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-800"
                                         value={filters.postcode}
-                                        onChange={(e) => setFilters({ ...filters, postcode: e.target.value })}
+                                        onChange={(e) => startTransition(() => setFilters({ ...filters, postcode: e.target.value }))}
                                     />
                                 </div>
 
                                 <div>
                                     <label className="block text-slate-800 text-sm font-medium mb-2">Sale Type</label>
-                                    <Select value={filters.saleType} onValueChange={(value) => setFilters({ ...filters, saleType: value })}>
+                                    <Select value={filters.saleType} onValueChange={(value) => startTransition(() => setFilters({ ...filters, saleType: value }))}>
                                         <SelectTrigger className="bg-white border-slate-300">
                                             <SelectValue placeholder="All Types" />
                                         </SelectTrigger>
@@ -364,7 +407,7 @@ export default function Home() {
 
                                 <div>
                                     <label className="block text-slate-800 text-sm font-medium mb-2">Distance</label>
-                                    <Select value={filters.distance} onValueChange={(value) => setFilters({ ...filters, distance: value })}>
+                                    <Select value={filters.distance} onValueChange={(value) => startTransition(() => setFilters({ ...filters, distance: value }))}>
                                         <SelectTrigger className="bg-white border-slate-300">
                                             <SelectValue placeholder="Distance" />
                                         </SelectTrigger>
@@ -407,10 +450,30 @@ export default function Home() {
                         <p className="text-sm text-slate-600">Browse listings in your area</p>
                     </div>
                     
-                    <Link to={createPageUrl('Home')} className="text-[#1e3a5f] hover:text-[#152a45] font-medium flex items-center gap-2">
-                        <Map className="w-4 h-4" />
-                        Map
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`font-medium flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                                viewMode === 'list'
+                                    ? 'bg-[#1e3a5f] text-white'
+                                    : 'text-[#1e3a5f] hover:bg-slate-100'
+                            }`}
+                        >
+                            <List className="w-4 h-4" />
+                            List
+                        </button>
+                        <button
+                            onClick={() => setViewMode('map')}
+                            className={`font-medium flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                                viewMode === 'map'
+                                    ? 'bg-[#1e3a5f] text-white'
+                                    : 'text-[#1e3a5f] hover:bg-slate-100'
+                            }`}
+                        >
+                            <Map className="w-4 h-4" />
+                            Map
+                        </button>
+                    </div>
                 </div>
 
                 {/* Content Results */}
@@ -428,9 +491,25 @@ export default function Home() {
                                 : 'Enter a postcode and click Search to find garage sales'}
                         </p>
                     </div>
-                ) : (
+                ) : viewMode === 'list' ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {searchResults.map((sale) => {
+                        {searchResults
+                            .reduce((unique, sale) => {
+                                if (!unique.find(s => s.id === sale.id)) {
+                                    unique.push(sale);
+                                }
+                                return unique;
+                            }, [])
+                            .filter(sale => {
+                                // Filter out past-dated listings
+                                if (!sale.end_date) return true;
+                                const now = new Date();
+                                now.setHours(0, 0, 0, 0);
+                                let endDate = new Date(sale.end_date);
+                                endDate.setHours(23, 59, 59, 999);
+                                return endDate >= now;
+                            })
+                            .map((sale) => {
                             const isSaved = savedListings.some(s => s.garage_sale_id === sale.id);
                             return (
                                 <div key={sale.id} className="relative">
@@ -477,6 +556,18 @@ export default function Home() {
                                 </div>
                             );
                         })}
+                    </div>
+                ) : (
+                    <div className="h-[600px] rounded-lg overflow-hidden shadow-md">
+                        <SaleMap sales={searchResults.filter(sale => {
+                            // Filter out past-dated listings for map view
+                            if (!sale.end_date) return true;
+                            const now = new Date();
+                            now.setHours(0, 0, 0, 0);
+                            let endDate = new Date(sale.end_date);
+                            endDate.setHours(23, 59, 59, 999);
+                            return endDate >= now;
+                        })} />
                     </div>
                 )}
             </section>

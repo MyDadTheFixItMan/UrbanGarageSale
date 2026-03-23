@@ -8,9 +8,53 @@ jest.mock('@/api/firebaseClient');
 describe('CreateListing Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    firebase.entities.GarageSale.create.mockResolvedValue({
-      id: 'listing_123',
-    });
+    
+    // Comprehensive mock setup for all firebase modules
+    firebase.auth = {
+      isAuthenticated: jest.fn().mockResolvedValue(true),
+      me: jest.fn().mockResolvedValue({ email: 'test@example.com', uid: 'test_uid' }),
+      is2FAEnabled: jest.fn().mockResolvedValue(true),
+      logout: jest.fn().mockResolvedValue(undefined),
+      signUp: jest.fn().mockResolvedValue({ uid: 'new_user' }),
+      signIn: jest.fn().mockResolvedValue({ uid: 'user_123' }),
+    };
+    
+    firebase.entities = {
+      GarageSale: {
+        create: jest.fn().mockResolvedValue({ id: 'listing_123' }),
+        update: jest.fn().mockResolvedValue({ id: 'listing_123' }),
+        delete: jest.fn().mockResolvedValue(true),
+        filter: jest.fn().mockResolvedValue([]),
+        get: jest.fn().mockResolvedValue({ id: 'listing_123' }),
+      },
+      Payment: {
+        create: jest.fn().mockResolvedValue({ id: 'payment_123' }),
+      },
+      AppSettings: {
+        get: jest.fn().mockResolvedValue({ free_listing_days: 7 }),
+      },
+      SavedListing: {
+        create: jest.fn().mockResolvedValue({ id: 'saved_123' }),
+        delete: jest.fn().mockResolvedValue(true),
+      },
+      EmailLog: {
+        create: jest.fn().mockResolvedValue({ id: 'email_123' }),
+      },
+    };
+    
+    firebase.storage = {
+      uploadImage: jest.fn().mockResolvedValue('https://storage.example.com/image.jpg'),
+    };
+    
+    firebase.functions = {
+      invoke: jest.fn().mockResolvedValue({ success: true }),
+    };
+    
+    firebase.firestore = {
+      collection: jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue({ docs: [] }),
+      }),
+    };
   });
 
   describe('Component Rendering', () => {

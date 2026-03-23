@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import {
-    Heart, Loader2, MapPin, Clock, Navigation, Tag, Route
+    Heart, Loader2, MapPin, Clock, Tag, Route
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

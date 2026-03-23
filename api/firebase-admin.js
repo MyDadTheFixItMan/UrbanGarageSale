@@ -6,7 +6,7 @@ export function getFirebaseAdmin() {
     const projectId = process.env.FIREBASE_PROJECT_ID || 'urbangaragesale';
     
     try {
-      // Try to get service account from environment variable first
+      // Construct service account from environment variables
       let credentials = undefined;
       
       if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
@@ -18,6 +18,23 @@ export function getFirebaseAdmin() {
         }
       }
       
+      // If not found, try to construct from individual env vars
+      if (!credentials && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+        credentials = {
+          type: 'service_account',
+          project_id: projectId,
+          private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+          private_key: process.env.FIREBASE_PRIVATE_KEY,
+          client_email: process.env.FIREBASE_CLIENT_EMAIL,
+          client_id: process.env.FIREBASE_CLIENT_ID,
+          auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+          token_uri: 'https://oauth2.googleapis.com/token',
+          auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+          client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
+        };
+        console.log('Using service account from individual environment variables');
+      }
+      
       // Initialize with or without explicit credentials
       const options = {
         projectId: projectId,
@@ -25,9 +42,10 @@ export function getFirebaseAdmin() {
       
       if (credentials) {
         options.credential = admin.credential.cert(credentials);
+        console.log('Using explicit service account credentials');
+      } else {
+        console.warn('No explicit credentials found, using Application Default Credentials');
       }
-      // If no credentials provided, Admin SDK will use Application Default Credentials
-      // (including credentials available to Vercel, Google Cloud, etc.)
       
       admin.initializeApp(options);
       console.log('Firebase Admin initialized with project:', projectId);

@@ -3,11 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { AlertCircle, Smartphone, RefreshCw, CreditCard, DollarSign, Smartphone as SmartphoneIcon, FileText, Printer } from 'lucide-react';
+import { Smartphone, RefreshCw, CreditCard, DollarSign, FileText, Printer } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
 import {
     Dialog,
     DialogContent,
@@ -147,96 +146,386 @@ export default function UrbanPay() {
         const printWindow = window.open('', '', 'width=1000,height=600');
         const total = salesList.reduce((sum, sale) => sum + (sale.amount || 0), 0);
         
-        // Group sales by garage sale
-        const salesByGarageSale = {};
-        salesList.forEach(sale => {
-            const garageSaleId = sale.garageSaleId || 'unknown';
-            if (!salesByGarageSale[garageSaleId]) {
-                salesByGarageSale[garageSaleId] = [];
-            }
-            salesByGarageSale[garageSaleId].push(sale);
-        });
-        
         let html = `
+            <!DOCTYPE html>
             <html>
             <head>
-                <title>Sales Report</title>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <title>Urban Garage Sale - Sales Report</title>
                 <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    h1 { color: #1e3a5f; }
-                    h2 { color: #2d5a8a; margin-top: 30px; border-bottom: 2px solid #1e3a5f; padding-bottom: 10px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-                    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-                    th { background-color: #1e3a5f; color: white; }
-                    tr:nth-child(even) { background-color: #f5f1e8; }
-                    .total-row { font-weight: bold; background-color: #e8f0f8; }
-                    .subtotal-row { font-weight: bold; background-color: #f0f5fa; }
-                    .date { color: #666; font-size: 0.9em; }
-                    .sale-total { color: #1e3a5f; }
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    
+                    html, body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                        background: #f8fafc !important;
+                        color: #1e293b;
+                        line-height: 1.6;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    @page {
+                        margin: 0.5in;
+                        size: letter;
+                        background: #f8fafc !important;
+                    }
+                    
+                    .content {
+                        position: relative;
+                        z-index: 10;
+                        padding: 20px;
+                    }
+                    
+                    .header {
+                        background: white !important;
+                        padding: 5px 40px 0 40px;
+                        margin-bottom: 35px;
+                        text-align: center;
+                        page-break-inside: avoid;
+                    }
+                    
+                    .header img {
+                        display: none;
+                    }
+                    
+                    .ribbon {
+                        background: linear-gradient(to right, #f97316 0%, #fb923c 100%) !important;
+                        color: white !important;
+                        padding: 12px 40px;
+                        margin: 0 -40px -35px -40px;
+                        border-radius: 0;
+                        text-align: center;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    .ribbon img {
+                        display: none;
+                    }
+                    
+                    .ribbon-text {
+                        display: block;
+                    }
+                    
+                    .ribbon h1 {
+                        font-size: 28px;
+                        margin: 0 0 4px 0;
+                        font-weight: 800;
+                        letter-spacing: 0.5px;
+                        color: white !important;
+                    }
+                    
+                    .ribbon p {
+                        opacity: 1;
+                        font-size: 14px;
+                        font-weight: 500;
+                        letter-spacing: 0.3px;
+                        margin: 0;
+                        color: white !important;
+                    }
+                    
+                    .logo-badge {
+                        display: none;
+                    }
+                    
+                    .report-meta {
+                        background: white !important;
+                        padding: 30px;
+                        border-left: 6px solid #f97316 !important;
+                        margin-bottom: 35px;
+                        border-radius: 10px;
+                        page-break-inside: avoid;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    .report-meta-grid {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 30px;
+                    }
+                    
+                    .meta-item {
+                        text-align: center;
+                        padding: 15px 0;
+                        border-right: 1px solid #e2e8f0;
+                    }
+                    
+                    .meta-item:last-child {
+                        border-right: none;
+                    }
+                    
+                    .meta-label {
+                        color: #64748b !important;
+                        font-size: 11px;
+                        font-weight: 800;
+                        text-transform: uppercase;
+                        letter-spacing: 1.5px;
+                        margin-bottom: 12px;
+                    }
+                    
+                    .meta-value {
+                        font-size: 26px;
+                        font-weight: 900;
+                        color: white !important;
+                        background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8c 100%) !important;
+                        padding: 12px 16px;
+                        border-radius: 6px;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    .section-title {
+                        font-size: 17px;
+                        color: white !important;
+                        background: linear-gradient(to right, #1e3a5f 0%, #2d5a8c 100%) !important;
+                        padding: 16px 24px;
+                        margin: 35px 0 20px 0;
+                        border-radius: 8px;
+                        font-weight: 800;
+                        letter-spacing: 0.3px;
+                        page-break-inside: avoid;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 28px;
+                        border-radius: 8px;
+                        overflow: hidden;
+                        page-break-inside: avoid;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    th {
+                        background: #1e3a5f !important;
+                        color: white !important;
+                        padding: 16px 14px;
+                        text-align: left;
+                        font-weight: 800;
+                        font-size: 12px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.7px;
+                        border: none;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    td {
+                        padding: 14px;
+                        border-bottom: 1px solid #e2e8f0 !important;
+                        background: white !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    tr:nth-child(even) td {
+                        background-color: #f8fafc !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    .subtotal-row td {
+                        background: linear-gradient(to right, #e0f2fe 0%, #f0f9ff 100%) !important;
+                        font-weight: 800;
+                        color: #1e3a5f !important;
+                        border-top: 3px solid #0284c7 !important;
+                        border-bottom: 3px solid #0284c7 !important;
+                        padding: 16px 14px;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    .amount-cell {
+                        text-align: right;
+                        font-weight: 700;
+                        color: #1e3a5f !important;
+                        font-family: 'Courier New', monospace;
+                        font-size: 15px;
+                    }
+                    
+                    .date-cell {
+                        color: #64748b !important;
+                        font-size: 13px;
+                        font-weight: 500;
+                    }
+                    
+                    .type-badge {
+                        display: inline-block;
+                        padding: 6px 14px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        font-weight: 800;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    .type-cash {
+                        background: #dcfce7 !important;
+                        color: #15803d !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    .type-card {
+                        background: #cffafe !important;
+                        color: #0369a1 !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    .grand-total {
+                        margin-top: 45px;
+                        padding: 20px;
+                        background: linear-gradient(135deg, #f97316 0%, #fb923c 100%) !important;
+                        color: white !important;
+                        border-radius: 12px;
+                        text-align: center;
+                        page-break-inside: avoid;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    .grand-total-label {
+                        font-size: 15px;
+                        font-weight: 800;
+                        letter-spacing: 1.8px;
+                        text-transform: uppercase;
+                        margin-bottom: 8px;
+                        color: white !important;
+                    }
+                    
+                    .grand-total-value {
+                        font-size: 56px;
+                        font-weight: 900;
+                        font-family: 'Courier New', monospace;
+                        letter-spacing: 3px;
+                        color: white !important;
+                    }
+                    
+                    .footer {
+                        margin-top: 45px;
+                        padding-top: 25px;
+                        border-top: 3px solid #f97316 !important;
+                        text-align: center;
+                        color: #64748b !important;
+                        font-size: 11px;
+                        page-break-inside: avoid;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    .footer-text {
+                        margin: 6px 0;
+                        font-weight: 600;
+                        color: #64748b !important;
+                    }
+                    
+                    @media print {
+                        html, body { 
+                            background: #f8fafc !important;
+                            margin: 0;
+                            padding: 0;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        * { 
+                            box-shadow: none !important;
+                            page-break-inside: avoid !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                    }
                 </style>
             </head>
             <body>
-                <h1>Urban Garage Sale - Sales Report</h1>
-                <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
-                <p><strong>Total Sales Transactions:</strong> ${salesList.length}</p>
-                <p><strong>Grand Total:</strong> <span class="sale-total"><strong>$${total.toFixed(2)}</strong></span></p>
+                <div class="content">
+                    <div class="header">
+                        <div class="ribbon">
+                            <div class="ribbon-text">
+                                <h1>Urban Garage Sale</h1>
+                                <p>Sales Performance Report</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="report-meta">
+                        <div class="report-meta-grid">
+                            <div class="meta-item">
+                                <div class="meta-label">Generated</div>
+                                <div class="meta-value">${new Date().toLocaleDateString()}</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-label">Total Transactions</div>
+                                <div class="meta-value">${salesList.length}</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-label">Period Revenue</div>
+                                <div class="meta-value">$${total.toFixed(2)}</div>
+                            </div>
+                        </div>
+                    </div>
         `;
         
-        // Generate report for each garage sale
-        Object.entries(salesByGarageSale).forEach(([garageSaleId, salesToReport]) => {
-            const garageSale = garageSales.find(gs => gs.id === garageSaleId);
-            const garageSaleName = garageSale?.title || 'Unknown Sale';
-            const garageSaleTotal = salesToReport.reduce((sum, sale) => sum + (sale.amount || 0), 0);
-            
-            html += `<h2>${garageSaleName}</h2>`;
-            html += `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Description</th>
-                            <th style="text-align: right;">Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            salesToReport.forEach(sale => {
-                // Convert Firestore Timestamp to Date
-                let dateObj = sale.createdAt;
-                if (sale.createdAt && typeof sale.createdAt.toDate === 'function') {
-                    dateObj = sale.createdAt.toDate();
-                } else if (sale.createdAt instanceof Date) {
-                    dateObj = sale.createdAt;
-                } else if (typeof sale.createdAt === 'string') {
-                    dateObj = new Date(sale.createdAt);
-                }
-                const date = dateObj instanceof Date ? dateObj.toLocaleString() : 'Invalid Date';
-                const type = sale.paymentMethod === 'cash' ? 'Cash' : 'Card';
-                html += `
-                        <tr>
-                            <td class="date">${date}</td>
-                            <td>${type}</td>
-                            <td>${sale.description || '-'}</td>
-                            <td style="text-align: right;">$${(sale.amount || 0).toFixed(2)}</td>
-                        </tr>
-                `;
-            });
+        // Generate flat report with all sales in one table
+        html += `
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Payment Type</th>
+                        <th>Item Description</th>
+                        <th style="text-align: right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        salesList.forEach(sale => {
+            // Convert Firestore Timestamp to Date
+            let dateObj = sale.createdAt;
+            if (sale.createdAt && typeof sale.createdAt.toDate === 'function') {
+                dateObj = sale.createdAt.toDate();
+            } else if (sale.createdAt instanceof Date) {
+                dateObj = sale.createdAt;
+            } else if (typeof sale.createdAt === 'string') {
+                dateObj = new Date(sale.createdAt);
+            }
+            const date = dateObj instanceof Date ? dateObj.toLocaleString() : 'Invalid Date';
+            const type = sale.paymentMethod === 'cash' ? 'Cash' : 'Card';
+            const badgeClass = sale.paymentMethod === 'cash' ? 'type-cash' : 'type-card';
+            const badgeEmoji = sale.paymentMethod === 'cash' ? '💵' : '💳';
             
             html += `
-                        <tr class="subtotal-row">
-                            <td colspan="3" style="text-align: right;">Garage Sale Total:</td>
-                            <td style="text-align: right;">$${garageSaleTotal.toFixed(2)}</td>
-                        </tr>
-                    </tbody>
-                </table>
+                    <tr>
+                        <td class="date-cell">${date}</td>
+                        <td><span class="type-badge ${badgeClass}">${badgeEmoji} ${type}</span></td>
+                        <td>${sale.description || '—'}</td>
+                        <td class="amount-cell">$${(sale.amount || 0).toFixed(2)}</td>
+                    </tr>
             `;
         });
         
         html += `
-                <div style="margin-top: 40px; padding-top: 20px; border-top: 3px solid #1e3a5f;">
-                    <p style="font-size: 16px;"><strong>GRAND TOTAL:</strong> <span style="color: #1e3a5f; font-size: 20px;">$${total.toFixed(2)}</span></p>
+                </tbody>
+            </table>
+        `;
+        
+        html += `
+                    <div class="grand-total">
+                        <div class="grand-total-label">💰 Grand Total Revenue</div>
+                        <div class="grand-total-value">$${total.toFixed(2)}</div>
+                    </div>
+                    
+                    <div class="footer">
+                        <div class="footer-text">Urban Garage Sale Platform © 2026 — Your Local Garage Sale Hub</div>
+                        <div class="footer-text">Find & List Garage Sales Locally | This report is confidential and for your records only</div>
+                    </div>
                 </div>
             </body>
             </html>
@@ -244,7 +533,11 @@ export default function UrbanPay() {
         
         printWindow.document.write(html);
         printWindow.document.close();
-        printWindow.print();
+        
+        // Wait for document to render before printing
+        setTimeout(() => {
+            printWindow.print();
+        }, 250);
     }
 
     useEffect(() => {
@@ -263,6 +556,11 @@ export default function UrbanPay() {
 
         if (!cardDescription || !cardDescription.trim()) {
             toast.error('Please enter a description');
+            return;
+        }
+
+        if (!selectedGarageSaleId) {
+            toast.error('Please select a garage sale');
             return;
         }
 
@@ -287,6 +585,7 @@ export default function UrbanPay() {
                     amount: parseFloat(cardAmount),
                     description: cardDescription.trim(),
                     sellerId: currentUser.uid,
+                    garageSaleId: selectedGarageSaleId,
                 }),
             });
 
@@ -318,6 +617,7 @@ export default function UrbanPay() {
                     paymentIntentId: data.paymentIntentId,
                     currency: 'aud',
                     paymentMethod: 'tap_to_pay',
+                    garageSaleId: selectedGarageSaleId,
                 }),
             });
 
@@ -757,6 +1057,25 @@ export default function UrbanPay() {
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4 py-4">
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Garage Sale</label>
+                                        <select 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            value={selectedGarageSaleId}
+                                            onChange={(e) => setSelectedGarageSaleId(e.target.value)}
+                                            disabled={isProcessingCard || isLoadingGarageSales}
+                                        >
+                                            <option value="">-- Select a garage sale --</option>
+                                            {garageSales.map(sale => (
+                                                <option key={sale.id} value={sale.id}>
+                                                    {sale.title || 'Untitled'} {sale.date ? `(${new Date(sale.date instanceof Date ? sale.date : new Date(sale.date)).toLocaleDateString()})` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {garageSales.length === 0 && (
+                                            <p className="text-xs text-amber-600 mt-1">No garage sales found. Create one first.</p>
+                                        )}
+                                    </div>
                                     <div>
                                         <label className="text-sm font-medium text-slate-700 mb-1 block">Amount ($)</label>
                                         <input 

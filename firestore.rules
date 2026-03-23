@@ -25,7 +25,7 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null && isAdmin();
     }
 
-    // Admin settings (deprecated but kept for compatibility)
+    // Admin settings - for app-level admin messages and configurations
     match /admin_settings/{document=**} {
       allow read: if request.auth != null;
       allow create, update, delete: if request.auth != null && isAdmin();

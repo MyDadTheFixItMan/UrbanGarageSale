@@ -1,6 +1,7 @@
 // lib/screens/tap_to_pay_reader.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
@@ -94,9 +95,11 @@ class _TapToPayReaderState extends State<TapToPayReader> {
       if (user == null) throw Exception('Not authenticated');
 
       final idToken = await user.getIdToken();
-      
+
       final response = await http.post(
-        Uri.parse('https://urban-garage-sale.vercel.app/api/urbanPayment/createPaymentIntent'),
+        Uri.parse(
+          'https://urban-garage-sale.vercel.app/api/urbanPayment/createPaymentIntent',
+        ),
         headers: {
           'Authorization': 'Bearer $idToken',
           'Content-Type': 'application/json',
@@ -171,7 +174,9 @@ class _TapToPayReaderState extends State<TapToPayReader> {
       final idToken = await user.getIdToken();
 
       await http.post(
-        Uri.parse('https://urban-garage-sale.vercel.app/api/urbanPayment/recordTapToPaySale'),
+        Uri.parse(
+          'https://urban-garage-sale.vercel.app/api/urbanPayment/recordTapToPaySale',
+        ),
         headers: {
           'Authorization': 'Bearer $idToken',
           'Content-Type': 'application/json',
@@ -185,7 +190,7 @@ class _TapToPayReaderState extends State<TapToPayReader> {
         }),
       );
     } catch (e) {
-      print('Error recording payment: $e');
+      debugPrint('Error recording payment: $e');
     }
   }
 
@@ -203,9 +208,9 @@ class _TapToPayReaderState extends State<TapToPayReader> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -235,7 +240,7 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFF9500).withOpacity(0.1),
+                    color: const Color(0xFFFF9500).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -258,7 +263,11 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                 const Text(
                   'To accept card payments with Tap to Pay, you need to enable card payments in your profile first.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.5),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                    height: 1.5,
+                  ),
                 ),
               ],
             ),
@@ -302,7 +311,10 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.check_circle, color: Colors.green),
+                              const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -328,7 +340,10 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.bluetooth_disabled, color: Colors.red),
+                              const Icon(
+                                Icons.bluetooth_disabled,
+                                color: Colors.red,
+                              ),
                               const SizedBox(width: 8),
                               const Text(
                                 'No reader connected',
@@ -346,7 +361,9 @@ class _TapToPayReaderState extends State<TapToPayReader> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF1e3a5f),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                               ),
                             ),
                           ),
@@ -455,7 +472,7 @@ class _TapToPayReaderState extends State<TapToPayReader> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Column(

@@ -111,7 +111,7 @@ class _UrbanPayHomeState extends State<UrbanPayHome> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF9500).withOpacity(0.1),
+                  color: const Color(0xFFFF9500).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Icon(

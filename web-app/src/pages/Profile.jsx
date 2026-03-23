@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { firebase } from '@/api/firebaseClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+
+// API configuration - switch between local dev and production
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 import { createPageUrl } from '../utils';
 import { MapPin, Mail, Phone, Pencil, Plus, Loader2,
-    Tag, Clock, Trash2, Eye, FileText, CheckCircle, XCircle, CreditCard
+    Tag, Clock, Trash2, Eye, FileText, CheckCircle, XCircle, CreditCard, Printer
 } from 'lucide-react';
 import GooglePlacesAutocomplete from '@/components/GooglePlacesAutocomplete';
 import { Button } from "@/components/ui/button";
@@ -13,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { printListingPoster, paperSizes } from '../utils/printGarageSaleSign';
 import { format, parseISO, isBefore, startOfToday } from 'date-fns';
 import {
     Dialog,
@@ -66,6 +70,12 @@ export default function Profile() {
     const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
     const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
     const [cardPaymentsLoading, setCardPaymentsLoading] = useState(false);
+    const [stripeAccountDialogOpen, setStripeAccountDialogOpen] = useState(false);
+    const [stripeAPIKey, setStripeAPIKey] = useState('');
+    const [linkingExistingAccount, setLinkingExistingAccount] = useState(false);
+    const [printDialogOpen, setPrintDialogOpen] = useState(false);
+    const [selectedPrintSize, setSelectedPrintSize] = useState('A4');
+    const [printingListing, setPrintingListing] = useState(null);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -103,7 +113,8 @@ export default function Profile() {
               address: userData.address,
               phone: userData.phone,
               phone_verified: userData.phone_verified,
-              role: userData.role
+              role: userData.role,
+              stripeConnectId: userData.stripeConnectId
             });
             setUser(userData);
             setEditForm({
@@ -113,14 +124,104 @@ export default function Profile() {
                 phone: userData.phone || '',
             });
             
-            // Load card payments status
-            const cardPaymentsStatus = userData.cardPaymentsEnabled || false;
-            const stripeConnectId = userData.stripeConnectId || null;
-            setCardPaymentsEnabled(cardPaymentsStatus && !!stripeConnectId);
+            // Verify card payments status with backend if stripeConnectId exists
+            let cardPaymentsStatus = userData.cardPaymentsEnabled || false;
+            if (userData.stripeConnectId) {
+              try {
+                console.log('✓ Verifying Stripe account status...');
+                const currentUser = firebase.currentUser;
+                if (currentUser) {
+                  const token = await currentUser.getIdToken();
+                  const response = await fetch(`${API_BASE_URL}/verifyStripeConnectStatus`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                    },
+                  });
+                  if (response.ok) {
+                    const data = await response.json();
+                    cardPaymentsStatus = data.cardPaymentsEnabled;
+                    console.log('✓ Stripe status verified:', {
+                      enabled: data.cardPaymentsEnabled,
+                      chargesEnabled: data.chargesEnabled,
+                      payoutsEnabled: data.payoutsEnabled
+                    });
+                  }
+                }
+              } catch (err) {
+                console.warn('Could not verify Stripe status:', err.message);
+                // Fall back to Firestore value
+              }
+            }
+            
+            setCardPaymentsEnabled(cardPaymentsStatus && !!userData.stripeConnectId);
             
             setLoading(false);
         };
         init();
+    }, []);
+
+    // Handle Stripe OAuth callback
+    useEffect(() => {
+        const handleOAuthCallback = async () => {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('code');
+            const state = params.get('state');
+            const error = params.get('error');
+
+            if (error) {
+                console.error('OAuth error:', error);
+                toast.error('Stripe connection failed: ' + error);
+                // Remove error params from URL
+                window.history.replaceState({}, document.title, window.location.pathname + '?tab=payments');
+                return;
+            }
+
+            if (code && state) {
+                try {
+                    toast.loading('Completing Stripe connection...');
+                    const currentUser = firebase.currentUser;
+                    if (!currentUser) {
+                        throw new Error('Not authenticated');
+                    }
+
+                    const token = await currentUser.getIdToken();
+
+                    const response = await fetch(`${API_BASE_URL}/handleStripeOAuthCallback`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ code, state }),
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.error || 'OAuth callback failed');
+                    }
+
+                    const data = await response.json();
+                    
+                    // Refresh user data
+                    const refreshedUser = await firebase.auth.me();
+                    setUser(refreshedUser);
+                    setCardPaymentsEnabled(data.cardPaymentsEnabled);
+                    
+                    toast.success('Stripe account linked successfully!');
+                    
+                    // Clean up URL
+                    window.history.replaceState({}, document.title, window.location.pathname + '?tab=payments');
+                } catch (err) {
+                    console.error('OAuth callback error:', err);
+                    toast.error('Failed to link account: ' + err.message);
+                    window.history.replaceState({}, document.title, window.location.pathname + '?tab=payments');
+                }
+            }
+        };
+
+        handleOAuthCallback();
     }, []);
 
     const { data: userListings = [], isLoading: listingsLoading } = useQuery({
@@ -211,28 +312,33 @@ export default function Profile() {
         }
     };
 
-    const handleEnableCardPayments = async () => {
+    const handleEnableCardPayments = () => {
+        // Show dialog asking user to choose between new and existing account
+        setStripeAccountDialogOpen(true);
+        setStripeAPIKey('');
+    };
+
+    const handleCreateNewStripeAccount = async () => {
         setCardPaymentsLoading(true);
+        const toastId = toast.loading('Setting up your Stripe account...');
         try {
-            // Get the user's ID token
-            const currentUser = firebase.auth.getCurrentUser();
+            const currentUser = firebase.currentUser;
             if (!currentUser) {
                 throw new Error('Not authenticated');
             }
 
             const token = await currentUser.getIdToken();
 
-            // Call the backend to initialize Stripe Connect
-            const response = await fetch('https://urban-garage-sale.vercel.app/api/urbanPayment/enableStripeConnect', {
+            const response = await fetch(`${API_BASE_URL}/enableStripeConnect`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    email: user.email,
+                    email: currentUser.email, // Use authenticated user's email
                     firstName: user.full_name?.split(' ')[0] || 'Seller',
-                    lastName: user.full_name?.split(' ').slice(1).join(' ') || user.email.split('@')[0],
+                    lastName: user.full_name?.split(' ').slice(1).join(' ') || currentUser.email.split('@')[0],
                     address: user.address,
                     city: 'Sydney',
                     state: 'NSW',
@@ -240,23 +346,272 @@ export default function Profile() {
                     refreshUrl: window.location.href,
                     returnUrl: window.location.href,
                 }),
+            }).catch(fetchError => {
+                throw fetchError;
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Failed: ${response.status}`);
+                throw new Error(errorData.error || errorData.message || `Failed: ${response.status}`);
             }
 
             const data = await response.json();
+            toast.dismiss(toastId);
+            toast.success('Opening Stripe onboarding...');
 
-            // Redirect to Stripe onboarding
+            // Open in popup window instead of full page navigation
             if (data.onboardingUrl) {
-                window.location.href = data.onboardingUrl;
+                setStripeAccountDialogOpen(false);
+                const width = 800;
+                const height = 600;
+                const left = window.screenX + (window.outerWidth - width) / 2;
+                const top = window.screenY + (window.outerHeight - height) / 2;
+                const popupWindow = window.open(data.onboardingUrl, 'stripeOnboarding', `width=${width},height=${height},left=${left},top=${top},popup=true`);
+                
+                // Check if popup was blocked
+                if (!popupWindow) {
+                    throw new Error('Popup blocked - please allow popups');
+                }
+                
+                // Monitor popup closure and reset loading state
+                const checkPopupInterval = setInterval(async () => {
+                    if (popupWindow.closed) {
+                        clearInterval(checkPopupInterval);
+                        setCardPaymentsLoading(false);
+                        
+                        // Reload user data to get updated Stripe info
+                        try {
+                            console.log('Popup closed. Reloading user data...');
+                            const updatedUserData = await firebase.auth.me();
+                            setUser(updatedUserData);
+                            
+                            // Verify Stripe status to check if onboarding completed
+                            if (updatedUserData.stripeConnectId) {
+                                try {
+                                    const currentUser = firebase.currentUser;
+                                    if (currentUser) {
+                                        const token = await currentUser.getIdToken();
+                                        const verifyResponse = await fetch(`${API_BASE_URL}/verifyStripeConnectStatus`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Authorization': `Bearer ${token}`,
+                                                'Content-Type': 'application/json',
+                                            },
+                                        });
+                                        if (verifyResponse.ok) {
+                                            const verifyData = await verifyResponse.json();
+                                            setCardPaymentsEnabled(verifyData.cardPaymentsEnabled);
+                                            console.log('Stripe verification complete:', verifyData);
+                                            if (verifyData.cardPaymentsEnabled) {
+                                                toast.success('🎉 Card payments enabled!');
+                                            } else {
+                                                toast.info('Stripe onboarding in progress. Please complete all requirements.');
+                                            }
+                                        }
+                                    }
+                                } catch (verifyErr) {
+                                    console.error('Could not verify Stripe status:', verifyErr);
+                                    // Fall back to local state
+                                    setCardPaymentsEnabled(updatedUserData.cardPaymentsEnabled && !!updatedUserData.stripeConnectId);
+                                }
+                            } else {
+                                setCardPaymentsEnabled(false);
+                            }
+                        } catch (err) {
+                            console.error('Failed to reload user data:', err);
+                        }
+                    }
+                }, 500);
+            } else if (data.url) {
+                setStripeAccountDialogOpen(false);
+                const width = 800;
+                const height = 600;
+                const left = window.screenX + (window.outerWidth - width) / 2;
+                const top = window.screenY + (window.outerHeight - height) / 2;
+                const popupWindow = window.open(data.url, 'stripeOnboarding', `width=${width},height=${height},left=${left},top=${top},popup=true`);
+                
+                // Check if popup was blocked
+                if (!popupWindow) {
+                    throw new Error('Popup blocked - please allow popups');
+                }
+                
+                // Monitor popup closure and reset loading state
+                const checkPopupInterval = setInterval(async () => {
+                    if (popupWindow.closed) {
+                        clearInterval(checkPopupInterval);
+                        setCardPaymentsLoading(false);
+                        
+                        // Reload user data to get updated Stripe info
+                        try {
+                            console.log('Popup closed. Reloading user data...');
+                            const updatedUserData = await firebase.auth.me();
+                            setUser(updatedUserData);
+                            
+                            // Verify Stripe status to check if onboarding completed
+                            if (updatedUserData.stripeConnectId) {
+                                try {
+                                    const currentUser = firebase.currentUser;
+                                    if (currentUser) {
+                                        const token = await currentUser.getIdToken();
+                                        const verifyResponse = await fetch(`${API_BASE_URL}/verifyStripeConnectStatus`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Authorization': `Bearer ${token}`,
+                                                'Content-Type': 'application/json',
+                                            },
+                                        });
+                                        if (verifyResponse.ok) {
+                                            const verifyData = await verifyResponse.json();
+                                            setCardPaymentsEnabled(verifyData.cardPaymentsEnabled);
+                                            console.log('Stripe verification complete:', verifyData);
+                                            if (verifyData.cardPaymentsEnabled) {
+                                                toast.success('🎉 Card payments enabled!');
+                                            } else {
+                                                toast.info('Stripe onboarding in progress. Please complete all requirements.');
+                                            }
+                                        }
+                                    }
+                                } catch (verifyErr) {
+                                    console.error('Could not verify Stripe status:', verifyErr);
+                                    // Fall back to local state
+                                    setCardPaymentsEnabled(updatedUserData.cardPaymentsEnabled && !!updatedUserData.stripeConnectId);
+                                }
+                            } else {
+                                setCardPaymentsEnabled(false);
+                            }
+                        } catch (err) {
+                            console.error('Failed to reload user data:', err);
+                        }
+                    }
+                }, 500);
+            } else {
+                throw new Error('No onboarding URL received from server');
             }
         } catch (error) {
-            console.error('Error enabling card payments:', error);
-            toast.error('Failed to enable card payments: ' + error.message);
+            toast.dismiss(toastId);
+            toast.error('Failed: ' + error.message);
             setCardPaymentsLoading(false);
+        }
+    };
+
+    const handleLinkExistingStripeAccount = async () => {
+        setLinkingExistingAccount(true);
+        const toastId = toast.loading('Connecting to Stripe...');
+        try {
+            const currentUser = firebase.currentUser;
+            if (!currentUser) {
+                throw new Error('Not authenticated');
+            }
+
+            const token = await currentUser.getIdToken();
+
+            // Initiate OAuth flow
+            const response = await fetch(`${API_BASE_URL}/initiateStripeOAuth`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: currentUser.email, // Pass authenticated user's email
+                    redirectUri: window.location.origin,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to initiate OAuth');
+            }
+
+            const data = await response.json();
+            
+            // Open in popup window instead of full page redirect
+            if (data.oauthUrl) {
+                toast.dismiss(toastId);
+                toast.success('Opening Stripe connection...');
+                setStripeAccountDialogOpen(false);
+                const width = 800;
+                const height = 600;
+                const left = window.screenX + (window.outerWidth - width) / 2;
+                const top = window.screenY + (window.outerHeight - height) / 2;
+                const popupWindow = window.open(data.oauthUrl, 'stripeOAuth', `width=${width},height=${height},left=${left},top=${top},popup=true`);
+                
+                // Check if popup was blocked
+                if (!popupWindow) {
+                    throw new Error('Popup blocked - please allow popups');
+                }
+                
+                // Monitor popup closure and reset loading state
+                const checkPopupInterval = setInterval(async () => {
+                    if (popupWindow.closed) {
+                        clearInterval(checkPopupInterval);
+                        setLinkingExistingAccount(false);
+                        
+                        // Reload user data to get updated Stripe info
+                        try {
+                            console.log('OAuth popup closed. Reloading user data...');
+                            const updatedUserData = await firebase.auth.me();
+                            setUser(updatedUserData);
+                            
+                            // Verify Stripe status to check if OAuth linking completed
+                            if (updatedUserData.stripeConnectId) {
+                                try {
+                                    const currentUser = firebase.currentUser;
+                                    if (currentUser) {
+                                        const token = await currentUser.getIdToken();
+                                        const verifyResponse = await fetch(`${API_BASE_URL}/verifyStripeConnectStatus`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Authorization': `Bearer ${token}`,
+                                                'Content-Type': 'application/json',
+                                            },
+                                        });
+                                        if (verifyResponse.ok) {
+                                            const verifyData = await verifyResponse.json();
+                                            setCardPaymentsEnabled(verifyData.cardPaymentsEnabled);
+                                            console.log('Stripe verification complete:', verifyData);
+                                            if (verifyData.cardPaymentsEnabled) {
+                                                toast.success('🎉 Stripe account linked successfully!');
+                                            } else {
+                                                toast.info('Account linked. Waiting for Stripe verification.');
+                                            }
+                                        }
+                                    }
+                                } catch (verifyErr) {
+                                    console.error('Could not verify Stripe status:', verifyErr);
+                                    // Fall back to local state
+                                    setCardPaymentsEnabled(updatedUserData.cardPaymentsEnabled && !!updatedUserData.stripeConnectId);
+                                }
+                            } else {
+                                setCardPaymentsEnabled(false);
+                            }
+                        } catch (err) {
+                            console.error('Failed to reload user data:', err);
+                        }
+                    }
+                }, 500);
+            } else {
+                throw new Error('No OAuth URL received');
+            }
+        } catch (error) {
+            toast.dismiss(toastId);
+            toast.error('Failed to connect Stripe: ' + error.message);
+            setLinkingExistingAccount(false);
+        }
+    };
+
+    const handlePrintSign = (listing) => {
+        setPrintingListing(listing);
+        setPrintDialogOpen(true);
+    };
+
+    const handlePrintSignConfirm = () => {
+        if (printingListing) {
+            printListingPoster(printingListing);
+            setPrintDialogOpen(false);
+            setPrintingListing(null);
+            setSelectedPrintSize('A4');
+            toast.success('Opening print poster window...');
         }
     };
 
@@ -369,6 +724,19 @@ export default function Profile() {
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
+
+                        {/* Print Sign Button */}
+                        {(listing.status === 'active' || listing.status === 'pending_approval') && (
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="h-9 px-2"
+                                onClick={() => handlePrintSign(listing)}
+                                title="Print garage sale sign"
+                            >
+                                <Printer className="w-4 h-4" />
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -377,6 +745,46 @@ export default function Profile() {
 
     return (
         <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
+            {/* Print Size Selection Dialog */}
+            <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Print Garage Sale Sign</DialogTitle>
+                        <DialogDescription>
+                            Select the paper size for your garage sale sign
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-3">
+                            {Object.entries(paperSizes).map(([key, size]) => (
+                                <label key={key} className="flex items-center p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="paper-size"
+                                        value={key}
+                                        checked={selectedPrintSize === key}
+                                        onChange={(e) => setSelectedPrintSize(e.target.value)}
+                                        className="w-4 h-4"
+                                    />
+                                    <span className="ml-3 font-medium text-slate-700">{size.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex gap-3 justify-end">
+                        <Button variant="outline" onClick={() => setPrintDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            className="bg-[#1e3a5f] hover:bg-[#152a45]"
+                            onClick={handlePrintSignConfirm}
+                        >
+                            <Printer className="w-4 h-4 mr-2" />
+                            Print Sign
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -410,7 +818,7 @@ export default function Profile() {
             )}
             
             <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
-                <div className="max-w-4xl mx-auto pt-2 md:pt-4 relative z-10">
+                <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
                 {/* Page Header */}
                 <div className="flex items-center gap-3 mb-8">
                     <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
@@ -599,6 +1007,7 @@ export default function Profile() {
                                 ? 'bg-green-100 border border-green-300 text-green-700 hover:bg-green-100 cursor-not-allowed opacity-75' 
                                 : 'bg-[#1e3a5f] text-white hover:bg-[#152a45]'
                             }`}
+                            title={cardPaymentsEnabled && user?.stripeAccountType ? `Account type: ${user.stripeAccountType === 'created' ? 'Created' : 'Linked'}` : ''}
                         >
                             {cardPaymentsLoading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -654,8 +1063,8 @@ export default function Profile() {
                 </div>
                 </section>
 
-                <section className="relative bg-[#f5f1e8]">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10 py-8 -mt-20 sm:mt-0 md:-mt-8">
+                <section className="relative bg-[#f5f1e8] -mt-16">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 pt-0 pb-8">
 
                 {/* Listings */}
                 <div className="flex items-center justify-between mb-6">
@@ -705,7 +1114,7 @@ export default function Profile() {
                                 </Link>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {activeListings.map(listing => (
                                     <ListingCard key={listing.id} listing={listing} />
                                 ))}
@@ -720,7 +1129,7 @@ export default function Profile() {
                                 <p className="text-slate-500">No draft listings</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {draftListings.map(listing => (
                                     <ListingCard key={listing.id} listing={listing} />
                                 ))}
@@ -735,7 +1144,7 @@ export default function Profile() {
                                 <p className="text-slate-500">No past listings</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {pastListings.map(listing => (
                                     <ListingCard key={listing.id} listing={listing} />
                                 ))}
@@ -745,6 +1154,71 @@ export default function Profile() {
                 </Tabs>
                 </div>
             </section>
+
+            {/* Stripe Account Choice Dialog */}
+            <Dialog open={stripeAccountDialogOpen} onOpenChange={setStripeAccountDialogOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Set Up Card Payments</DialogTitle>
+                        <DialogDescription>
+                            How would you like to accept card payments?
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    {/* Important Note */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-2">
+                        <p className="text-sm text-blue-900">
+                            <span className="font-semibold">✓ Note:</span> Card payments can only be accepted when you have at least one live listing active.
+                        </p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                        {/* New Account Option */}
+                        <div className="border rounded-lg p-4 hover:bg-slate-50 cursor-pointer transition">
+                            <h3 className="font-semibold text-sm mb-2">Create New Stripe Account</h3>
+                            <p className="text-xs text-slate-600 mb-4">
+                                We'll set up a new Stripe Express account for you. You'll be guided through the onboarding process.
+                            </p>
+                            <Button
+                                onClick={handleCreateNewStripeAccount}
+                                disabled={cardPaymentsLoading}
+                                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                {cardPaymentsLoading ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Creating Account...
+                                    </>
+                                ) : (
+                                    'Create New Account'
+                                )}
+                            </Button>
+                        </div>
+
+                        {/* Existing Account Option */}
+                        <div className="border rounded-lg p-4 hover:bg-slate-50 transition">
+                            <h3 className="font-semibold text-sm mb-2">Link Existing Stripe Account</h3>
+                            <p className="text-xs text-slate-600 mb-4">
+                                Connect your existing Stripe account securely via Stripe OAuth.
+                            </p>
+                            <Button
+                                onClick={handleLinkExistingStripeAccount}
+                                disabled={linkingExistingAccount}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                                {linkingExistingAccount ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Redirecting to Stripe...
+                                    </>
+                                ) : (
+                                    'Connect with Stripe'
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

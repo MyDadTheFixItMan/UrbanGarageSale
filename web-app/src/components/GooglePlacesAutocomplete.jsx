@@ -32,8 +32,6 @@ export default function GooglePlacesAutocomplete({
     }
 
     try {
-      console.log('Initializing Autocomplete Service...');
-      
       // @ts-ignore
       autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
       
@@ -42,8 +40,6 @@ export default function GooglePlacesAutocomplete({
       mapRef.current = new window.google.maps.Map(document.createElement('div'));
       // @ts-ignore
       placesServiceRef.current = new window.google.maps.places.PlacesService(mapRef.current);
-
-      console.log('Autocomplete Service initialized');
     } catch (error) {
       console.error('Failed to initialize Autocomplete Service:', error);
     }
@@ -68,7 +64,6 @@ export default function GooglePlacesAutocomplete({
         types: ['address'],
       });
 
-      console.log('Predictions:', result.predictions);
       setPredictions(result.predictions || []);
     } catch (error) {
       console.error('Error getting predictions:', error);
@@ -77,8 +72,6 @@ export default function GooglePlacesAutocomplete({
 
   const handleSelectPrediction = (prediction) => {
     if (!placesServiceRef.current) return;
-
-    console.log('Selected prediction:', prediction);
 
     // @ts-ignore
     placesServiceRef.current.getDetails(
@@ -89,7 +82,6 @@ export default function GooglePlacesAutocomplete({
       (place, status) => {
         // @ts-ignore
         if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
-          console.log('Place details:', place);
           handlePlaceSelected(place);
           setPredictions([]);
           if (inputRef.current) {
@@ -110,7 +102,6 @@ export default function GooglePlacesAutocomplete({
     let postcode = '';
 
     const addressComponents = place.address_components || [];
-    console.log('Address components:', addressComponents);
 
     addressComponents.forEach((component) => {
       const types = component.types || [];
@@ -138,7 +129,6 @@ export default function GooglePlacesAutocomplete({
     // Australian format: "Address, Suburb STATE POSTCODE, Country"
     if ((!state || !postcode) && place.formatted_address) {
       const formatted = place.formatted_address;
-      console.log('Fallback parsing from formatted_address:', formatted);
       
       // Try to extract state (2 letter code) and postcode (4 digits) using one pattern
       // Looks for "STATE POSTCODE" pattern like "VIC 3226"
@@ -147,7 +137,6 @@ export default function GooglePlacesAutocomplete({
         if (statePostcodeMatch) {
           state = statePostcodeMatch[1];
           postcode = statePostcodeMatch[2];
-          console.log('Extracted state:', state, 'postcode:', postcode);
         }
       }
     }
@@ -163,8 +152,6 @@ export default function GooglePlacesAutocomplete({
       postcode,
       place_id: place.place_id,
     };
-
-    console.log('Final result with fallback:', result);
 
     onChange?.(address);
     onSelect?.(result);

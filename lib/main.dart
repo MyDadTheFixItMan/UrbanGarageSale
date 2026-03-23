@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
@@ -20,9 +21,9 @@ void main() async {
     await StripeTerminalService.initializeTerminal(
       'pk_live_OlSbCxeHrHkFwobGROFX32Md',
     );
-    print('✓ Stripe Terminal ready');
+    debugPrint('✓ Stripe Terminal ready');
   } catch (e) {
-    print('⚠️ Terminal init: $e');
+    debugPrint('⚠️ Terminal init: $e');
   }
 
   runApp(const MyApp());

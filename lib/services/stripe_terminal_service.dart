@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class StripeTerminalService {
@@ -9,10 +10,10 @@ class StripeTerminalService {
       final bool result = await platform.invokeMethod('initializeTerminal', {
         'apiKey': apiKey,
       });
-      print('✓ Stripe Terminal initialized: $result');
+      debugPrint('✓ Stripe Terminal initialized: $result');
       return result;
     } catch (e) {
-      print('✗ Error initializing terminal: $e');
+      debugPrint('✗ Error initializing terminal: $e');
       throw Exception('Failed to initialize Stripe Terminal: $e');
     }
   }
@@ -23,10 +24,10 @@ class StripeTerminalService {
       final String token = await platform.invokeMethod('getConnectionToken', {
         'authToken': authToken,
       });
-      print('✓ Got connection token');
+      debugPrint('✓ Got connection token');
       return token;
     } catch (e) {
-      print('✗ Error getting connection token: $e');
+      debugPrint('✗ Error getting connection token: $e');
       throw Exception('Failed to get connection token: $e');
     }
   }
@@ -34,11 +35,13 @@ class StripeTerminalService {
   /// Discover available payment readers
   static Future<List<Map<String, dynamic>>> discoverReaders() async {
     try {
-      final List<dynamic> result = await platform.invokeMethod('discoverReaders');
-      print('✓ Found ${result.length} readers');
+      final List<dynamic> result = await platform.invokeMethod(
+        'discoverReaders',
+      );
+      debugPrint('✓ Found ${result.length} readers');
       return result.cast<Map<String, dynamic>>();
     } catch (e) {
-      print('✗ Error discovering readers: $e');
+      debugPrint('✗ Error discovering readers: $e');
       throw Exception('Failed to discover readers: $e');
     }
   }
@@ -49,10 +52,10 @@ class StripeTerminalService {
       final bool result = await platform.invokeMethod('connectReader', {
         'readerId': readerId,
       });
-      print('✓ Connected to reader: $readerId');
+      debugPrint('✓ Connected to reader: $readerId');
       return result;
     } catch (e) {
-      print('✗ Error connecting to reader: $e');
+      debugPrint('✗ Error connecting to reader: $e');
       throw Exception('Failed to connect to reader: $e');
     }
   }
@@ -64,17 +67,19 @@ class StripeTerminalService {
     String paymentIntentId,
   ) async {
     try {
-      final Map<dynamic, dynamic> result =
-          await platform.invokeMethod('collectPayment', {
-        'amount': (amount * 100).toInt(), // Convert to cents
-        'description': description,
-        'paymentIntentId': paymentIntentId,
-      });
-      
-      print('✓ Payment collected: ${result['status']}');
+      final Map<dynamic, dynamic> result = await platform.invokeMethod(
+        'collectPayment',
+        {
+          'amount': (amount * 100).toInt(), // Convert to cents
+          'description': description,
+          'paymentIntentId': paymentIntentId,
+        },
+      );
+
+      debugPrint('✓ Payment collected: ${result['status']}');
       return result.cast<String, dynamic>();
     } catch (e) {
-      print('✗ Error collecting payment: $e');
+      debugPrint('✗ Error collecting payment: $e');
       throw Exception('Failed to collect payment: $e');
     }
   }
@@ -83,10 +88,10 @@ class StripeTerminalService {
   static Future<bool> disconnectReader() async {
     try {
       final bool result = await platform.invokeMethod('disconnectReader');
-      print('✓ Disconnected from reader');
+      debugPrint('✓ Disconnected from reader');
       return result;
     } catch (e) {
-      print('✗ Error disconnecting: $e');
+      debugPrint('✗ Error disconnecting: $e');
       throw Exception('Failed to disconnect reader: $e');
     }
   }
@@ -94,19 +99,20 @@ class StripeTerminalService {
   /// Get connected reader status
   static Future<Map<String, dynamic>> getReaderStatus() async {
     try {
-      final Map<dynamic, dynamic> result =
-          await platform.invokeMethod('getReaderStatus');
+      final Map<dynamic, dynamic> result = await platform.invokeMethod(
+        'getReaderStatus',
+      );
       return result.cast<String, dynamic>();
     } catch (e) {
-      print('✗ Error getting reader status: $e');
+      debugPrint('✗ Error getting reader status: $e');
       return {};
     }
   }
 
   /// Listen to reader connection/disconnection events
   static Stream<Map<String, dynamic>> get readerStatusStream {
-    return EventChannel('com.urbangarageSale/stripe_terminal_events')
-        .receiveBroadcastStream()
-        .cast<Map<String, dynamic>>();
+    return EventChannel(
+      'com.urbangarageSale/stripe_terminal_events',
+    ).receiveBroadcastStream().cast<Map<String, dynamic>>();
   }
 }

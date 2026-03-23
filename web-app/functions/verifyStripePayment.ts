@@ -3,26 +3,54 @@ import Stripe from 'npm:stripe@17.5.0';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'));
 
+// CORS headers
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json',
+};
+
 Deno.serve(async (req) => {
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 204,
+            headers: corsHeaders,
+        });
+    }
+
     try {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
 
         if (!user) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+                status: 401,
+                headers: corsHeaders,
+            });
         }
 
         const { sessionId, saleId } = await req.json();
 
         if (!sessionId || !saleId) {
-            return Response.json({ error: 'Missing required parameters' }, { status: 400 });
+            return new Response(JSON.stringify({ error: 'Missing required parameters' }), {
+                status: 400,
+                headers: corsHeaders,
+            });
         }
 
         // Retrieve the checkout session from Stripe
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
         if (session.payment_status !== 'paid') {
-            return Response.json({ success: false, error: 'Payment not completed' }, { status: 400 });
+            return new Response(
+                JSON.stringify({ success: false, error: 'Payment not completed' }),
+                {
+                    status: 400,
+                    headers: corsHeaders,
+                }
+            );
         }
 
         // Create payment record
@@ -41,9 +69,18 @@ Deno.serve(async (req) => {
             payment_status: 'paid',
         });
 
-        return Response.json({ success: true });
+        return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: corsHeaders,
+        });
     } catch (error) {
         console.error('Payment verification error:', error);
-        return Response.json({ error: error.message }, { status: 500 });
+        return new Response(
+            JSON.stringify({ error: error.message || 'Internal server error' }),
+            {
+                status: 500,
+                headers: corsHeaders,
+            }
+        );
     }
 });

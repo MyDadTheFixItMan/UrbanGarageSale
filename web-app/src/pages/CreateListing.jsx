@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { firebase } from '@/api/firebaseClient';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { compressImage } from '@/lib/imageOptimization';
 import {
-    MapPin, Calendar, Image, Upload, X, Loader2,
-    ChevronLeft, Save, Send, DollarSign, Info, Plus
+    MapPin, Calendar, Image, Upload, X, Loader2, Save, Send, Info, Plus
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

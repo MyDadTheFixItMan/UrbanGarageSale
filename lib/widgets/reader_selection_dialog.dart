@@ -4,10 +4,7 @@ import '../services/stripe_terminal_service.dart';
 class ReaderSelectionDialog extends StatefulWidget {
   final Function(Map<String, dynamic>) onReaderSelected;
 
-  const ReaderSelectionDialog({
-    Key? key,
-    required this.onReaderSelected,
-  }) : super(key: key);
+  const ReaderSelectionDialog({super.key, required this.onReaderSelected});
 
   @override
   State<ReaderSelectionDialog> createState() => _ReaderSelectionDialogState();
@@ -34,7 +31,9 @@ class _ReaderSelectionDialogState extends State<ReaderSelectionDialog> {
       });
 
       if (readers.isEmpty) {
-        _showMessage('No readers found. Make sure your reader is enabled and nearby.');
+        _showMessage(
+          'No readers found. Make sure your reader is enabled and nearby.',
+        );
       }
     } catch (e) {
       setState(() => isDiscovering = false);
@@ -53,9 +52,9 @@ class _ReaderSelectionDialogState extends State<ReaderSelectionDialog> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -76,32 +75,32 @@ class _ReaderSelectionDialogState extends State<ReaderSelectionDialog> {
                 ),
               )
             : readers.isEmpty
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.devices_other, size: 48, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      const Text('No readers found'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _discoverReaders,
-                        child: const Text('Search Again'),
-                      ),
-                    ],
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: readers.length,
-                    itemBuilder: (context, index) {
-                      final reader = readers[index];
-                      return ListTile(
-                        title: Text(reader['label'] as String? ?? 'Unknown'),
-                        subtitle: Text(reader['serialNumber'] as String? ?? ''),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _connectReader(reader),
-                      );
-                    },
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.devices_other, size: 48, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text('No readers found'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _discoverReaders,
+                    child: const Text('Search Again'),
                   ),
+                ],
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                itemCount: readers.length,
+                itemBuilder: (context, index) {
+                  final reader = readers[index];
+                  return ListTile(
+                    title: Text(reader['label'] as String? ?? 'Unknown'),
+                    subtitle: Text(reader['serialNumber'] as String? ?? ''),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _connectReader(reader),
+                  );
+                },
+              ),
       ),
       actions: [
         TextButton(

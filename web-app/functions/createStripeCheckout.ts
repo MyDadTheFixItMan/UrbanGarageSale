@@ -3,19 +3,41 @@ import Stripe from 'npm:stripe@17.5.0';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'));
 
+// CORS headers
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json',
+};
+
 Deno.serve(async (req) => {
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 204,
+            headers: corsHeaders,
+        });
+    }
+
     try {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
 
         if (!user) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+                status: 401,
+                headers: corsHeaders,
+            });
         }
 
         const { saleId, saleTitle } = await req.json();
 
         if (!saleId) {
-            return Response.json({ error: 'Sale ID is required' }, { status: 400 });
+            return new Response(JSON.stringify({ error: 'Sale ID is required' }), {
+                status: 400,
+                headers: corsHeaders,
+            });
         }
 
         // Create Stripe checkout session
@@ -43,9 +65,18 @@ Deno.serve(async (req) => {
             },
         });
 
-        return Response.json({ url: session.url });
+        return new Response(JSON.stringify({ url: session.url }), {
+            status: 200,
+            headers: corsHeaders,
+        });
     } catch (error) {
         console.error('Stripe checkout error:', error);
-        return Response.json({ error: error.message }, { status: 500 });
+        return new Response(
+            JSON.stringify({ error: error.message || 'Internal server error' }),
+            {
+                status: 500,
+                headers: corsHeaders,
+            }
+        );
     }
 });

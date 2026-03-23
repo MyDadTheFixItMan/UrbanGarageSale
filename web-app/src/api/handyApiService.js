@@ -16,7 +16,6 @@ export const handyApiService = {
       }
 
       const data = await response.json();
-      console.log('API response:', data);
       
       // Filter data based on search text
       const query = searchText.toLowerCase();
@@ -47,23 +46,7 @@ export const handyApiService = {
       }
 
       const data = await response.json();
-      console.log('Validate: Total records in dataset:', Array.isArray(data) ? data.length : 'not an array');
-      
-      // Log first few items to see data structure
-      if (Array.isArray(data) && data.length > 0) {
-        console.log('Validate: First item sample:', data[0]);
-      }
-      
-      // Debug: show all suburbs that contain the search term
-      if (Array.isArray(data)) {
-        const matchingSuburbs = data.filter(item =>
-          (item.suburb || item.locality || '').toLowerCase().includes(suburb.toLowerCase())
-        );
-        console.log(`Validate: Found ${matchingSuburbs.length} suburbs matching "${suburb}"`);
-        if (matchingSuburbs.length > 0) {
-          console.log('Validate: First matching suburbs:', matchingSuburbs.slice(0, 3));
-        }
-      }
+
       
       const found = Array.isArray(data) ? data.find(item => {
         const itemSuburb = (item.suburb || item.locality || '').toLowerCase();
@@ -71,12 +54,9 @@ export const handyApiService = {
         const searchSuburb = suburb.toLowerCase();
         const searchPostcode = String(postcode);
         
-        console.log(`Validate: Checking - "${itemSuburb}" === "${searchSuburb}" && "${itemPostcode}" === "${searchPostcode}"`);
-        
         return itemSuburb === searchSuburb && itemPostcode === searchPostcode;
       }) : null;
 
-      console.log(`Validate result: found=${!!found}, isValid=${!!found}`);
       return { isValid: !!found };
     } catch (error) {
       console.error('API validate failed:', error);

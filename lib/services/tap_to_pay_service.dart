@@ -22,8 +22,10 @@ class TapToPayService {
   /// Check if device supports Tap to Pay
   Future<bool> isSupported() async {
     try {
-      return await Stripe.instance.isApplePaySupported ||
-          Stripe.instance.isGooglePaySupported;
+      // Try to check if platform pay is supported
+      // This will return true if Apple Pay or Google Pay is available
+      final isSupported = await Stripe.instance.isPlatformPaySupported();
+      return isSupported;
     } catch (e) {
       return false;
     }
@@ -90,7 +92,6 @@ class TapToPayService {
         return PaymentIntentResponse(
           clientSecret: paymentIntentId,
           paymentIntentId: paymentIntentId,
-          status: 'succeeded',
         );
       } else {
         throw Exception('Failed to record payment: ${response.body}');
@@ -112,8 +113,6 @@ class TapToPayService {
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: clientSecret,
           merchantDisplayName: merchantDisplayName,
-          style: ThemeMode.light,
-          billingDetailsCollectionLevel: BillingDetailsCollectionLevel.none,
           googlePay: const PaymentSheetGooglePay(
             testEnv: false,
             currencyCode: 'AUD',

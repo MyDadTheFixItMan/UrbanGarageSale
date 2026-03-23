@@ -1,0 +1,271 @@
+/**
+ * Poster Template Stylesheet
+ * 
+ * This stylesheet defines the layout for a poster template at A4 print resolution.
+ * 
+ * Key principles:
+ * 1. The background image is displayed at full size without modification
+ * 2. All text fields are absolutely positioned on top of the image
+ * 3. The layout is pixel-perfect for PDF export at 2480x3508px (A4 @ 300 DPI)
+ * 4. No JavaScript manipulation of the background image is performed
+ * 5. The template is designed to be printable and exportable as PDF
+ */
+
+/* 
+ * Print Mode Configuration
+ * Ensures proper rendering when printing to PDF
+ */
+@page {
+    size: A4;
+    margin: 0;
+}
+
+@media print {
+    body {
+        margin: 0;
+        padding: 0;
+        background: white;
+    }
+    
+    .poster-container {
+        box-shadow: none;
+        page-break-after: avoid;
+    }
+}
+
+/* 
+ * Global Styles
+ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f5f5;
+    overflow-x: hidden;
+}
+
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    margin: 0;
+}
+
+/* 
+ * Main Poster Container
+ * Width: 2480px, Height: 3508px (A4 at 300 DPI print resolution)
+ * Position: relative (creates positioning context for absolutely positioned children)
+ * The background image fills this entire container
+ */
+.poster-container {
+    position: relative;
+    width: 2480px;
+    height: 3508px;
+    background-color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    
+    /* Ensure crisp rendering at high resolution */
+    image-rendering: crisp-edges;
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
+}
+
+/* 
+ * Background Image
+ * IMPORTANT: This image is NEVER modified by the application
+ * - The image is loaded via <img> tag (not CSS background)
+ * - The image fills the entire poster container
+ * - No filters, transforms, or overlays are applied to this element
+ * - The image serves as the static design foundation
+ */
+.poster-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+
+/* 
+ * Text Field Base Styling
+ * All text fields use absolute positioning to overlay on the background image
+ * Adjust top, left, width, and height values based on your poster design layout
+ */
+.text-field {
+    position: absolute;
+    word-wrap: break-word;
+    overflow: hidden;
+    white-space: pre-wrap;
+    
+    /* Ensure text renders sharply in print */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 
+ * Title Field Styling
+ * Displays the listing title
+ * Positioned at top of poster
+ */
+.text-title {
+    top: 280px;
+    left: 30px;
+    width: 360px;
+    height: 50px;
+    
+    font-size: 96px;
+    font-weight: 700;
+    color: #1e3a5f;
+    line-height: 1.2;
+    text-align: center;
+    font-family: 'Arial', sans-serif;
+}
+
+/* 
+ * Date Field Styling
+ * Displays listing start date and end date
+ * Positioned below title
+ */
+.text-date {
+    top: 350px;
+    left: 30px;
+    width: 360px;
+    height: 50px;
+    
+    font-size: 48px;
+    font-weight: 600;
+    color: #ff9500;
+    line-height: 1.4;
+    text-align: center;
+    font-family: 'Arial', sans-serif;
+}
+
+/* 
+ * Location Field Styling
+ * Displays street address and suburb
+ * Positioned in upper-middle area
+ */
+.text-location {
+    top: 420px;
+    left: 30px;
+    width: 360px;
+    height: 50px;
+    
+    font-size: 54px;
+    font-weight: 600;
+    color: #1e3a5f;
+    line-height: 1.3;
+    text-align: center;
+    font-family: 'Arial', sans-serif;
+}
+
+/* 
+ * QR Code Section
+ * Displays a QR code that links directly to the listing on the webpage
+ * When scanned, users are taken to: https://yourdomain.com/listing/{{listingId}}
+ * Positioned in the bottom right for easy access
+ */
+.qr-code-placeholder {
+    position: absolute;
+    bottom: 50px;
+    right: 50px;
+    width: 100px;
+    height: 100px;
+    
+    background-color: white;
+    border: 3px solid #1e3a5f;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.qr-code-image {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+    display: block;
+}
+
+.qr-label {
+    position: absolute;
+    bottom: 20px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #1e3a5f;
+    text-align: center;
+    font-family: 'Arial', sans-serif;
+}
+
+/* 
+ * Responsive Preview Mode (for screen display only)
+ * When viewing in browser at smaller resolutions, scale proportionally
+ */
+@media screen and (max-width: 2800px) {
+    html, body {
+        padding: 10px;
+    }
+    
+    .poster-container {
+        width: 740px;
+        height: 1052px;
+        zoom: 0.3;
+        transform-origin: top center;
+        margin: 0 auto;
+    }
+}
+
+@media screen and (max-width: 1200px) {
+    .poster-container {
+        width: 420px;
+        height: 594px;
+        zoom: 0.17;
+    }
+}
+
+/* 
+ * Print Optimization
+ * Ensures proper rendering when exporting to PDF
+ */
+@media print {
+    html, body {
+        width: 210mm;
+        height: 297mm;
+        padding: 0;
+        margin: 0;
+    }
+    
+    body {
+        display: block;
+    }
+    
+    .poster-container {
+        width: 210mm;
+        height: 297mm;
+        box-shadow: none;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /**
+     * Text fields maintain their absolute positioning in print mode
+     * SVG filters and CSS filters are disabled for better PDF compatibility
+     */
+    .text-field {
+        background: transparent;
+    }
+}

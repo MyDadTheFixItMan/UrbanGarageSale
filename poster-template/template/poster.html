@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Poster Template - Static Background with Dynamic Text Overlays">
+    <title>Poster Template</title>
+    <link rel="stylesheet" href="poster.css">
+</head>
+<body>
+    <!-- 
+        POSTER TEMPLATE USAGE GUIDE:
+        
+        This HTML file is designed to work with dynamic text replacement.
+        
+        How it works:
+        1. The background image (poster-bg.png) is a static, non-modifiable asset
+        2. Text fields below are overlaid on top using absolute positioning
+        3. Replace the placeholder text ({{variable}}) with actual content:
+           - {{title}} → Poster title/heading
+           - {{date}} → Event date
+           - {{location}} → Event location/address
+           - {{description}} → Event description
+        
+        For Web App:
+        - Search and replace {{variable}} with dynamic values before rendering
+        - Use a templating engine (Handlebars, EJS, etc.) or simple string.replace()
+        
+        For Flutter:
+        - Generate HTML dynamically by replacing placeholders with WebView variables
+        - Or use Flutter webview_flutter package with JavaScript bridge
+        
+        For PDF Export:
+        - Use print-to-PDF browser feature (Ctrl+P or Cmd+P)
+        - Or use a PDF library (python-pptx, html2pdf, etc.) that renders this template
+        - The container is sized exactly for A4 at 2480x3508px print resolution
+    -->
+    
+    <div class="poster-container">
+        <!-- 
+            STATIC BACKGROUND IMAGE
+            - This image is never modified by the application
+            - Image path: ../assets/poster-bg.png
+            - The image fills the entire poster container
+        -->
+        <img src="../assets/poster-bg.png" alt="Poster Background" class="poster-background">
+        
+        <!-- 
+            TEXT OVERLAY FIELDS
+            - All text fields are absolutely positioned on top of the background
+            - Each field uses CSS to define position, size, and styling
+            - Replace {{placeholder}} with actual dynamic content from the listing
+        -->
+        
+        <!-- Listing Title -->
+        <div class="text-field text-title">
+            {{title}}
+        </div>
+        
+        <!-- Listing Date Range (Start and End dates) -->
+        <div class="text-field text-date">
+            {{startDate}} - {{endDate}}
+        </div>
+        
+        <!-- Listing Location (Street Address and Suburb) -->
+        <div class="text-field text-location">
+            {{address}}, {{suburb}}
+        </div>
+        
+        <!-- QR Code: Links to the listing page -->
+        <div class="qr-code-placeholder">
+            <!-- QR code is dynamically generated with data={{listingUrl}} -->
+            <img src="" alt="QR Code - Tap to view listing" class="qr-code-image">
+            <span class="qr-label">Tap to View</span>
+        </div>
+    </div>
+</body>
+</html>

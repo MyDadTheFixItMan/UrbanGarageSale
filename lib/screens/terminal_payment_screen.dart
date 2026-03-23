@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import '../services/stripe_terminal_service.dart';
 
 class TerminalPaymentScreen extends StatefulWidget {
@@ -9,13 +10,13 @@ class TerminalPaymentScreen extends StatefulWidget {
   final Function(String) onPaymentError;
 
   const TerminalPaymentScreen({
-    Key? key,
+    super.key,
     required this.amount,
     required this.description,
     required this.paymentIntentId,
     required this.onPaymentComplete,
     required this.onPaymentError,
-  }) : super(key: key);
+  });
 
   @override
   State<TerminalPaymentScreen> createState() => _TerminalPaymentScreenState();
@@ -37,7 +38,7 @@ class _TerminalPaymentScreenState extends State<TerminalPaymentScreen> {
       final status = await StripeTerminalService.getReaderStatus();
       setState(() => readerStatus = status);
     } catch (e) {
-      print('Error checking reader status: $e');
+      debugPrint('Error checking reader status: $e');
     }
   }
 
@@ -80,9 +81,9 @@ class _TerminalPaymentScreenState extends State<TerminalPaymentScreen> {
       await StripeTerminalService.disconnectReader();
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -92,7 +93,9 @@ class _TerminalPaymentScreenState extends State<TerminalPaymentScreen> {
       onWillPop: () async {
         if (isProcessing) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cannot close while processing payment')),
+            const SnackBar(
+              content: Text('Cannot close while processing payment'),
+            ),
           );
           return false;
         }
@@ -112,9 +115,9 @@ class _TerminalPaymentScreenState extends State<TerminalPaymentScreen> {
               Text(
                 '\$${widget.amount.toStringAsFixed(2)}',
                 style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 16),
               Text(
@@ -155,9 +158,9 @@ class _TerminalPaymentScreenState extends State<TerminalPaymentScreen> {
                     Text(
                       status,
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Colors.green,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge?.copyWith(color: Colors.green),
                     ),
                   ],
                 )

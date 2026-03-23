@@ -43,30 +43,156 @@ app.use((req, res, next) => {
 
 // Import API handlers
 let createStripeCheckoutHandler;
-try {
-  console.log('Loading createStripeCheckout handler...');
-  const module = await import('./urbanPayment/createStripeCheckout.js');
-  createStripeCheckoutHandler = module.default;
-  console.log('✅ createStripeCheckout handler loaded');
-} catch (err) {
-  console.error('❌ Could not load createStripeCheckout handler:', err.message);
-  console.error('   Stack:', err.stack);
-}
+let enableStripeConnectHandler;
+let linkExistingStripeAccountHandler;
+let verifyStripeConnectStatusHandler;
+let initiateStripeOAuthHandler;
+let handleStripeOAuthCallbackHandler;
 
-// API Routes
-if (createStripeCheckoutHandler) {
-  app.post('/createStripeCheckout', async (req, res) => {
-    console.log('🔗 POST /createStripeCheckout route handler called');
-    try {
-      await createStripeCheckoutHandler(req, res);
-    } catch (err) {
-      console.error('❌ Handler error:', err);
-      res.status(500).json({ error: err.message });
-    }
-  });
-} else {
-  console.warn('⚠️  createStripeCheckout handler not loaded - endpoint will not work');
-}
+// Load handlers asynchronously
+(async () => {
+  try {
+    console.log('Loading createStripeCheckout handler...');
+    const module = await import('./urbanPayment/createStripeCheckout.js');
+    createStripeCheckoutHandler = module.default;
+    console.log('✅ createStripeCheckout handler loaded');
+  } catch (err) {
+    console.error('❌ Could not load createStripeCheckout handler:', err.message);
+    console.error('   Stack:', err.stack);
+  }
+
+  try {
+    console.log('Loading enableStripeConnect handler...');
+    const module = await import('./urbanPayment/enableStripeConnect.js');
+    enableStripeConnectHandler = module.default;
+    console.log('✅ enableStripeConnect handler loaded');
+  } catch (err) {
+    console.error('❌ Could not load enableStripeConnect handler:', err.message);
+    console.error('   Stack:', err.stack);
+  }
+
+  try {
+    console.log('Loading linkExistingStripeAccount handler...');
+    const module = await import('./urbanPayment/linkExistingStripeAccount.js');
+    linkExistingStripeAccountHandler = module.default;
+    console.log('✅ linkExistingStripeAccount handler loaded');
+  } catch (err) {
+    console.error('❌ Could not load linkExistingStripeAccount handler:', err.message);
+    console.error('   Stack:', err.stack);
+  }
+
+  try {
+    console.log('Loading verifyStripeConnectStatus handler...');
+    const module = await import('./urbanPayment/verifyStripeConnectStatus.js');
+    verifyStripeConnectStatusHandler = module.default;
+    console.log('✅ verifyStripeConnectStatus handler loaded');
+  } catch (err) {
+    console.error('❌ Could not load verifyStripeConnectStatus handler:', err.message);
+    console.error('   Stack:', err.stack);
+  }
+
+  try {
+    console.log('Loading initiateStripeOAuth handler...');
+    const module = await import('./urbanPayment/initiateStripeOAuth.js');
+    initiateStripeOAuthHandler = module.default;
+    console.log('✅ initiateStripeOAuth handler loaded');
+  } catch (err) {
+    console.error('❌ Could not load initiateStripeOAuth handler:', err.message);
+    console.error('   Stack:', err.stack);
+  }
+
+  try {
+    console.log('Loading handleStripeOAuthCallback handler...');
+    const module = await import('./urbanPayment/handleStripeOAuthCallback.js');
+    handleStripeOAuthCallbackHandler = module.default;
+    console.log('✅ handleStripeOAuthCallback handler loaded');
+  } catch (err) {
+    console.error('❌ Could not load handleStripeOAuthCallback handler:', err.message);
+    console.error('   Stack:', err.stack);
+  }
+})();
+
+// CORS preflight handlers for all routes
+app.options('*', cors());
+
+// API Routes - Always register routes, check handler at request time
+app.post('/createStripeCheckout', async (req, res) => {
+  if (!createStripeCheckoutHandler) {
+    return res.status(503).json({ error: 'Handler not loaded yet, try again' });
+  }
+  console.log('🔗 POST /createStripeCheckout route handler called');
+  try {
+    await createStripeCheckoutHandler(req, res);
+  } catch (err) {
+    console.error('❌ Handler error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/enableStripeConnect', async (req, res) => {
+  if (!enableStripeConnectHandler) {
+    return res.status(503).json({ error: 'Handler not loaded yet, try again' });
+  }
+  console.log('🔗 POST /enableStripeConnect route handler called');
+  try {
+    await enableStripeConnectHandler(req, res);
+  } catch (err) {
+    console.error('❌ Handler error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/linkExistingStripeAccount', async (req, res) => {
+  if (!linkExistingStripeAccountHandler) {
+    return res.status(503).json({ error: 'Handler not loaded yet, try again' });
+  }
+  console.log('🔗 POST /linkExistingStripeAccount route handler called');
+  try {
+    await linkExistingStripeAccountHandler(req, res);
+  } catch (err) {
+    console.error('❌ Handler error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/verifyStripeConnectStatus', async (req, res) => {
+  if (!verifyStripeConnectStatusHandler) {
+    return res.status(503).json({ error: 'Handler not loaded yet, try again' });
+  }
+  console.log('🔗 POST /verifyStripeConnectStatus route handler called');
+  try {
+    await verifyStripeConnectStatusHandler(req, res);
+  } catch (err) {
+    console.error('❌ Handler error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/initiateStripeOAuth', async (req, res) => {
+  if (!initiateStripeOAuthHandler) {
+    return res.status(503).json({ error: 'Handler not loaded yet, try again' });
+  }
+  console.log('🔗 POST /initiateStripeOAuth route handler called');
+  try {
+    await initiateStripeOAuthHandler(req, res);
+  } catch (err) {
+    console.error('❌ Handler error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/handleStripeOAuthCallback', async (req, res) => {
+  if (!handleStripeOAuthCallbackHandler) {
+    return res.status(503).json({ error: 'Handler not loaded yet, try again' });
+  }
+  console.log('🔗 POST /handleStripeOAuthCallback route handler called');
+  try {
+    await handleStripeOAuthCallbackHandler(req, res);
+  } catch (err) {
+    console.error('❌ Handler error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -105,6 +231,8 @@ const server = app.listen(PORT, () => {
   console.log(`${'='.repeat(60)}`);
   console.log(`📚 Available endpoints:`);
   console.log(`   POST /createStripeCheckout`);
+  console.log(`   POST /enableStripeConnect`);
+  console.log(`   POST /linkExistingStripeAccount`);
   console.log(`   GET  /health`);
   console.log(`${'='.repeat(60)}\n`);
 });

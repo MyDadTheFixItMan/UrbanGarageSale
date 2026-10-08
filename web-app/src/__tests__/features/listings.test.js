@@ -217,7 +217,7 @@ describe('Listing Management', () => {
     });
 
     test('should delete associated images when deleting listing', async () => {
-      const listingId = 'listing_123';
+      'listing_123';
       const imageUrls = [
         'image1.jpg',
         'image2.jpg',

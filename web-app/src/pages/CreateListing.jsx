@@ -226,7 +226,7 @@ export default function CreateListing() {
         let authUser = null;
         try {
             authUser = await firebase.auth.me();
-        } catch (error) {
+        } catch {
             toast.error('Not authenticated');
             setUploadingImages(false);
             return;
@@ -265,7 +265,7 @@ export default function CreateListing() {
                             fileToUpload = compressedFile;
                             console.log(`📦 Image compressed: ${file.name} (saved ${savings}%)`);
                         }
-                    } catch (compressionError) {
+                    } catch {
                         console.warn(`⚠️ Image compression skipped for ${file.name}, uploading original`);
                         // Continue with original file if compression fails
                     }

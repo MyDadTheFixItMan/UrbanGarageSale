@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { firebase } from '@/api/firebaseClient';
-import { localApi } from '@/lib/localApi';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Shield, Loader2, Tag, DollarSign, TrendingUp,
@@ -49,7 +48,6 @@ const statusConfig = {
     rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700' },
 };
 
-const CHART_COLORS = ['#1e3a5f', '#2d4a6f', '#3d5a7f', '#152a45', '#0f1f35', '#4d6a8f'];
 
 export default function AdminDashboard() {
     const queryClient = useQueryClient();
@@ -113,7 +111,7 @@ export default function AdminDashboard() {
         init();
     }, []);
 
-    const { data: allPromotions = [], isLoading: promoLoading } = useQuery({
+    const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
         queryFn: async () => {
             try {
@@ -235,7 +233,7 @@ export default function AdminDashboard() {
                   }
                 });
                 
-                const duplicates = Object.entries(emailCounts).filter(([email, count]) => count > 1);
+                const duplicates = Object.entries(emailCounts).filter(([, count]) => count > 1);
                 if (duplicates.length > 0) {
                   console.warn(`⚠️ Found ${duplicates.length} email addresses with duplicate users:`, duplicates.map(d => `${d[0]} (${d[1]} users)`).join(', '));
                 }
@@ -285,30 +283,17 @@ export default function AdminDashboard() {
         }
     }, [appSettings]);
 
-    // Load listing data for payments
+    // Match each payment to its listing and payer from the loaded Firestore data
     useEffect(() => {
-        const loadPaymentListingData = async () => {
-            if (allPayments.length === 0) return;
-            
-            const data = {};
-            const sales = await localApi.garage_sales.getAll();
-            const users = await localApi.users.getAll();
-            
-            for (const payment of allPayments) {
-                const sale = sales.find(s => s.id === payment.garage_sale_id);
-                const paymentUser = users.find(u => u.email === payment.user_email);
-                
-                data[payment.id] = {
-                    sale,
-                    user: paymentUser,
-                };
-            }
-            
-            setPaymentListingData(data);
-        };
-        
-        loadPaymentListingData();
-    }, [allPayments]);
+        const data = {};
+        for (const payment of allPayments) {
+            data[payment.id] = {
+                sale: allListings.find(s => s.id === payment.garage_sale_id),
+                user: allUsers.find(u => u.id === payment.user_id || (payment.user_email && u.email === payment.user_email)),
+            };
+        }
+        setPaymentListingData(data);
+    }, [allPayments, allListings, allUsers]);
 
     // Auto-update listings that have passed their end date to 'completed'
     useEffect(() => {
@@ -379,8 +364,6 @@ export default function AdminDashboard() {
         });
     });
 
-    const completedPayments = allPayments.filter(p => p.status === 'completed' && p.amount);
-
     const totalRevenue = allPayments
         .filter(p => p.status === 'completed' && p.amount)
         .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
@@ -395,11 +378,6 @@ export default function AdminDashboard() {
         acc[state] = (acc[state] || 0) + 1;
         return acc;
     }, {});
-
-    const stateChartData = Object.entries(listingsByState).map(([name, value]) => ({
-        name,
-        value,
-    }));
 
     const statesList = Object.keys(listingsByState).filter(s => s !== 'Unknown').sort();
 
@@ -424,11 +402,6 @@ export default function AdminDashboard() {
         acc[state] = (acc[state] || 0) + 1;
         return acc;
     }, {});
-
-    const usersByStateChartData = Object.entries(usersByState).map(([name, value]) => ({
-        name,
-        value,
-    }));
 
     // User states list for filter
     const userStatesList = Object.keys(usersByState).filter(s => s !== 'Unknown').sort();
@@ -514,20 +487,6 @@ export default function AdminDashboard() {
             console.error('🔴 Error message:', error.message);
             console.error('🔴 Error code:', error.code);
             toast.error('Failed to reject listing: ' + (error.message || error.code || 'Unknown error'));
-        },
-    });
-
-    const grantFreeMutation = useMutation({
-        mutationFn: async (listingId) => {
-            await firebase.entities.GarageSale.update(listingId, {
-                status: 'active',
-                payment_status: 'free',
-                is_free_listing: true,
-            });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['allListings'] });
-            toast.success('Free listing granted');
         },
     });
 
@@ -808,7 +767,6 @@ export default function AdminDashboard() {
         const displayStatus = overrideStatus || listing.status;
         const approveClickRef = useRef(false);
         const rejectClickRef = useRef(false);
-        const deleteClickRef = useRef(false);
         
         const handleApproveClick = (e) => {
             if (approveClickRef.current) return; // Prevent double-click

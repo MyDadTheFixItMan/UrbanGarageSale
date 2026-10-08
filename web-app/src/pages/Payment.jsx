@@ -17,7 +17,6 @@ export default function Payment() {
     const saleId = urlParams.get('id');
     const sessionId = urlParams.get('session_id');
 
-    const [user, setUser] = useState(null);
     const [sale, setSale] = useState(null);
     const [loading, setLoading] = useState(true);
     const [processingPayment, setProcessingPayment] = useState(false);
@@ -81,7 +80,6 @@ export default function Payment() {
                 }
 
                 const userData = await firebase.auth.me();
-                setUser(userData);
 
                 if (saleId) {
                     try {

@@ -38,7 +38,7 @@ describe('Complete User Workflows', () => {
 
     test('should complete listing with image upload', async () => {
       // Create listing
-      const listing = await firebase.entities.GarageSale.create({
+      await firebase.entities.GarageSale.create({
         title: 'Estate Sale',
         description: 'Full estate contents',
       });
@@ -74,14 +74,6 @@ describe('Complete User Workflows', () => {
         userId: buyer.id,
         listingId: listing.id,
       });
-
-      // Step 4: Create payment
-      const payment = {
-        listingId: listing.id,
-        amount: 9999,
-        currency: 'AUD',
-        email: buyer.email,
-      };
 
       // Step 5: Process payment (mock)
       const paymentId = 'payment_123';
@@ -257,41 +249,6 @@ describe('Complete User Workflows', () => {
       expect(saved1).toBeTruthy();
       expect(saved).toBeTruthy();
       expect(Array.isArray(saved)).toBe(true);
-    });
-  });
-
-  describe('Error Recovery Workflow', () => {
-    test('should recover from payment failure', async () => {
-      // Initial payment attempt fails
-      const failedPayment = {
-        status: 'failed',
-        error: 'Card declined',
-      };
-
-      // Retry payment
-      const retryPayment = {
-        status: 'processing',
-      };
-
-      // Success
-      const successPayment = {
-        status: 'completed',
-      };
-
-      expect(successPayment.status).toBe('completed');
-    });
-
-    test('should recover from upload failure', async () => {
-      // Upload fails
-      const failedUpload = { status: 'failed' };
-
-      // User retries
-      const retryUpload = { status: 'uploading' };
-
-      // Success
-      const successUpload = { status: 'completed', url: 'https://...' };
-
-      expect(successUpload.status).toBe('completed');
     });
   });
 

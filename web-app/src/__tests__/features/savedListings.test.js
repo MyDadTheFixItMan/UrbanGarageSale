@@ -29,7 +29,7 @@ describe('Saved Listings (Favorites)', () => {
       const userId = 'user_123';
       const listingId = 'listing_456';
 
-      const saved1 = await firebase.entities.SavedListing.create({
+      await firebase.entities.SavedListing.create({
         userId,
         listingId,
       });

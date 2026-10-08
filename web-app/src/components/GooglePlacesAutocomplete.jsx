@@ -18,6 +18,14 @@ export default function GooglePlacesAutocomplete({
     initializeAutocomplete();
   }, []);
 
+  // Show the saved address (e.g. when editing a listing). The input stays uncontrolled so
+  // Google Places can write to it directly.
+  useEffect(() => {
+    if (inputRef.current && inputRef.current.value !== (value || '')) {
+      inputRef.current.value = value || '';
+    }
+  }, [value]);
+
   const initializeAutocomplete = async () => {
     // Wait for Google Maps API to be available
     let attempts = 0;

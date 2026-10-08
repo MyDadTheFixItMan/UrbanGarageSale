@@ -53,7 +53,7 @@ function MapUpdater({ center, zoom }) {
     return null;
 }
 
-export default function SaleMap({ sales, center, zoom = 12, onSaleClick }) {
+export default function SaleMap({ sales, center, zoom = 12 }) {
     const defaultCenter = center || [-33.8688, 151.2093]; // Sydney default
 
     return (

@@ -152,7 +152,7 @@ describe('Payment Flow', () => {
 
   describe('Refund Processing', () => {
     test('should initiate refund for completed payment', async () => {
-      const paymentId = 'payment_123';
+      'payment_123';
       const stripeChargeId = 'ch_test_123';
 
       // Mock refund initiation

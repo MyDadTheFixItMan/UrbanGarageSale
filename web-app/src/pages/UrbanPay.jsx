@@ -23,7 +23,6 @@ export default function UrbanPay() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [sellerStats, setSellerStats] = useState({ totalEarnings: 0, totalSales: 0 });
-    const [quickAmounts] = useState([5, 10, 20, 50, 100]);
     const [promoIndex, setPromoIndex] = useState(0);
     const [cashAmount, setCashAmount] = useState('');
     const [cashDescription, setCashDescription] = useState('');

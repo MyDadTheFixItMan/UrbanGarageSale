@@ -69,7 +69,6 @@ export default function Profile() {
         confirmPassword: '',
     });
     const [passwordError, setPasswordError] = useState('');
-    const [passwordLoading, setPasswordLoading] = useState(false);
     const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
     const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
     const [cardPaymentsLoading, setCardPaymentsLoading] = useState(false);

@@ -115,7 +115,7 @@ describe('Admin Features & Moderation', () => {
 
     test('should suspend user account', async () => {
       const userId = 'user_123';
-      const suspended = await firebase.auth?.me?.();
+      await firebase.auth?.me?.();
 
       // Mock update
       const updatedUser = { id: userId, status: 'suspended' };

@@ -141,7 +141,7 @@ describe('File Upload & Compression', () => {
     test('should reject files over 5MB', () => {
       const maxSize = 5 * 1024 * 1024;
       const largeFileSize = maxSize + 1;
-      const largeFile = new File(
+      new File(
         ['x'.repeat(100)],  // Create a file with 100 bytes of content
         'huge.jpg',
         { type: 'image/jpeg' }

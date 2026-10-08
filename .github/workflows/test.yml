@@ -7,33 +7,54 @@ on:
   push:
     branches: [main, develop]
     paths:
-      - 'web-app/src/**'
-      - 'web-app/package.json'
+      - 'web-app/**'
+      - 'api/**'
       - '.github/workflows/test.yml'
   pull_request:
     branches: [main, develop]
 
 jobs:
-  test:
+  web-app:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: web-app
-    
+
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [22.x, 24.x]
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-      
-      - run: npm install
-      
+
+      - run: npm ci
+
+      - run: npm run lint
+
       - run: npm test -- --maxWorkers=2
         env:
           CI: true
           NODE_ENV: test
+
+      - run: npm run build
+
+  api-and-functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - run: npm ci
+
+      - name: Syntax-check API and Cloud Functions
+        run: |
+          for f in api/*.js api/*/*.js web-app/functions/index.js scripts/*.js scripts/*.mjs; do
+            node --check "$f"
+          done

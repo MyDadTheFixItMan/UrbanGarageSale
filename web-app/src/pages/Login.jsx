@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { createPageUrl } from '../utils';
 import { Mail } from 'lucide-react';
 import GooglePlacesAutocomplete from '@/components/GooglePlacesAutocomplete';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const countryPlaceholders = {
   'AU': '+61 412 345 678',
@@ -47,7 +47,6 @@ export default function Login() {
   const [signUpError, setSignUpError] = useState('');
   const [signUpSuccess, setSignUpSuccess] = useState('');
   const [signUpLoading, setSignUpLoading] = useState(false);
-  const [userCountry, setUserCountry] = useState('');
   const [phonePlaceholder, setPhonePlaceholder] = useState(countryPlaceholders['default']);
   const [isSignUpComplete, setIsSignUpComplete] = useState(false);
   
@@ -80,7 +79,6 @@ export default function Login() {
   useEffect(() => {
     // Urban Garage Sale is an Australian service, so phone numbers default to +61.
     const detectCountry = async () => {
-      setUserCountry('AU');
       setSignUpPhone('+61 ');
       setPhonePlaceholder(countryPlaceholders['AU']);
     };
@@ -410,10 +408,6 @@ export default function Login() {
     } finally {
       setSignUpLoading(false);
     }
-  };
-
-  const handleDemoLogin = async (role) => {
-    // Demo login removed
   };
 
 

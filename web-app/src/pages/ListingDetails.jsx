@@ -155,7 +155,7 @@ export default function ListingDetails() {
                     text: `Check out this garage sale: ${sale?.title}`,
                     url: window.location.href,
                 });
-            } catch (err) {
+            } catch {
                 // User cancelled
             }
         } else {

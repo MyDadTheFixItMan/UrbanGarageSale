@@ -89,7 +89,7 @@ describe('Email Notifications', () => {
     });
 
     test('should render template with user data', () => {
-      const template = 'payment_confirmation';
+      'payment_confirmation';
       const data = {
         buyerName: 'John Doe',
         amount: '$99.99',
@@ -159,10 +159,6 @@ describe('Email Notifications', () => {
     test('should send confirmation to both buyer and seller', async () => {
       const buyerEmail = 'buyer@example.com';
       const sellerEmail = 'seller@example.com';
-      const listingData = {
-        title: 'Estate Sale',
-        amount: 9999,
-      };
 
       const emailsSent = [];
 

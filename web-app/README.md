@@ -25,7 +25,6 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 
 # Stripe Configuration
-VITE_STRIPE_PUBLIC_KEY=pk_test_your_stripe_key
 
 # API Configuration
 VITE_API_BASE_URL=http://localhost:3000

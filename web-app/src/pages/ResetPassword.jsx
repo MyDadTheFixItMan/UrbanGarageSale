@@ -20,7 +20,7 @@ export default function ResetPassword() {
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
     const [promoIndex, setPromoIndex] = useState(0);
-    const [isConfirmingReset, setIsConfirmingReset] = useState(mode === 'resetPassword' && !!oobCode);
+    const isConfirmingReset = mode === 'resetPassword' && !!oobCode;
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],

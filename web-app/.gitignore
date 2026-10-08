@@ -29,3 +29,6 @@ dist-ssr
 
 .env
 .vercel
+
+# Settings templates (placeholders only) are committed
+!.env.example

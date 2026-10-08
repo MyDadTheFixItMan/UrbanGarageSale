@@ -20,7 +20,7 @@ jest.mock('@/api/firebaseClient', () => ({
 }));
 
 // Test component that uses useAuth hook
-const TestComponent = () => {
+() => {
   const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
   
   return (

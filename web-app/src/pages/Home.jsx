@@ -12,7 +12,7 @@ import { formatDateAU } from '@/lib/format';
 
 export default function Home() {
     const queryClient = useQueryClient();
-    const [isPending, startTransition] = useTransition();
+    const [, startTransition] = useTransition();
     const [viewMode, setViewMode] = useState('list');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [user, setUser] = useState(null);
@@ -190,40 +190,6 @@ export default function Home() {
             localStorage.setItem('homeSearchResults', JSON.stringify(searchResults));
         }
     }, [searchResults]);
-
-    const performSearch = async (location = userLocation, searchFilters = {}) => {
-        if (!location) {
-            toast.error('Location not available. Please enable location access or enter a suburb.');
-            return;
-        }
-
-        setIsSearching(true);
-        try {
-            const filters = {
-                status: 'active',
-                saleType: searchFilters.saleType !== 'all' ? searchFilters.saleType : undefined,
-                distance: searchFilters.distance || '25',
-                userLatitude: location.latitude,
-                userLongitude: location.longitude,
-            };
-
-            // Fetch filtered sales
-            const results = await firebase.entities.GarageSale.filter(filters);
-            
-            if (results.length === 0) {
-                toast.info('No listings found in your search area');
-            } else {
-                toast.success(`Found ${results.length} listing${results.length !== 1 ? 's' : ''}`);
-            }
-            
-            setSearchResults(results);
-        } catch (error) {
-            console.error('Search error:', error);
-            toast.error('Failed to search listings');
-        } finally {
-            setIsSearching(false);
-        }
-    };
 
     const requestGeolocation = () => {
         return new Promise((resolve) => {

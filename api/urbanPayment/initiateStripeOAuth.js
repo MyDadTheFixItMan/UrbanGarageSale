@@ -1,15 +1,12 @@
 // Initiate Stripe OAuth flow for linking existing accounts
-import { getFirebaseAdmin, verifyToken } from '../firebase-admin.js';
+import crypto from 'crypto';
+import { getFirebaseAdmin } from '../_shared/firebase-admin.js';
+import { requireUser, requireSecondFactor, sendError } from '../_shared/http.js';
+import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 
-function setCorsHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Content-Type', 'application/json');
-}
 
 export default async (req, res) => {
-  setCorsHeaders(res);
+  applyCors(res, getTrustedOrigin(req.headers.origin, process.env.FRONTEND_URL || 'http://localhost:5173'), 'POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -20,33 +17,7 @@ export default async (req, res) => {
   }
 
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing authorization token' });
-    }
-
-    const idToken = authHeader.substring(7);
-    
-    // Verify user
-    let userId;
-    try {
-      userId = await verifyToken(idToken);
-    } catch (tokenError) {
-      // Development fallback
-      if (process.env.NODE_ENV !== 'production') {
-        try {
-          const parts = idToken.split('.');
-          if (parts.length !== 3) throw new Error('Invalid token format');
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-          userId = payload.uid || payload.sub;
-          if (!userId) throw new Error('No uid in token');
-        } catch (decodeError) {
-          throw new Error(`Token verification failed: ${tokenError.message}`);
-        }
-      } else {
-        throw tokenError;
-      }
-    }
+    const { uid: userId } = requireSecondFactor(await requireUser(req));
 
     // Get Stripe Client ID from environment
     const stripeClientId = process.env.STRIPE_CLIENT_ID;
@@ -56,10 +27,10 @@ export default async (req, res) => {
 
     // Get the redirect URI from request body, use base URL for Stripe
     const body = req.body || {};
-    const redirectUri = body.redirectUri || `${process.env.FRONTEND_URL || 'http://localhost:5173'}`;
+    const redirectUri = getTrustedOrigin(body.redirectUri || req.headers.origin, process.env.FRONTEND_URL || 'http://localhost:5173');
 
     // Generate a state token for security (CSRF protection)
-    const stateToken = Buffer.from(`${userId}:${Date.now()}`).toString('base64');
+    const stateToken = crypto.randomBytes(32).toString('hex');
     
     // Save state token to Firestore temporarily (expires in 10 minutes)
     const admin = getFirebaseAdmin();
@@ -78,7 +49,7 @@ export default async (req, res) => {
     stripeOAuthUrl.searchParams.append('state', stateToken);
     // Force fresh authentication session
     stripeOAuthUrl.searchParams.append('always_prompt', 'true');
-    // Log out any existing Stripe session - CRITICAL for security
+    // Pre-select individual (not company) on Stripe's sign-up form
     stripeOAuthUrl.searchParams.append('stripe_user[business_type]', 'individual');
     // Add timestamp to prevent caching
     stripeOAuthUrl.searchParams.append('t', Date.now().toString());
@@ -93,10 +64,6 @@ export default async (req, res) => {
       oauthUrl: stripeOAuthUrl.toString(),
     });
   } catch (error) {
-    console.error('OAuth initiation error:', error);
-    return res.status(500).json({
-      error: 'Failed to initiate Stripe OAuth',
-      message: error.message,
-    });
+    return sendError(res, error, 'Failed to initiate Stripe OAuth');
   }
 };

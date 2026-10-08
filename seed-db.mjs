@@ -2,13 +2,17 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCmAD0m-2Z_-WomxpDvREimaPSp2CtjmEY",
-  authDomain: "urbangaragesale.firebaseapp.com",
-  projectId: "urbangaragesale",
-  storageBucket: "urbangaragesale.firebasestorage.app",
-  messagingSenderId: "264749197802",
-  appId: "1:264749197802:web:f09553f241658137af6a93",
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID,
 };
+
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  throw new Error('Missing Firebase config env vars for seed-db.mjs');
+}
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);

@@ -3,6 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import { API_BASE_URL } from '@/lib/api-base';
+import { formatAud, formatDateAU, formatDateTimeAU } from '@/lib/format';
+import { escapeHtml } from '@/lib/escape';
 import { Smartphone, RefreshCw, CreditCard, DollarSign, FileText, Printer } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -29,7 +32,7 @@ export default function UrbanPay() {
     const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
     const [cardAmount, setCardAmount] = useState('');
     const [cardDescription, setCardDescription] = useState('');
-    const [isProcessingCard, setIsProcessingCard] = useState(false);
+    const [isProcessingCard] = useState(false);
     const [showCashModal, setShowCashModal] = useState(false);
     const [showCardModal, setShowCardModal] = useState(false);
     const [showSalesListModal, setShowSalesListModal] = useState(false);
@@ -458,7 +461,7 @@ export default function UrbanPay() {
                         <div class="report-meta-grid">
                             <div class="meta-item">
                                 <div class="meta-label">Generated</div>
-                                <div class="meta-value">${new Date().toLocaleDateString()}</div>
+                                <div class="meta-value">${formatDateAU(new Date())}</div>
                             </div>
                             <div class="meta-item">
                                 <div class="meta-label">Total Transactions</div>
@@ -466,7 +469,7 @@ export default function UrbanPay() {
                             </div>
                             <div class="meta-item">
                                 <div class="meta-label">Period Revenue</div>
-                                <div class="meta-value">$${total.toFixed(2)}</div>
+                                <div class="meta-value">${formatAud(total)}</div>
                             </div>
                         </div>
                     </div>
@@ -496,7 +499,7 @@ export default function UrbanPay() {
             } else if (typeof sale.createdAt === 'string') {
                 dateObj = new Date(sale.createdAt);
             }
-            const date = dateObj instanceof Date ? dateObj.toLocaleString() : 'Invalid Date';
+            const date = formatDateTimeAU(dateObj, 'Unknown date');
             const type = sale.paymentMethod === 'cash' ? 'Cash' : 'Card';
             const badgeClass = sale.paymentMethod === 'cash' ? 'type-cash' : 'type-card';
             const badgeEmoji = sale.paymentMethod === 'cash' ? '💵' : '💳';
@@ -505,8 +508,8 @@ export default function UrbanPay() {
                     <tr>
                         <td class="date-cell">${date}</td>
                         <td><span class="type-badge ${badgeClass}">${badgeEmoji} ${type}</span></td>
-                        <td>${sale.description || '—'}</td>
-                        <td class="amount-cell">$${(sale.amount || 0).toFixed(2)}</td>
+                        <td>${escapeHtml(sale.description || '—')}</td>
+                        <td class="amount-cell">${formatAud(sale.amount)}</td>
                     </tr>
             `;
         });
@@ -519,7 +522,7 @@ export default function UrbanPay() {
         html += `
                     <div class="grand-total">
                         <div class="grand-total-label">💰 Grand Total Revenue</div>
-                        <div class="grand-total-value">$${total.toFixed(2)}</div>
+                        <div class="grand-total-value">${formatAud(total)}</div>
                     </div>
                     
                     <div class="footer">
@@ -548,118 +551,17 @@ export default function UrbanPay() {
         return () => clearInterval(interval);
     }, [allPromotions.length]);
 
+    // The web dashboard has no card reader, so it cannot take card payments itself.
+    // Card sales are taken in the Urban Pay mobile app (Tap to Pay), which records them
+    // only after Stripe confirms the payment succeeded.
     async function recordCardPayment() {
-        if (!cardAmount || parseFloat(cardAmount) <= 0) {
-            toast.error('Please enter a valid amount');
-            return;
-        }
-
-        if (!cardDescription || !cardDescription.trim()) {
-            toast.error('Please enter a description');
-            return;
-        }
-
-        if (!selectedGarageSaleId) {
-            toast.error('Please select a garage sale');
-            return;
-        }
-
-        setIsProcessingCard(true);
-
-        try {
-            const currentUser = firebase.auth.getCurrentUser();
-            if (!currentUser) {
-                throw new Error('Not authenticated');
-            }
-
-            const token = await currentUser.getIdToken();
-            
-            // Create payment intent
-            const response = await fetch('https://urban-garage-sale.vercel.app/api/urbanPayment/createPaymentIntent', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    amount: parseFloat(cardAmount),
-                    description: cardDescription.trim(),
-                    sellerId: currentUser.uid,
-                    garageSaleId: selectedGarageSaleId,
-                }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                console.error('API Error Response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    data: errorData
-                });
-                throw new Error(errorData.error || `Failed to create payment (${response.status})`);
-            }
-
-            const data = await response.json();
-            
-            // Log the payment intent for testing
-            console.log('Payment intent created:', data.paymentIntentId);
-            
-            // Now record the sale in Firestore
-            const recordSaleResponse = await fetch('https://urban-garage-sale.vercel.app/api/urbanPayment/recordTapToPaySale', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    amount: parseFloat(cardAmount),
-                    description: cardDescription.trim(),
-                    paymentIntentId: data.paymentIntentId,
-                    currency: 'aud',
-                    paymentMethod: 'tap_to_pay',
-                    garageSaleId: selectedGarageSaleId,
-                }),
-            });
-
-            if (!recordSaleResponse.ok) {
-                const errorData = await recordSaleResponse.json().catch(() => ({}));
-                console.error('Record Sale Error:', errorData);
-                throw new Error(errorData.error || 'Failed to record sale in database');
-            }
-
-            const saleData = await recordSaleResponse.json();
-            console.log('Sale recorded:', saleData.saleId);
-            console.log('Payment status:', saleData.paymentStatus);
-            
-            if (saleData.paymentStatus === 'succeeded') {
-              toast.success('Card payment processed successfully!');
-            } else if (saleData.paymentStatus === 'requires_action') {
-              toast.success('Payment is awaiting confirmation. You may see it shortly.');
-            } else {
-              toast.success(`Payment recorded with status: ${saleData.paymentStatus}`);
-            }
-            
-            // Reset form
-            setCardAmount('');
-            setCardDescription('');
-            
-            // Close modal
-            setShowCardModal(false);
-            
-            // Refresh stats
-            refreshSellerStats();
-        } catch (error) {
-            console.error('Card payment error:', error);
-            toast.error(error.message || 'Failed to process card payment');
-        } finally {
-            setIsProcessingCard(false);
-        }
+        toast.error('Card payments are taken with Tap to Pay in the Urban Pay mobile app. They will appear here once completed.');
+        setShowCardModal(false);
     }
 
     async function recordCashSale() {
-        console.log('[recordCashSale] Starting...');
-        
-        if (!cashAmount || parseFloat(cashAmount) <= 0) {
+        const amount = Number(cashAmount);
+        if (!Number.isFinite(amount) || amount <= 0) {
             toast.error('Please enter a valid amount');
             return;
         }
@@ -677,97 +579,41 @@ export default function UrbanPay() {
         setIsRecordingCash(true);
 
         try {
-            console.log('[recordCashSale] User:', user?.id);
-            
-            if (!user || !user.id) {
+            const currentUser = firebase.auth.getCurrentUser();
+            if (!currentUser) {
                 throw new Error('User not authenticated');
             }
+            const token = await currentUser.getIdToken();
 
-            // Use Firestore Web SDK directly
-            const saleData = {
-                sellerId: user.id,
-                garageSaleId: selectedGarageSaleId,
-                amount: parseFloat(cashAmount),
-                description: cashDescription.trim(),
-                paymentMethod: 'cash',
-                status: 'completed',
-                createdAt: new Date(),
-            };
-
-            console.log('[recordCashSale] Creating sale document:', saleData);
-            
-            // Create the sale document - add() returns the document ID
-            const saleId = await firebase.firestore.collection('sales').add(saleData);
-            console.log('[recordCashSale] Sale created:', saleId);
-
-            // Update seller stats (lifetime)
-            console.log('[recordCashSale] Updating seller stats...');
-            const statsRef = firebase.firestore.collection('sellerStats').doc(user.id);
-            const statsDoc = await statsRef.get();
-
-            if (statsDoc.exists) {
-                const currentStats = statsDoc.data();
-                await statsRef.set({
-                    ...currentStats,
-                    totalEarnings: (currentStats.totalEarnings || 0) + parseFloat(cashAmount),
-                    completedEarnings: (currentStats.completedEarnings || 0) + parseFloat(cashAmount),
-                    totalSales: (currentStats.totalSales || 0) + 1,
-                    completedSales: (currentStats.completedSales || 0) + 1,
-                    lastSaleDate: new Date(),
-                }, { merge: true });
-            } else {
-                await statsRef.set({
-                    totalEarnings: parseFloat(cashAmount),
-                    completedEarnings: parseFloat(cashAmount),
-                    pendingEarnings: 0,
-                    totalSales: 1,
-                    completedSales: 1,
-                    pendingSales: 0,
-                    lastSaleDate: new Date(),
-                });
-            }
-
-            // Update sale-specific stats
-            console.log('[recordCashSale] Updating sale stats for garage sale:', selectedGarageSaleId);
-            const saleStatsRef = firebase.firestore.collection('saleStats').doc(selectedGarageSaleId);
-            const saleStatsDoc = await saleStatsRef.get();
-
-            if (saleStatsDoc.exists) {
-                const currentSaleStats = saleStatsDoc.data();
-                await saleStatsRef.set({
-                    ...currentSaleStats,
-                    totalEarnings: (currentSaleStats.totalEarnings || 0) + parseFloat(cashAmount),
-                    completedEarnings: (currentSaleStats.completedEarnings || 0) + parseFloat(cashAmount),
-                    totalSales: (currentSaleStats.totalSales || 0) + 1,
-                    completedSales: (currentSaleStats.completedSales || 0) + 1,
-                    lastSaleDate: new Date(),
-                }, { merge: true });
-            } else {
-                await saleStatsRef.set({
+            // Recorded server-side so the sale and both stats documents update atomically.
+            const response = await fetch(`${API_BASE_URL}/api/urbanPayment/recordSale`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount,
+                    description: cashDescription.trim(),
+                    paymentMethod: 'cash',
                     garageSaleId: selectedGarageSaleId,
-                    sellerId: user.id,
-                    totalEarnings: parseFloat(cashAmount),
-                    completedEarnings: parseFloat(cashAmount),
-                    pendingEarnings: 0,
-                    totalSales: 1,
-                    completedSales: 1,
-                    pendingSales: 0,
-                    lastSaleDate: new Date(),
-                });
+                }),
+            });
+
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(result.error || `Failed to record sale (${response.status})`);
             }
 
-            console.log('[recordCashSale] Stats updated');
-            
-            toast.success(`Cash sale recorded! $${parseFloat(cashAmount).toFixed(2)}`);
-            
+            toast.success(`Cash sale recorded! ${formatAud(result.amount ?? amount)}`);
+
             // Reset form
             setCashAmount('');
             setCashDescription('');
             setShowCashModal(false);
-            
+
             // Refresh stats
             await refreshSellerStats();
-            
         } catch (error) {
             console.error('Error recording cash sale:', error);
             toast.error('Failed to record cash sale: ' + error.message);
@@ -794,6 +640,13 @@ export default function UrbanPay() {
                     }, 2000);
                     return;
                 }
+                // 2FA must have been completed in this sign-in (the server and Firestore rules check the same).
+                if (!(await firebase.auth.hasSecondFactorSession())) {
+                    toast.error('Please sign in again with your password and SMS code to continue.');
+                    await firebase.auth.logout();
+                    window.location.href = '/login';
+                    return;
+                }
 
                 const userData = await firebase.auth.me();
                 setUser(userData);
@@ -816,7 +669,7 @@ export default function UrbanPay() {
             refreshSellerStats();
             loadGarageSales();
             // Check if card payments are enabled
-            setCardPaymentsEnabled(user.stripeConnectId ? true : false);
+            setCardPaymentsEnabled(user.cardPaymentsEnabled === true && !!user.stripeConnectId);
         }
     }, [user]);
 
@@ -907,7 +760,7 @@ export default function UrbanPay() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
                                     <p className="text-xs text-slate-600 font-semibold">Total Earnings</p>
-                                    <p className="text-2xl font-bold text-[#1e3a5f] mt-1">${typeof sellerStats.totalEarnings === 'number' ? sellerStats.totalEarnings.toFixed(2) : '0.00'}</p>
+                                    <p className="text-2xl font-bold text-[#1e3a5f] mt-1">{formatAud(sellerStats.totalEarnings)}</p>
                                 </div>
                                 <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
                                     <p className="text-xs text-slate-600 font-semibold">Total Sales</p>
@@ -995,7 +848,7 @@ export default function UrbanPay() {
                                             <option value="">-- Select a garage sale --</option>
                                             {garageSales.map(sale => (
                                                 <option key={sale.id} value={sale.id}>
-                                                    {sale.title || 'Untitled'} {sale.date ? `(${new Date(sale.date instanceof Date ? sale.date : new Date(sale.date)).toLocaleDateString()})` : ''}
+                                                    {sale.title || 'Untitled'} {sale.date ? `(${formatDateAU(sale.date)})` : ''}
                                                 </option>
                                             ))}
                                         </select>
@@ -1068,7 +921,7 @@ export default function UrbanPay() {
                                             <option value="">-- Select a garage sale --</option>
                                             {garageSales.map(sale => (
                                                 <option key={sale.id} value={sale.id}>
-                                                    {sale.title || 'Untitled'} {sale.date ? `(${new Date(sale.date instanceof Date ? sale.date : new Date(sale.date)).toLocaleDateString()})` : ''}
+                                                    {sale.title || 'Untitled'} {sale.date ? `(${formatDateAU(sale.date)})` : ''}
                                                 </option>
                                             ))}
                                         </select>
@@ -1144,7 +997,7 @@ export default function UrbanPay() {
                                             <div>
                                                 <p className="text-xs text-slate-600 font-semibold">Total Amount</p>
                                                 <p className="text-xl font-bold text-green-600">
-                                                    ${salesList.reduce((sum, sale) => sum + (sale.amount || 0), 0).toFixed(2)}
+                                                    {formatAud(salesList.reduce((sum, sale) => sum + (sale.amount || 0), 0))}
                                                 </p>
                                             </div>
                                         </div>
@@ -1171,7 +1024,7 @@ export default function UrbanPay() {
                                                         } else if (typeof sale.createdAt === 'string') {
                                                             dateObj = new Date(sale.createdAt);
                                                         }
-                                                        const date = dateObj instanceof Date ? dateObj.toLocaleString() : 'Invalid Date';
+                                                        const date = formatDateTimeAU(dateObj, 'Unknown date');
                                                         const type = sale.paymentMethod === 'cash' ? '💵 Cash' : '💳 Card';
                                                         
                                                         // Find garage sale name
@@ -1184,7 +1037,7 @@ export default function UrbanPay() {
                                                                 <td className="py-2 px-3">{type}</td>
                                                                 <td className="py-2 px-3 text-xs text-slate-700">{garageSaleName}</td>
                                                                 <td className="py-2 px-3 text-slate-700 max-w-xs truncate">{sale.description || '-'}</td>
-                                                                <td className="py-2 px-3 text-right font-semibold text-slate-900 whitespace-nowrap">${(sale.amount || 0).toFixed(2)}</td>
+                                                                <td className="py-2 px-3 text-right font-semibold text-slate-900 whitespace-nowrap">{formatAud(sale.amount)}</td>
                                                             </tr>
                                                         );
                                                     })}

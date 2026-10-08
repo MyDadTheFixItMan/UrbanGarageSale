@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { AU_DAY_MONTH } from '@/lib/format';
 
 // Fix for default marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -84,7 +85,7 @@ export default function SaleMap({ sales, center, zoom = 12, onSaleClick }) {
                                     <div className="space-y-1 text-xs text-slate-600 mb-3">
                                         <div className="flex items-center gap-2">
                                             <Calendar className="w-3 h-3" />
-                                            <span>{format(new Date(sale.start_date), 'MMM d')}</span>
+                                            <span>{format(new Date(sale.start_date), AU_DAY_MONTH)}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Clock className="w-3 h-3" />

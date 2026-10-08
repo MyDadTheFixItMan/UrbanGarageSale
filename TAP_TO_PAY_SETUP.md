@@ -98,7 +98,7 @@ Tap to Pay is Stripe's "phone as terminal" technology that leverages:
 
 ### Stripe Integration
 
-**Publishable Key:** `pk_live_OlSbCxeHrHkFwobGROFX32Md` (Live)
+**Publishable Key:** `pk_live_YOUR_STRIPE_PUBLISHABLE_KEY` (Live)
 - Used in Flutter app for payment initialization
 - Hardcoded in `lib/main.dart`
 

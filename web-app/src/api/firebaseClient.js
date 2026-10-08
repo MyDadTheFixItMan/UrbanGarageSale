@@ -8,9 +8,11 @@ import {
   sendPasswordResetEmail,
   verifyPasswordResetCode,
   confirmPasswordReset,
-  signInWithPhoneNumber,
-  linkWithPhoneNumber,
   RecaptchaVerifier,
+  getMultiFactorResolver,
+  multiFactor,
+  PhoneMultiFactorGenerator,
+  sendEmailVerification,
   linkWithCredential,
   PhoneAuthProvider,
   updatePassword,
@@ -46,6 +48,7 @@ import {
   getFunctions,
   httpsCallable as functionsHttpsCallable
 } from 'firebase/functions';
+import { API_BASE_URL } from '@/lib/api-base';
 
 // Firebase configuration
 // TODO: Replace with your Firebase config from Google Cloud Console
@@ -77,6 +80,70 @@ if (isDevelopment) {
   console.log('✓ Phone Auth: Production mode - app verification enabled');
 }
 
+// In-progress multi-factor sign-in / enrolment (kept in memory only, never persisted).
+let pendingMfaResolver = null;
+let pendingMfaVerificationId = null;
+let pendingEnrollmentVerificationId = null;
+
+// Converts Firebase's "second factor required" error into one the login page can act on.
+function mfaRequiredError(error) {
+  pendingMfaResolver = getMultiFactorResolver(auth, error);
+  pendingMfaVerificationId = null;
+  const hint = pendingMfaResolver.hints.find((h) => h.factorId === PhoneMultiFactorGenerator.FACTOR_ID);
+  const err = new Error('Enter the code we text to your phone to finish signing in.');
+  err.mfaRequired = true;
+  err.phoneHint = hint?.phoneNumber || '';
+  return err;
+}
+
+// E.164 format; Australian numbers like 0412 345 678 or +61 0412... become +61412345678.
+function normalizePhone(phone) {
+  let cleaned = String(phone || '').replace(/[\s\-()]/g, '');
+  if (/^04\d{8}$/.test(cleaned)) cleaned = '+61' + cleaned.slice(1);
+  cleaned = cleaned.replace(/^\+610/, '+61');
+  if (!/^\+[1-9]\d{7,14}$/.test(cleaned)) {
+    throw new Error('Please enter a valid mobile number, e.g. 0412 345 678');
+  }
+  return cleaned;
+}
+
+function smsErrorMessage(error) {
+  switch (error.code) {
+    case 'auth/too-many-requests': return 'Too many SMS requests. Please wait a few minutes and try again.';
+    case 'auth/invalid-phone-number': return 'That mobile number is not valid.';
+    case 'auth/captcha-check-failed': return 'Security check failed. Please refresh the page and try again.';
+    case 'auth/network-request-failed': return 'Network error. Please check your connection and try again.';
+    case 'auth/unverified-email': return 'Please verify your email address first.';
+    case 'auth/second-factor-already-in-use': return 'That mobile number is already enrolled on this account.';
+    default: return `Could not send the SMS code: ${error.message}`;
+  }
+}
+
+// Asks the API to turn 2FA on or off, then refreshes the ID token so the new claim applies.
+async function setTwoFactor(action) {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('No authenticated user');
+  }
+
+  const token = await user.getIdToken();
+  const response = await fetch(`${API_BASE_URL}/api/setUserClaims`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ action })
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || `Failed to ${action} 2FA (${response.status})`);
+  }
+
+  await user.getIdToken(true);
+}
+
 // Authentication functions
 export const firebaseAuth = {
   // Login with email and password
@@ -85,6 +152,7 @@ export const firebaseAuth = {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       return userCredential.user;
     } catch (error) {
+      if (error.code === 'auth/multi-factor-auth-required') throw mfaRequiredError(error);
       throw new Error(`Login failed: ${error.message}`);
     }
   },
@@ -95,20 +163,8 @@ export const firebaseAuth = {
       console.log('Firebase sign up attempt with email:', email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       console.log('Firebase sign up successful');
-      
-      // Auto-enable 2FA for new users
-      try {
-        const userRef = doc(db, 'users', userCredential.user.uid);
-        await updateDoc(userRef, {
-          two_fa_enabled: true,
-          two_fa_enabled_date: new Date().toISOString()
-        });
-        console.log('✓ 2FA automatically enabled for new user');
-      } catch (twoFAError) {
-        console.error('Warning: Could not auto-enable 2FA:', twoFAError.message);
-        // Don't fail signup if 2FA auto-enable fails, but log it
-      }
-      
+      // Firebase requires a verified email before 2FA (SMS) can be enrolled.
+      await sendEmailVerification(userCredential.user).catch((e) => console.warn('Verification email not sent:', e.message));
       return userCredential.user;
     } catch (error) {
       console.error('Firebase sign up error code:', error.code);
@@ -145,6 +201,7 @@ export const firebaseAuth = {
       const result = await signInWithPopup(auth, provider);
       return result.user;
     } catch (error) {
+      if (error.code === 'auth/multi-factor-auth-required') throw mfaRequiredError(error);
       if (error.code === 'auth/popup-closed-by-user') {
         throw new Error('Sign in was cancelled');
       } else if (error.code === 'auth/popup-blocked') {
@@ -163,6 +220,7 @@ export const firebaseAuth = {
       const result = await signInWithPopup(auth, provider);
       return result.user;
     } catch (error) {
+      if (error.code === 'auth/multi-factor-auth-required') throw mfaRequiredError(error);
       if (error.code === 'auth/popup-closed-by-user') {
         throw new Error('Sign in was cancelled');
       } else if (error.code === 'auth/popup-blocked') {
@@ -182,6 +240,7 @@ export const firebaseAuth = {
       const result = await signInWithPopup(auth, provider);
       return result.user;
     } catch (error) {
+      if (error.code === 'auth/multi-factor-auth-required') throw mfaRequiredError(error);
       if (error.code === 'auth/popup-closed-by-user') {
         throw new Error('Sign in was cancelled');
       } else if (error.code === 'auth/popup-blocked') {
@@ -228,17 +287,17 @@ export const firebaseAuth = {
       }
     } catch (error) {
       console.warn('⚠️ Could not fetch user profile from Firestore:', error.message);
-      // Fall through to return minimal data if Firestore is temporarily unavailable
+      // Don't block app if Firestore is temporarily unavailable
     }
     
-    // If user doesn't exist in Firestore yet or Firestore is offline, return minimal auth user data
-    // Do NOT auto-create empty profiles - this prevents "No Name" users
+    // Return auth user data even if Firestore fails
+    // This allows the app to function while Firestore reconnects
     return {
       id: user.uid,
       email: user.email,
-      full_name: '',
+      full_name: user.displayName || '',
       role: 'user',
-      // Profile will be created when user completes signup/onboarding
+      phone_verified: false
     };
   },
 
@@ -350,13 +409,7 @@ export const firebaseAuth = {
       // Wait for DOM to update before creating new verifier
       setTimeout(() => {
         try {
-          const recaptchaKey = import.meta.env.VITE_FIREBASE_RECAPTCHA_KEY;
-          if (!recaptchaKey) {
-            console.error('❌ reCAPTCHA key not configured. Check VITE_FIREBASE_RECAPTCHA_KEY in .env.local');
-            reject(new Error('reCAPTCHA key not configured'));
-            return;
-          }
-
+          // Firebase's invisible reCAPTCHA for phone/SMS auth needs no site key of our own.
           console.log('Creating reCAPTCHA verifier with element:', elementId, isDevelopment ? '(dev mode)' : '(prod mode)');
           
           // Create verifier for both dev and prod
@@ -387,226 +440,143 @@ export const firebaseAuth = {
     });
   },
 
-  // Send SMS verification code
-  sendPhoneVerification: async (phoneNumber) => {
+  // ---------- Two-factor authentication (Firebase multi-factor auth, SMS) ----------
+  // Once a user enrols, Firebase itself refuses to complete sign-in (password or Google /
+  // Facebook / Apple) until the SMS code is entered, so the second factor can't be skipped
+  // by skipping a screen. Firestore rules and the API additionally require that the
+  // current session passed the second factor before any listing or payment action.
+
+  // True if the account has a second factor enrolled.
+  is2FAEnabled: async () => {
+    const user = auth.currentUser;
+    return Boolean(user) && multiFactor(user).enrolledFactors.length > 0;
+  },
+
+  // True if this sign-in session completed the SMS second factor.
+  hasSecondFactorSession: async () => {
+    const user = auth.currentUser;
+    if (!user) return false;
+    const { claims } = await user.getIdTokenResult();
+    return Boolean(claims.firebase?.sign_in_second_factor) && claims.two_fa_enabled === true;
+  },
+
+  // Sign-in step 2: text the code to the phone enrolled on the account.
+  // Call after login() / signInWith*() threw an error with `mfaRequired: true`.
+  sendMfaSignInCode: async (recaptchaElementId) => {
+    if (!pendingMfaResolver) {
+      throw new Error('Your sign-in session expired. Please sign in again.');
+    }
+    const hint = pendingMfaResolver.hints.find((h) => h.factorId === PhoneMultiFactorGenerator.FACTOR_ID);
+    if (!hint) {
+      throw new Error('No phone is enrolled for two-factor sign-in on this account.');
+    }
+    const verifier = await firebaseAuth.setupRecaptcha(recaptchaElementId);
     try {
-      // Get current authenticated user (should be the email/password user from signup)
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No user signed in. Please complete email signup first.');
-      }
-
-      console.log('Current user before phone verification:', user.email, user.uid);
-
-      // Normalize phone number: remove spaces, dashes, parentheses
-      let cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
-      
-      // For countries like AU (+61), remove leading 0 if it comes after +61
-      // e.g., "+610412345678" becomes "+61412345678"
-      if (cleanPhone.match(/^\+610/)) {
-        cleanPhone = cleanPhone.replace(/^\+610/, '+61');
-      }
-
-      // Verify phone number format
-      if (!cleanPhone.match(/^\+[1-9]\d{1,14}$/)) {
-        throw new Error('Invalid phone number format');
-      }
-      
-      console.log('Sending SMS to:', cleanPhone, 'for user:', user.email);
-      
-      // In development mode, use a test phone number format
-      // Firebase will auto-confirm test numbers without SMS or reCAPTCHA
-      let phoneToUse = cleanPhone;
-      if (isDevelopment) {
-        // For development/testing: use a special format that Firebase recognizes
-        // We convert the user's number to a test number that auto-confirms
-        console.log('Development mode: Using Firebase test SMS flow');
-        // Just use the number as-is, Firebase will handle it in test mode
-      }
-      
-      // In development with appVerificationDisabledForTesting=true, Firebase will skip verification
-      // We still need to provide a verifier object, but Firebase won't validate it
-      let verifier = window.recaptchaVerifier;
-      
-      // If no verifier in development, just proceed - Firebase might send test SMS
-      if (!verifier && isDevelopment) {
-        console.log('⚠️ No reCAPTCHA verifier available in development mode, attempting direct SMS send');
-        // Don't throw error, try to proceed without verifier
-      } else if (!verifier) {
-        throw new Error('reCAPTCHA not initialized. Please try again.');
-      }
-      
-      if (verifier) {
-        console.log('Using reCAPTCHA verifier for phone verification');
-      }
-      
-      // Link phone number to existing email/password user
-      const confirmationResult = await linkWithPhoneNumber(user, phoneToUse, verifier);
-      
-      // Store confirmation result for verification code
-      window.confirmationResult = confirmationResult;
-      console.log('✓ SMS sent successfully to phone:', cleanPhone);
-      return confirmationResult;
+      pendingMfaVerificationId = await new PhoneAuthProvider(auth).verifyPhoneNumber(
+        { multiFactorHint: hint, session: pendingMfaResolver.session },
+        verifier
+      );
     } catch (error) {
-      console.error('Phone verification error:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      
-      // Provide detailed error messages
-      if (error.code === 'auth/captcha-check-failed' || error.message.includes('Recaptcha verification failed')) {
-        throw new Error(`reCAPTCHA validation failed. In development, clear your browser cache and reload the page. If this persists, check your .env.local for a valid VITE_FIREBASE_RECAPTCHA_KEY.`);
-      }
-      if (error.code === 'auth/invalid-app-credential' || error.message.includes('invalid-app-credential')) {
-        throw new Error(`SMS service not properly configured.\n\nTo fix this:\n1. Go to Firebase Console > Authentication > Phone\n2. Enable Phone Authentication\n3. Add your domain to the Authorized domains list (http://localhost:5173 for development)`);
-      }
-      if (error.code === 'auth/network-request-failed') {
-        throw new Error('Network error. Please check your internet connection and try again.');
-      }
-      if (error.code === 'auth/too-many-requests') {
-        throw new Error('Too many SMS requests. Please wait a few minutes and try again.');
-      }
-      throw new Error(`Failed to send SMS: ${error.message}`);
+      throw new Error(smsErrorMessage(error));
     }
   },
 
-  // Verify SMS code and link phone credential
-  verifyPhoneCode: async (code) => {
+  // Sign-in step 3: check the SMS code. Firebase only issues the session after this succeeds.
+  completeMfaSignIn: async (code) => {
+    if (!pendingMfaResolver || !pendingMfaVerificationId) {
+      throw new Error('Your sign-in session expired. Please sign in again.');
+    }
     try {
-      const confirmationResult = window.confirmationResult;
-      if (!confirmationResult) {
-        throw new Error('No SMS verification in progress');
-      }
-
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No user logged in');
-      }
-
-      // Verify the code - this will confirm the phone without creating a new session
-      const result = await confirmationResult.confirm(code);
-      
-      // Phone is now verified, return the user
+      const credential = PhoneAuthProvider.credential(pendingMfaVerificationId, String(code).trim());
+      const result = await pendingMfaResolver.resolveSignIn(PhoneMultiFactorGenerator.assertion(credential));
+      pendingMfaResolver = null;
+      pendingMfaVerificationId = null;
       return result.user;
     } catch (error) {
-      console.error('Phone verification error details:', error);
-      throw new Error(`Invalid verification code: ${error.message}`);
-    }
-  },
-
-  // Check if user has 2FA enabled
-  is2FAEnabled: async () => {
-    try {
-      const user = auth.currentUser;
-      if (!user) return false;
-      
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
-      
-      if (userSnap.exists()) {
-        return userSnap.data().two_fa_enabled === true;
+      if (error.code === 'auth/invalid-verification-code') {
+        throw new Error('That code is incorrect. Please check the SMS and try again.');
       }
-      return false;
-    } catch (error) {
-      console.error('Error checking 2FA status:', error);
-      return false;
-    }
-  },
-
-  // Enable 2FA for current user
-  enable2FA: async () => {
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No authenticated user');
+      if (error.code === 'auth/code-expired') {
+        throw new Error('That code has expired. Please request a new one.');
       }
-      
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        two_fa_enabled: true,
-        two_fa_enabled_date: new Date().toISOString()
-      });
-      
-      console.log('✓ 2FA enabled for user');
-    } catch (error) {
-      throw new Error(`Failed to enable 2FA: ${error.message}`);
+      throw new Error(`Verification failed: ${error.message}`);
     }
   },
 
-  // Disable 2FA for current user
+  // Firebase requires a verified email before a second factor can be enrolled.
+  sendVerificationEmail: async () => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('No authenticated user');
+    await sendEmailVerification(user);
+  },
+
+  // Enrolment step 1: text a code to the phone number being enrolled.
+  startMfaEnrollment: async (phoneNumber, recaptchaElementId) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('No authenticated user');
+
+    await user.reload();
+    if (!user.emailVerified) {
+      const error = new Error('Please verify your email address first. Check your inbox for the verification link.');
+      error.emailNotVerified = true;
+      throw error;
+    }
+
+    const normalized = normalizePhone(phoneNumber);
+    const verifier = await firebaseAuth.setupRecaptcha(recaptchaElementId);
+    try {
+      const session = await multiFactor(user).getSession();
+      pendingEnrollmentVerificationId = await new PhoneAuthProvider(auth).verifyPhoneNumber(
+        { phoneNumber: normalized, session },
+        verifier
+      );
+    } catch (error) {
+      if (error.code === 'auth/requires-recent-login') {
+        throw new Error('For your security, please sign out and sign in again before turning on 2FA.');
+      }
+      throw new Error(smsErrorMessage(error));
+    }
+  },
+
+  // Enrolment step 2: confirm the code, enrol the phone, then have the server set the claim.
+  // Returns { signInAgain: true } if the user must sign in again to get a 2FA session.
+  finishMfaEnrollment: async (code) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('No authenticated user');
+    if (!pendingEnrollmentVerificationId) {
+      throw new Error('Please request a new code.');
+    }
+
+    try {
+      const credential = PhoneAuthProvider.credential(pendingEnrollmentVerificationId, String(code).trim());
+      await multiFactor(user).enroll(PhoneMultiFactorGenerator.assertion(credential), 'Mobile');
+      pendingEnrollmentVerificationId = null;
+    } catch (error) {
+      if (error.code === 'auth/invalid-verification-code') {
+        throw new Error('That code is incorrect. Please check the SMS and try again.');
+      }
+      throw new Error(`Could not turn on 2FA: ${error.message}`);
+    }
+
+    await setTwoFactor('enable');
+    return { signInAgain: !(await firebaseAuth.hasSecondFactorSession()) };
+  },
+
+  // Removes every enrolled second factor. Firebase may ask for a recent sign-in first.
   disable2FA: async () => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('No authenticated user');
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No authenticated user');
+      for (const factor of multiFactor(user).enrolledFactors) {
+        await multiFactor(user).unenroll(factor);
       }
-      
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        two_fa_enabled: false,
-        two_fa_disabled_date: new Date().toISOString()
-      });
-      
-      console.log('✓ 2FA disabled for user');
     } catch (error) {
-      throw new Error(`Failed to disable 2FA: ${error.message}`);
+      if (error.code === 'auth/requires-recent-login') {
+        throw new Error('For your security, please sign out and sign in again before turning off 2FA.');
+      }
+      throw error;
     }
-  },
-
-  // Send 2FA verification code via SMS to user's phone
-  send2FACode: async (phone) => {
-    try {
-      if (!phone) {
-        throw new Error('Phone number is required for 2FA');
-      }
-
-      const isDev = import.meta.env.MODE === 'development';
-      
-      // In development, we'll generate a test code and store it temporarily
-      if (isDev) {
-        const testCode = '123456'; // Test code for development
-        sessionStorage.setItem('twoFACode', testCode);
-        sessionStorage.setItem('twoFAPhone', phone);
-        console.log('Development mode: Test 2FA code stored (code: 123456)');
-        return;
-      }
-
-      // Production: Send SMS via Firebase (requires backend API)
-      // For now, we'll use a mock implementation
-      // In production, this would call: POST /api/send2FACode
-      console.log('Sending 2FA code to', phone);
-      
-    } catch (error) {
-      throw new Error(`Failed to send 2FA code: ${error.message}`);
-    }
-  },
-
-  // Verify 2FA code
-  verify2FACode: async (code) => {
-    try {
-      if (!code) {
-        throw new Error('Verification code is required');
-      }
-
-      const isDev = import.meta.env.MODE === 'development';
-      
-      if (isDev) {
-        // In development, verify against stored code
-        const storedCode = sessionStorage.getItem('twoFACode');
-        if (code !== storedCode) {
-          throw new Error('Invalid verification code');
-        }
-        // Clear stored code after verification
-        sessionStorage.removeItem('twoFACode');
-        sessionStorage.removeItem('twoFAPhone');
-        console.log('✓ 2FA code verified');
-        return true;
-      }
-
-      // Production verification would happen here
-      return true;
-    } catch (error) {
-      throw new Error(`2FA verification failed: ${error.message}`);
-    }
+    await setTwoFactor('disable');
   },
 
   // Clear reCAPTCHA
@@ -647,7 +617,6 @@ export const firebaseEntities = {
       const garageSalesRef = collection(db, 'garageSales');
       const docRef = await addDoc(garageSalesRef, {
         ...data,
-        created_by: user.email,
         user_id: user.uid,
         created_at: new Date(),
         status: data.status || 'draft'
@@ -669,8 +638,8 @@ export const firebaseEntities = {
         return docSnap.exists() ? [{ id: docSnap.id, ...docSnap.data() }] : [];
       }
 
-      if (filters.created_by) {
-        constraints.push(where('created_by', '==', filters.created_by));
+      if (filters.user_id) {
+        constraints.push(where('user_id', '==', filters.user_id));
       }
 
       if (filters.status) {
@@ -856,43 +825,12 @@ export const firebaseEntities = {
     },
 
     delete: async (id) => {
-      // Call the backend API to delete the user
-      // This will handle both Firebase Auth deletion and Firestore deletion
-      const user = auth.currentUser;
-      if (!user) {
+      // Admin-only Cloud Function: removes the auth account and the user's personal data.
+      if (!auth.currentUser) {
         throw new Error('Not authenticated. Please log in to delete users.');
       }
-      
-      try {
-        console.log('🔵 Starting user deletion for id:', id);
-        const token = await user.getIdToken();
-        console.log('✓ Got ID token for:', user.email);
-        
-        const response = await fetch('http://localhost:3000/deleteUser', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ userId: id }),
-        });
-
-        console.log('🔵 Delete API response status:', response.status);
-        const responseData = await response.json();
-        console.log('🔵 Delete API response:', responseData);
-
-        if (!response.ok) {
-          const errorMsg = responseData.error || 'Failed to delete user';
-          console.error('❌ Delete failed:', errorMsg);
-          throw new Error(errorMsg);
-        }
-
-        console.log('✓ User deletion succeeded');
-        return { id, deleted: true };
-      } catch (error) {
-        console.error('❌ User.delete() error:', error.message, error);
-        throw error;
-      }
+      await functionsHttpsCallable(functions, 'deleteUser')({ userId: id });
+      return { id, deleted: true };
     }
   },
 
@@ -1167,233 +1105,6 @@ export const firebase = {
   // Get current authenticated user
   get currentUser() {
     return auth.currentUser;
-  },
-  // Seed sample listings
-  seedSampleListings: async () => {
-    const sampleListings = [
-      {
-        title: 'Vintage Furniture & Decor',
-        description: 'Beautiful vintage furniture, lamps, and home decor items. Great condition!',
-        address: '123 Chapel Street',
-        suburb: 'Prahran',
-        postcode: '3181',
-        state: 'VIC',
-        latitude: -37.8606,
-        longitude: 145.0039,
-        start_date: '2026-02-08',
-        end_date: '2026-02-08',
-        start_time: '09:00',
-        end_time: '15:00',
-        sale_type: 'garage_sale',
-        photos: [],
-        created_by: 'seller@example.com',
-        user_id: 'demo_user_1',
-        status: 'active',
-        payment_status: 'pending'
-      },
-      {
-        title: 'Electronics & Books',
-        description: 'Used electronics, textbooks, and paperbacks. All working perfectly.',
-        address: '456 Fitzroy Street',
-        suburb: 'Fitzroy',
-        postcode: '3065',
-        state: 'VIC',
-        latitude: -37.8019,
-        longitude: 144.9766,
-        start_date: '2026-02-07',
-        end_date: '2026-02-08',
-        start_time: '08:00',
-        end_time: '14:00',
-        sale_type: 'garage_sale',
-        photos: [],
-        created_by: 'seller@example.com',
-        user_id: 'demo_user_2',
-        status: 'active',
-        payment_status: 'pending'
-      },
-      {
-        title: 'Moving Sale - Everything Must Go',
-        description: 'Complete household items. Owner relocating interstate.',
-        address: '789 Toorak Road',
-        suburb: 'South Yarra',
-        postcode: '3141',
-        state: 'VIC',
-        latitude: -37.8468,
-        longitude: 145.0164,
-        start_date: '2026-02-14',
-        end_date: '2026-02-15',
-        start_time: '09:00',
-        end_time: '16:00',
-        sale_type: 'moving_sale',
-        photos: [],
-        created_by: 'seller@example.com',
-        user_id: 'demo_user_3',
-        status: 'active',
-        payment_status: 'pending'
-      },
-      {
-        title: 'Garden Tools & Outdoor Gear',
-        description: 'Lawnmowers, gardening tools, outdoor furniture and BBQ equipment.',
-        address: '321 Commercial Road',
-        suburb: 'Melbourne',
-        postcode: '3000',
-        state: 'VIC',
-        latitude: -37.8136,
-        longitude: 144.9631,
-        start_date: '2026-02-09',
-        end_date: '2026-02-09',
-        start_time: '10:00',
-        end_time: '14:00',
-        sale_type: 'garage_sale',
-        photos: [],
-        created_by: 'seller@example.com',
-        user_id: 'demo_user_4',
-        status: 'active',
-        payment_status: 'pending'
-      },
-      {
-        title: 'Kids Toys & Baby Equipment',
-        description: 'Children\'s toys, stroller, crib, and kids clothing. Gently used.',
-        address: '654 Southbank Boulevard',
-        suburb: 'Southbank',
-        postcode: '3006',
-        state: 'VIC',
-        latitude: -37.8267,
-        longitude: 144.9769,
-        start_date: '2026-02-10',
-        end_date: '2026-02-10',
-        start_time: '09:00',
-        end_time: '13:00',
-        sale_type: 'garage_sale',
-        photos: [],
-        created_by: 'seller@example.com',
-        user_id: 'demo_user_5',
-        status: 'active',
-        payment_status: 'pending'
-      },
-      {
-        title: 'Clothing & Fashion Items',
-        description: 'Designer clothes, shoes, handbags and accessories. Various sizes.',
-        address: '987 Queen Street',
-        suburb: 'Melbourne',
-        postcode: '3000',
-        state: 'VIC',
-        latitude: -37.8129,
-        longitude: 144.9701,
-        start_date: '2026-02-11',
-        end_date: '2026-02-11',
-        start_time: '10:00',
-        end_time: '15:00',
-        sale_type: 'garage_sale',
-        photos: [],
-        created_by: 'seller@example.com',
-        user_id: 'demo_user_6',
-        status: 'active',
-        payment_status: 'pending'
-      },
-      {
-        title: 'Estate Sale - Antiques & Collectibles',
-        description: 'Antique furniture, china, jewelry and rare collectible items.',
-        address: '111 Domain Road',
-        suburb: 'South Yarra',
-        postcode: '3141',
-        state: 'VIC',
-        latitude: -37.8394,
-        longitude: 144.9852,
-        start_date: '2026-02-15',
-        end_date: '2026-02-16',
-        start_time: '10:00',
-        end_time: '17:00',
-        sale_type: 'estate_sale',
-        photos: [],
-        created_by: 'seller@example.com',
-        user_id: 'demo_user_7',
-        status: 'active',
-        payment_status: 'pending'
-      },
-      {
-        title: 'Kitchen & Dining Equipment',
-        description: 'Pots, pans, dishes, cutlery, kitchen appliances and dining furniture.',
-        address: '222 Brunswick Street',
-        suburb: 'Fitzroy',
-        postcode: '3065',
-        state: 'VIC',
-        latitude: -37.8006,
-        longitude: 144.9814,
-        start_date: '2026-02-12',
-        end_date: '2026-02-12',
-        start_time: '09:00',
-        end_time: '14:00',
-        sale_type: 'garage_sale',
-        photos: [],
-        created_by: 'seller@example.com',
-        user_id: 'demo_user_8',
-        status: 'active',
-        payment_status: 'pending'
-      },
-      {
-        title: 'Sports & Fitness Equipment',
-        description: 'Exercise bikes, dumbbells, yoga mats, sports equipment and gear.',
-        address: '333 Swanston Street',
-        suburb: 'Melbourne',
-        postcode: '3000',
-        state: 'VIC',
-        latitude: -37.8102,
-        longitude: 144.9658,
-        start_date: '2026-02-13',
-        end_date: '2026-02-13',
-        start_time: '10:00',
-        end_time: '13:00',
-        sale_type: 'garage_sale',
-        photos: [],
-        created_by: 'seller@example.com',
-        user_id: 'demo_user_9',
-        status: 'active',
-        payment_status: 'pending'
-      },
-      {
-        title: 'Yard Sale - Everything Goes',
-        description: 'Mixed household items, furniture, and miscellaneous goods.',
-        address: '444 Lonsdale Street',
-        suburb: 'Melbourne',
-        postcode: '3000',
-        state: 'VIC',
-        latitude: -37.8141,
-        longitude: 144.9609,
-        start_date: '2026-02-16',
-        end_date: '2026-02-16',
-        start_time: '08:00',
-        end_time: '12:00',
-        sale_type: 'yard_sale',
-        photos: [],
-        created_by: 'seller@example.com',
-        user_id: 'demo_user_10',
-        status: 'active',
-        payment_status: 'pending'
-      }
-    ];
-
-    try {
-      let count = 0;
-      for (const listing of sampleListings) {
-        try {
-          // Directly insert listings without user_id requirement
-          const garageSalesRef = collection(db, 'garageSales');
-          await addDoc(garageSalesRef, {
-            ...listing,
-            created_at: new Date(),
-          });
-          count++;
-        } catch (itemError) {
-          console.error(`Error adding listing "${listing.title}":`, itemError);
-        }
-      }
-      console.log(`✅ Successfully added ${count} sample listings to Firestore`);
-      return count;
-    } catch (error) {
-      console.error('❌ Error seeding sample listings:', error);
-      throw error;
-    }
   }
 };
 
@@ -1413,11 +1124,17 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 // Helper function to get coordinates for a suburb/postcode using Google Geocoding API
 async function getSuburbCoordinates(suburbOrPostcode) {
   if (!suburbOrPostcode) return null;
+  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+
+  if (!googleMapsApiKey) {
+    console.warn('⚠️ Missing VITE_GOOGLE_PLACES_API_KEY - geocoding lookup skipped');
+    return null;
+  }
   
   try {
     const searchTerm = suburbOrPostcode.trim();
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(searchTerm)}&country=AU&key=AIzaSyCmAD0m-2Z_-WomxpDvREimaPSp2CtjmEY`
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(searchTerm)}&country=AU&key=${googleMapsApiKey}`
     );
 
     if (!response.ok) {

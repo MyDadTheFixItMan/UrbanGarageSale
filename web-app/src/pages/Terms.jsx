@@ -81,7 +81,7 @@ export default function Terms() {
                     <div className="mb-12">
                         <h1 className="text-3xl font-bold text-[#001f3f] mb-2">Terms and Conditions</h1>
                         <p className="text-slate-600 mb-6">Urban Garage Sale</p>
-                        <p className="text-sm text-slate-500 mb-6">Last updated: February 2026</p>
+                        <p className="text-sm text-slate-500 mb-6">Last updated: October 2026</p>
 
                         <div className="prose prose-sm max-w-none text-slate-700 space-y-4">
                             <p className="italic">Welcome to Urban Garage Sale. By accessing or using this platform, you agree to comply with and be bound by the following Terms and Conditions. Please read them carefully.</p>
@@ -138,23 +138,39 @@ export default function Terms() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">7. Platform Availability</h3>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">7. Fees and Payments</h3>
+                                <ul className="list-disc list-inside space-y-1">
+                                    <li>Publishing a listing costs the fee shown before you pay (currently A$10.00). All prices are in Australian dollars.</li>
+                                    <li>Listing fees are processed by Stripe. Listings are reviewed before going live; if we reject your listing we will refund the fee.</li>
+                                    <li>Urban Pay card payments are processed by Stripe and paid to the seller's own Stripe account. Stripe's fees and terms apply to those payments.</li>
+                                    <li>Nothing in this section limits any refund or remedy you are entitled to under the Australian Consumer Law.</li>
+                                </ul>
+                            </div>
+
+                            <div>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">8. Platform Availability</h3>
                                 <p>Urban Garage Sale may update, modify, or suspend parts of the service at any time. We do not guarantee uninterrupted or error-free operation.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">8. Liability</h3>
-                                <p>Urban Garage Sale is not responsible for losses, damages, disputes, or issues arising from the use of the platform. Your usage and participation are entirely at your own risk.</p>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">9. Liability</h3>
+                                <p>Urban Garage Sale is a listing platform and is not a party to sales between buyers and sellers. To the extent permitted by law, we are not liable for losses or disputes arising from those sales or from your use of the platform.</p>
+                                <p className="mt-2">Nothing in these Terms excludes, restricts, or modifies rights you may have under the Australian Consumer Law (including non-excludable consumer guarantees) or any other law where those rights cannot lawfully be excluded.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">9. Termination</h3>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">10. Termination</h3>
                                 <p>Urban Garage Sale may suspend or delete accounts that violate the Terms or pose risks to others.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">10. Changes to Terms</h3>
-                                <p>We may update these Terms occasionally. Continued use of the platform means you accept any changes.</p>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">11. Changes to Terms</h3>
+                                <p>We may update these Terms from time to time. We will notify you by email or on the website before any material change takes effect. If you do not agree with a change, you may stop using the platform and ask us to close your account.</p>
+                            </div>
+
+                            <div>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">12. Governing Law</h3>
+                                <p>These Terms are governed by the laws in force in Australia. You and Urban Garage Sale submit to the non-exclusive jurisdiction of the Australian courts.</p>
                             </div>
                         </div>
                     </div>

@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { htmlSafeListing } from '@/lib/escape';
 
 const paperSizes = {
   A4: { width: 210, height: 297, name: 'A4 (210mm x 297mm)' },
@@ -10,6 +11,8 @@ const paperSizes = {
  * Includes crop marks and taping instructions
  */
 async function printGarageSaleSignAs4A4Pages(listing) {
+  // Listing text is user-supplied: escape it before building HTML.
+  listing = htmlSafeListing(listing);
   // Format the sale type label
   const saleTypeLabels = {
     garage_sale: 'GARAGE SALE',
@@ -383,11 +386,14 @@ async function printGarageSaleSignAs4A4Pages(listing) {
 export function printGarageSaleSign(listing, selectedSize = 'A4') {
   const paperSize = paperSizes[selectedSize];
 
-  // If A1 is selected, print on 4x A4 pages (2x2 grid)
+  // If A1 is selected, print on 4x A4 pages (2x2 grid); that function escapes the listing itself.
   if (selectedSize === 'A1') {
     printGarageSaleSignAs4A4Pages(listing);
     return;
   }
+
+  // Listing text is user-supplied: escape it before building HTML.
+  listing = htmlSafeListing(listing);
 
   // Format the sale type label
   const saleTypeLabels = {
@@ -711,6 +717,8 @@ export function printGarageSaleSign(listing, selectedSize = 'A4') {
  * Opens in a separate print window to avoid affecting the main page
  */
 export async function printListingPoster(listing) {
+  // Listing text is user-supplied: escape it before building HTML.
+  listing = htmlSafeListing(listing);
   // Format the sale dates and times
   const startDate = new Date(listing.start_date);
   const endDate = new Date(listing.end_date);

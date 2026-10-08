@@ -3,7 +3,7 @@
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
-const isDevelopment = !stripeSecretKey || stripeSecretKey.includes('YOUR_STRIPE_SECRET_KEY');
+const isDevelopment = process.env.NODE_ENV !== 'production' && (!stripeSecretKey || stripeSecretKey.includes('YOUR_STRIPE_SECRET_KEY'));
 
 console.log('📌 createStripeCheckout module loaded');
 console.log('   Stripe configured:', stripeSecretKey && !isDevelopment);
@@ -16,7 +16,10 @@ async function initStripe() {
   if (!stripeInstance) {
     try {
       const Stripe = (await import('stripe')).default;
-      if (!stripeSecretKey || isDevelopment) {
+      if (!stripeSecretKey) {
+        throw new Error('STRIPE_SECRET_KEY not configured');
+      }
+      if (isDevelopment) {
         console.warn('⚠️  STRIPE_SECRET_KEY not set - using development/mock mode');
         return null;
       }
@@ -63,7 +66,7 @@ export default async function handler(req, res) {
 
     console.log('📋 Processing payment for sale:', saleId);
 
-    // Use development mock if Stripe is not configured
+    // Use development mock only in non-production environments
     if (isDevelopment) {
       console.log('⚠️  DEVELOPMENT MODE: Using mock Stripe checkout');
       const mockSession = createMockCheckoutSession(saleId, saleTitle);
@@ -73,6 +76,10 @@ export default async function handler(req, res) {
         mode: 'development',
         message: 'This is a development/test checkout. In production, real Stripe payments would be processed.',
       });
+    }
+
+    if (!stripeSecretKey) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
     }
 
     // Use real Stripe in production

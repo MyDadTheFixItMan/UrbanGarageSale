@@ -1,135 +1,189 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user is admin - more robust version
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // True only if this sign-in completed Firebase's SMS second factor. Firebase writes
+    // sign_in_second_factor into the signed ID token; clients cannot add it.
+    function hasSecondFactorSession() {
+      return signedIn() && request.auth.token.firebase.get('sign_in_second_factor', null) != null;
+    }
+
+    // Admin access requires a 2FA session, so a stolen admin password alone is not enough.
     function isAdmin() {
-      return request.auth != null && 
+      return hasSecondFactorSession() &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
     }
 
-    // Helper function to check if user has 2FA enabled
+    // two_fa_enabled is set by the API (api/setUserClaims.ts) once an SMS second factor is
+    // enrolled; the session must also have passed that second factor.
     function has2FAEnabled() {
-      return request.auth != null && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('two_fa_enabled', false) == true;
+      return hasSecondFactorSession() && request.auth.token.get('two_fa_enabled', false) == true;
     }
 
-    // Promotional messages collection (anyone can read, only admins can write)
+    function unchanged(field) {
+      return request.resource.data.get(field, null) == resource.data.get(field, null);
+    }
+
+    // ---------- Users ----------
+    // Fields only the server (Admin SDK) or an admin may set.
+    function protectedUserFields() {
+      return ['role', 'two_fa_enabled', 'two_fa_enabled_date', 'two_fa_disabled_date',
+              'cardPaymentsEnabled', 'stripeConnectId', 'stripeAccountType', 'stripeConnectSetup',
+              'stripeBusinessName', 'stripeBusinessType', 'stripeCountry', 'stripeEmail', 'linkedAt'];
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+
+      // New profiles may only claim the default 'user' role.
+      allow create: if signedIn() && request.auth.uid == userId &&
+                       request.resource.data.get('role', 'user') == 'user' &&
+                       !request.resource.data.keys().hasAny(protectedUserFields().removeAll(['role']));
+
+      allow update: if isAdmin() ||
+                       (signedIn() && request.auth.uid == userId &&
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedUserFields()));
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Garage sale listings ----------
+    // A listing qualifies as free when the admin's free period is on and the sale starts inside it.
+    function isFreeListing(data) {
+      let settings = get(/databases/$(database)/documents/appSettings/default).data;
+      return data.get('status', '') == 'active' &&
+             data.get('payment_status', '') == 'completed' &&
+             settings.get('is_active', false) == true &&
+             data.get('start_date', '') is string &&
+             data.start_date >= settings.get('free_listing_start', '9999') &&
+             data.start_date <= settings.get('free_listing_end', '');
+    }
+
+    // Once a listing is paid for or approved, its dates and location are fixed, so one fee
+    // (or one free-period listing) can't be moved to another weekend or address.
+    function isPaidOrApproved(data) {
+      return data.get('status', '') in ['active', 'pending_approval'] ||
+             data.get('payment_status', '') in ['paid', 'completed', 'free'];
+    }
+
+    function lockedFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+        ['start_date', 'end_date', 'start_time', 'end_time',
+         'address', 'suburb', 'postcode', 'state', 'latitude', 'longitude']);
+    }
+
+    // Unpaid listings the owner controls. Paid/approved states are set by the server or an admin.
+    function isUnpaidOwnerState(data) {
+      return data.get('status', 'draft') in ['draft', 'pending_payment'] &&
+             data.get('payment_status', 'pending') == 'pending';
+    }
+
+    match /garageSales/{saleId} {
+      // The public sees live listings only. Drafts, unpaid, pending and rejected listings are
+      // visible to their owner and admins. Public queries must filter on status == 'active'.
+      allow read: if resource.data.get('status', '') == 'active' ||
+                     (signedIn() && request.auth.uid == resource.data.get('user_id', '')) ||
+                     isAdmin();
+
+      // Listings are public, so they must not carry the seller's email address.
+      allow create: if has2FAEnabled() &&
+                       request.resource.data.user_id == request.auth.uid &&
+                       !('created_by' in request.resource.data) &&
+                       (isUnpaidOwnerState(request.resource.data) || isFreeListing(request.resource.data));
+
+      allow update: if isAdmin() ||
+                       (signedIn() && request.auth.uid == resource.data.user_id &&
+                        unchanged('user_id') && unchanged('created_by') && unchanged('is_free_listing') &&
+                        (!isPaidOrApproved(resource.data) || lockedFieldsUnchanged()) &&
+                        (
+                          // Ordinary edits that leave the status alone
+                          (unchanged('status') && unchanged('payment_status')) ||
+                          // Owner ends their own sale
+                          (request.resource.data.get('status', '') == 'completed' && unchanged('payment_status')) ||
+                          // Moving between unpaid states (e.g. draft -> pending_payment)
+                          (isUnpaidOwnerState(resource.data) && isUnpaidOwnerState(request.resource.data)) ||
+                          // Free-period publish of a listing that was never paid for
+                          (resource.data.get('payment_status', 'pending') == 'pending' && isFreeListing(request.resource.data))
+                        ));
+
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == resource.data.user_id);
+    }
+
+    // ---------- Saved listings ----------
+    match /savedListings/{savedId} {
+      allow read, delete: if signedIn() && request.auth.uid == resource.data.user_id;
+      allow create: if signedIn() && request.auth.uid == request.resource.data.user_id;
+      allow update: if signedIn() && request.auth.uid == resource.data.user_id && unchanged('user_id');
+    }
+
+    // ---------- Listing fee payments ----------
+    // Paid records are written by Cloud Functions after Stripe confirms the payment.
+    // Clients may only record a $0 free-period entry for their own free listing.
+    match /payments/{paymentId} {
+      allow read: if signedIn() && (request.auth.uid == resource.data.get('user_id', '') || isAdmin());
+
+      allow create: if isAdmin() ||
+                       (signedIn() &&
+                        request.resource.data.user_id == request.auth.uid &&
+                        request.resource.data.amount == 0 &&
+                        request.resource.data.payment_method == 'free_period' &&
+                        request.resource.data.status == 'completed' &&
+                        get(/databases/$(database)/documents/garageSales/$(request.resource.data.garage_sale_id)).data.user_id == request.auth.uid &&
+                        get(/databases/$(database)/documents/garageSales/$(request.resource.data.garage_sale_id)).data.payment_status == 'completed');
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- Contact messages ----------
+    match /contactMessages/{messageId} {
+      allow create: if signedIn();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ---------- Site content and settings ----------
     match /promotions/{document=**} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null && isAdmin();
+      allow write: if isAdmin();
     }
 
-    // App settings - any authenticated user can read, only admins can write
     match /appSettings/{document=**} {
-      allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null && isAdmin();
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
 
-    // Admin settings - for app-level admin messages and configurations
     match /admin_settings/{document=**} {
-      allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null && isAdmin();
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
 
-    // Garage sales listings (public read, authenticated create with 2FA, own/admin update)
-    match /garageSales/{document=**} {
-      allow read: if true;
-      allow create: if request.auth != null && has2FAEnabled();
-      allow update: if request.auth != null && (
-        request.auth.uid == resource.data.user_id || isAdmin()
-      );
-      allow delete: if request.auth != null && (
-        request.auth.uid == resource.data.user_id || isAdmin()
-      );
-    }
-
-    // Saved listings (user-specific, with creation verification)
-    match /savedListings/{document=**} {
-      allow read, write, delete: if request.auth != null && request.auth.uid == resource.data.user_id;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.user_id;
-    }
-
-    // Payment records (user can read own, admin can read all, 2FA required for create)
-    match /payments/{document=**} {
-      allow read: if request.auth != null && (
-        request.auth.uid == resource.data.user_id || isAdmin()
-      );
-      allow create: if request.auth != null && has2FAEnabled();
-      allow update: if request.auth != null && isAdmin();
-      allow delete: if request.auth != null && isAdmin();
-    }
-
-    // Contact messages (anyone can create, only admins can read/update/delete)
-    match /contactMessages/{document=**} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if request.auth != null && isAdmin();
-    }
-
-    // User profiles
-    match /users/{userId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && isAdmin();
-    }
-
-    // Postcode cache (public read, server-only write via Admin SDK)
     match /postcode_cache/{document=**} {
       allow read: if true;
-      allow write: if false; // Only written by server via Admin SDK
+      allow write: if false; // Admin SDK only
     }
 
-    // Urban Pay Sales Transactions
+    // ---------- Urban Pay ----------
+    // Sales and stats are written only by the API (Admin SDK) so totals cannot be edited
+    // from the browser: cash via /api/urbanPayment/recordSale, card via recordTapToPaySale
+    // after Stripe confirms the payment.
     match /sales/{saleId} {
-      // Seller can create sales - 2FA checked in backend for REST API calls
-      allow create: if request.auth != null &&
-                     request.auth.uid == request.resource.data.sellerId;
-      
-      // Seller can read their own sales
-      allow read: if request.auth != null && 
-                  request.auth.uid == resource.data.sellerId;
-      
-      // Admins can read all sales
-      allow read: if request.auth != null && isAdmin();
-      
-      // Seller can update their own sales
-      allow update: if request.auth != null && 
-                   request.auth.uid == resource.data.sellerId;
-      
-      // Only admins can delete
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn() && (request.auth.uid == resource.data.sellerId || isAdmin());
+      allow write: if isAdmin();
     }
 
-    // Urban Pay Seller Statistics (lifetime)
     match /sellerStats/{sellerId} {
-      // User can read and write their own stats
-      allow read: if request.auth != null && request.auth.uid == sellerId;
-      allow write: if request.auth != null && request.auth.uid == sellerId;
-      
-      // Admins can read all stats
-      allow read: if request.auth != null && isAdmin();
-      
-      // Admins can update stats
-      allow update: if request.auth != null && isAdmin();
-      
-      // Only admins can delete
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn() && (request.auth.uid == sellerId || isAdmin());
+      allow write: if isAdmin();
     }
 
-    // Urban Pay Sale Statistics (per garage sale)
     match /saleStats/{garageSaleId} {
-      // User can read and write stats for their own garage sales
-      allow read, write: if request.auth != null && 
-                          request.auth.uid == resource.data.sellerId;
-      
-      // Allow creating new sale stats for authenticated sellers
-      allow create: if request.auth != null &&
-                     request.auth.uid == request.resource.data.sellerId;
-      
-      // Admins can read and update all sale stats
-      allow read, update: if request.auth != null && isAdmin();
-      
-      // Only admins can delete
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn() && (request.auth.uid == resource.data.sellerId || isAdmin());
+      allow write: if isAdmin();
     }
+
+    // oauth_states and anything not listed above: no client access (Admin SDK only).
   }
 }

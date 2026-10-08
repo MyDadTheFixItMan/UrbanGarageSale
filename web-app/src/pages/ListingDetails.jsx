@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { format, parseISO, differenceInDays } from 'date-fns';
 import SaleMap from '../components/map/SaleMap';
 import { printListingPoster, paperSizes } from '../utils/printGarageSaleSign';
+import { AU_WEEKDAY_DATE } from '@/lib/format';
 import {
     Dialog,
     DialogContent,
@@ -336,8 +337,8 @@ export default function ListingDetails() {
                                     </div>
                                     <div>
                                         <p className="font-medium text-[#1e40af]">
-                                            {format(startDate, 'EEEE, MMMM d')}
-                                            {durationDays > 1 && ` - ${format(endDate, 'EEEE, MMMM d')}`}
+                                            {format(startDate, AU_WEEKDAY_DATE)}
+                                            {durationDays > 1 && ` - ${format(endDate, AU_WEEKDAY_DATE)}`}
                                         </p>
                                         <p className="text-sm text-slate-500">
                                             {durationDays} {durationDays === 1 ? 'day' : 'days'}

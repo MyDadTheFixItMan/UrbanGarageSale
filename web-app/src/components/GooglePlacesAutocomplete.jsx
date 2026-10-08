@@ -6,6 +6,7 @@ export default function GooglePlacesAutocomplete({
   onSelect,
   placeholder = "Enter address",
   className = "",
+  disabled = false,
 }) {
   const inputRef = useRef(null);
   const [predictions, setPredictions] = useState([]);
@@ -165,6 +166,7 @@ export default function GooglePlacesAutocomplete({
           type="text"
           placeholder={placeholder}
           onChange={handleInputChange}
+          disabled={disabled}
           style={{
             width: '100%',
             border: '1px solid #e5e7eb',

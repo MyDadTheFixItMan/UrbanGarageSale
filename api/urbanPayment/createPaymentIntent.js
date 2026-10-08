@@ -1,152 +1,72 @@
-// Create Payment Intent endpoint for Vercel
+// Create a card PaymentIntent for an Urban Pay sale.
+// Funds are routed to the seller's connected Stripe account (destination charge),
+// so the platform never holds the seller's sale proceeds.
 import Stripe from 'stripe';
-import admin from 'firebase-admin';
-
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "";
-const projectId = process.env.FIREBASE_PROJECT_ID || "urbangaragesale";
-
-// Initialize Firebase Admin
-function getFirebaseAdmin() {
-  if (!admin.apps.length) {
-    try {
-      let credentials = undefined;
-      if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-        try {
-          credentials = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-        } catch (e) {
-          console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON');
-        }
-      }
-      
-      const options = { projectId };
-      if (credentials) {
-        options.credential = admin.credential.cert(credentials);
-      }
-      
-      admin.initializeApp(options);
-      console.log('✓ Firebase Admin initialized');
-    } catch (error) {
-      console.error('Firebase Admin init error:', error.message);
-      throw error;
-    }
-  }
-  return admin;
-}
-
-// Verify token and extract user ID
-async function extractUserIdFromToken(idToken) {
-  try {
-    const adminApp = getFirebaseAdmin();
-    const decodedToken = await adminApp.auth().verifyIdToken(idToken);
-    const uid = decodedToken.uid;
-    
-    if (!uid || typeof uid !== 'string' || uid.length > 128) {
-      throw new Error(`Invalid UID format: ${uid}`);
-    }
-    
-    console.log('✓ Token verified, UID:', uid);
-    return uid;
-  } catch (error) {
-    console.error('Token verification error:', error.message);
-    throw new Error(`Authentication failed: ${error.message}`);
-  }
-}
+import { getFirestore } from '../_shared/firebase-admin.js';
+import { applyCors, getTrustedOrigin } from '../_shared/security.js';
+import {
+  HttpError, readJsonBody, requireUser, requireSecondFactor, parseAudAmount, toCents, cleanText, sendError,
+} from '../_shared/http.js';
 
 let stripe = null;
-const getStripe = async () => {
+function getStripe() {
   if (!stripe) {
-    if (!stripeSecretKey) {
-      throw new Error("Stripe not configured - missing STRIPE_SECRET_KEY");
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY not configured');
     }
-    stripe = new Stripe(stripeSecretKey);
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   }
   return stripe;
-};
+}
 
 export default async (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Content-Type", "application/json");
+  applyCors(res, getTrustedOrigin(req.headers.origin), 'POST, OPTIONS');
 
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    console.log("=== Card Payment Request ===");
-    
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      console.error("Missing auth header");
-      return res.status(401).json({ error: "Missing authorization header" });
+    const { uid } = requireSecondFactor(await requireUser(req));
+    const body = await readJsonBody(req);
+
+    const amount = parseAudAmount(body.amount);
+    const description = cleanText(body.description, 100, 'Urban Pay Sale');
+    const garageSaleId = cleanText(body.garageSaleId, 128);
+    // Card-present (Terminal / Tap to Pay) intents need an explicit payment method type.
+    const cardPresent = body.channel === 'terminal' || body.channel === 'tap_to_pay';
+
+    const userDoc = await getFirestore().collection('users').doc(uid).get();
+    const user = userDoc.data() || {};
+    if (!user.stripeConnectId || user.cardPaymentsEnabled !== true) {
+      throw new HttpError(403, 'Card payments are not enabled for this account. Complete Stripe setup in your Profile first.');
     }
 
-    // Parse request body
-    let body = {};
-    try {
-      const bodyStr = await new Promise((resolve, reject) => {
-        let data = "";
-        req.on("data", chunk => data += chunk);
-        req.on("end", () => resolve(data));
-        req.on("error", reject);
-      });
-      body = bodyStr ? JSON.parse(bodyStr) : {};
-    } catch (e) {
-      console.error("Invalid JSON:", e.message);
-      return res.status(400).json({ error: "Invalid request body" });
-    }
-
-    const { amount, description, currency = "aud" } = body;
-    if (!amount) {
-      return res.status(400).json({ error: "Missing amount field" });
-    }
-
-    console.log("Amount:", amount, "Description:", description);
-
-    // Extract and verify user ID from token
-    const idToken = authHeader.substring(7);
-    let userId;
-    
-    try {
-      userId = await extractUserIdFromToken(idToken);
-    } catch (tokenError) {
-      console.error("Token error:", tokenError.message);
-      return res.status(401).json({ error: tokenError.message });
-    }
-
-    console.log("Creating payment intent for user:", userId);
-
-    // Create Stripe payment intent
-    const stripe = await getStripe();
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
-      currency: currency,
-      description: `Urban Pay Sale - ${description?.substring(0, 50)}`,
+    const paymentIntent = await getStripe().paymentIntents.create({
+      amount: toCents(amount),
+      currency: 'aud',
+      description: `Urban Pay Sale - ${description}`,
+      ...(cardPresent
+        ? { payment_method_types: ['card_present'], capture_method: 'automatic' }
+        : { automatic_payment_methods: { enabled: true } }),
+      on_behalf_of: user.stripeConnectId,
+      transfer_data: { destination: user.stripeConnectId },
       metadata: {
-        sellerId: userId,
-        saleDescription: description?.substring(0, 50) || "Urban Pay Sale",
+        sellerId: uid,
+        garageSaleId,
+        saleDescription: description,
       },
     });
-
-    console.log("✓ Payment intent created:", paymentIntent.id);
 
     return res.status(200).json({
       success: true,
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
     });
-    
   } catch (error) {
-    console.error("Fatal error:", error.message);
-    console.error("Stack:", error.stack);
-    return res.status(500).json({
-      error: error.message || "Internal server error",
-      type: error.constructor?.name,
-    });
+    return sendError(res, error, 'Failed to create payment');
   }
 };

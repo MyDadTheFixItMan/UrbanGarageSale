@@ -80,7 +80,7 @@ export default function SavedListings() {
     const { data: allSales = [] } = useQuery({
         queryKey: ['allSales'],
         queryFn: async () => {
-            const results = await firebase.entities.GarageSale.filter({});
+            const results = await firebase.entities.GarageSale.filter({ status: 'active' });
             console.log('SavedListings.jsx: Fetched all sales:', results);
             return results;
         },

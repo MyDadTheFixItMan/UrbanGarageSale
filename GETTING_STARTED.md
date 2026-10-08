@@ -192,6 +192,25 @@ When ready to go live:
 5. **Enable HTTPS** (required by Stripe)
 6. **Set up webhooks** for Stripe notifications
 
+### Google API Key Hardening (Required)
+
+- Use a dedicated browser key for `VITE_GOOGLE_PLACES_API_KEY`
+- Set **Application restrictions** to `HTTP referrers (web sites)`
+- Allow only required referrers:
+  - `https://www.urbangaragesale.com.au/*`
+  - `https://urbangaragesale.com.au/*`
+  - `https://web-app-pied-eta.vercel.app/*`
+  - `https://*.vercel.app/*` (only if preview deployments need Maps)
+  - `http://localhost:5173/*` (development only)
+- Set **API restrictions** to only:
+  - `Maps JavaScript API`
+  - `Places API`
+  - `Geocoding API`
+- Do not use unrestricted browser keys in production
+- Rotate and delete old Google keys after cutover
+- Store keys in deployment environment variables, not committed files
+- Keep server-only Google keys separate; use IP allowlist only when static egress IPs exist
+
 ## Support & Next Steps
 
 - For Stripe issues: https://support.stripe.com

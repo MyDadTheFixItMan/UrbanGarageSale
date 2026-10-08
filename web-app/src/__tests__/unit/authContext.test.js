@@ -4,9 +4,8 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import * as firebaseClient from '@/api/firebaseClient';
 
 // Mock firebase client
 jest.mock('@/api/firebaseClient', () => ({

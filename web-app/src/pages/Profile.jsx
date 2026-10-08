@@ -4,12 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
 // API configuration - switch between local dev and production
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+import { API_BASE_URL } from '@/lib/api-base';
+import { formatAud, AU_DATE } from '@/lib/format';
+import { LISTING_FEE_AUD } from '@/lib/pricing';
 import { createPageUrl } from '../utils';
 import { MapPin, Mail, Phone, Pencil, Plus, Loader2,
     Tag, Clock, Trash2, Eye, FileText, CheckCircle, XCircle, CreditCard, Printer
 } from 'lucide-react';
 import GooglePlacesAutocomplete from '@/components/GooglePlacesAutocomplete';
+import TwoFactorSetupDialog from '@/components/TwoFactorSetupDialog';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,8 +73,22 @@ export default function Profile() {
     const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
     const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
     const [cardPaymentsLoading, setCardPaymentsLoading] = useState(false);
+    const [twoFADialogOpen, setTwoFADialogOpen] = useState(false);
+
+    // Called once the mobile is enrolled as a Firebase second factor.
+    const handle2FAEnabled = async ({ signInAgain }) => {
+        setTwoFADialogOpen(false);
+        setUser(prev => ({ ...prev, two_fa_enabled: true }));
+        if (signInAgain) {
+            // This session started before 2FA existed; a fresh sign-in (password + SMS) is needed.
+            toast.success('2FA is on. Please sign in again with your password and SMS code.');
+            await firebase.auth.logout();
+            window.location.href = '/login';
+            return;
+        }
+        toast.success('Two-factor authentication is on');
+    };
     const [stripeAccountDialogOpen, setStripeAccountDialogOpen] = useState(false);
-    const [stripeAPIKey, setStripeAPIKey] = useState('');
     const [linkingExistingAccount, setLinkingExistingAccount] = useState(false);
     const [printDialogOpen, setPrintDialogOpen] = useState(false);
     const [selectedPrintSize, setSelectedPrintSize] = useState('A4');
@@ -132,7 +149,7 @@ export default function Profile() {
                 const currentUser = firebase.currentUser;
                 if (currentUser) {
                   const token = await currentUser.getIdToken();
-                  const response = await fetch(`${API_BASE_URL}/verifyStripeConnectStatus`, {
+                  const response = await fetch(`${API_BASE_URL}/api/urbanPayment/verifyStripeConnectStatus`, {
                     method: 'POST',
                     headers: {
                       'Authorization': `Bearer ${token}`,
@@ -188,7 +205,7 @@ export default function Profile() {
 
                     const token = await currentUser.getIdToken();
 
-                    const response = await fetch(`${API_BASE_URL}/handleStripeOAuthCallback`, {
+                    const response = await fetch(`${API_BASE_URL}/api/urbanPayment/handleStripeOAuthCallback`, {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${token}`,
@@ -226,12 +243,13 @@ export default function Profile() {
 
     const { data: userListings = [], isLoading: listingsLoading } = useQuery({
         queryKey: ['userListings', user?.email],
-        queryFn: () => firebase.entities.GarageSale.filter({ created_by: user.email }),
-        enabled: !!user?.email,
+        queryFn: () => firebase.entities.GarageSale.filter({ user_id: user.id }),
+        enabled: !!user?.id,
     });
 
-    const activeListings = userListings.filter(l => (l.status === 'active' || l.status === 'pending_approval') && l.end_date && !isBefore(parseISO(l.end_date), startOfToday()) && l.payment_status === 'paid');
-    const draftListings = userListings.filter(l => l.status === 'draft');
+    const activeListings = userListings.filter(l => (l.status === 'active' || l.status === 'pending_approval') && l.end_date && !isBefore(parseISO(l.end_date), startOfToday()) && ['paid', 'completed', 'free'].includes(l.payment_status));
+    const isUnpaidDraft = (l) => l.status === 'draft' || l.status === 'pending_payment';
+    const draftListings = userListings.filter(isUnpaidDraft);
     const pastListings = userListings.filter(l => l.status === 'completed' || ((l.status === 'active' || l.status === 'pending_approval') && l.end_date && isBefore(parseISO(l.end_date), startOfToday())));
 
     const updateProfileMutation = useMutation({
@@ -315,7 +333,6 @@ export default function Profile() {
     const handleEnableCardPayments = () => {
         // Show dialog asking user to choose between new and existing account
         setStripeAccountDialogOpen(true);
-        setStripeAPIKey('');
     };
 
     const handleCreateNewStripeAccount = async () => {
@@ -329,7 +346,7 @@ export default function Profile() {
 
             const token = await currentUser.getIdToken();
 
-            const response = await fetch(`${API_BASE_URL}/enableStripeConnect`, {
+            const response = await fetch(`${API_BASE_URL}/api/urbanPayment/enableStripeConnect`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -391,7 +408,7 @@ export default function Profile() {
                                     const currentUser = firebase.currentUser;
                                     if (currentUser) {
                                         const token = await currentUser.getIdToken();
-                                        const verifyResponse = await fetch(`${API_BASE_URL}/verifyStripeConnectStatus`, {
+                                        const verifyResponse = await fetch(`${API_BASE_URL}/api/urbanPayment/verifyStripeConnectStatus`, {
                                             method: 'POST',
                                             headers: {
                                                 'Authorization': `Bearer ${token}`,
@@ -453,7 +470,7 @@ export default function Profile() {
                                     const currentUser = firebase.currentUser;
                                     if (currentUser) {
                                         const token = await currentUser.getIdToken();
-                                        const verifyResponse = await fetch(`${API_BASE_URL}/verifyStripeConnectStatus`, {
+                                        const verifyResponse = await fetch(`${API_BASE_URL}/api/urbanPayment/verifyStripeConnectStatus`, {
                                             method: 'POST',
                                             headers: {
                                                 'Authorization': `Bearer ${token}`,
@@ -506,7 +523,7 @@ export default function Profile() {
             const token = await currentUser.getIdToken();
 
             // Initiate OAuth flow
-            const response = await fetch(`${API_BASE_URL}/initiateStripeOAuth`, {
+            const response = await fetch(`${API_BASE_URL}/api/urbanPayment/initiateStripeOAuth`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -559,7 +576,7 @@ export default function Profile() {
                                     const currentUser = firebase.currentUser;
                                     if (currentUser) {
                                         const token = await currentUser.getIdToken();
-                                        const verifyResponse = await fetch(`${API_BASE_URL}/verifyStripeConnectStatus`, {
+                                        const verifyResponse = await fetch(`${API_BASE_URL}/api/urbanPayment/verifyStripeConnectStatus`, {
                                             method: 'POST',
                                             headers: {
                                                 'Authorization': `Bearer ${token}`,
@@ -659,7 +676,7 @@ export default function Profile() {
 
                     {/* Date and Time */}
                     <p className="text-sm font-medium text-slate-600 mb-2">
-                        📅 {listing.start_date ? format(parseISO(listing.start_date), 'MMM d, yyyy') : 'No date'} 
+                        📅 {listing.start_date ? format(parseISO(listing.start_date), AU_DATE) : 'No date'} 
                         {listing.start_time && ` — ${listing.start_time}`}{listing.end_time && ` to ${listing.end_time}`}
                     </p>
 
@@ -681,7 +698,7 @@ export default function Profile() {
                         )}
 
                         {/* Edit Button */}
-                        {(listing.status === 'draft' || listing.status === 'active') && (
+                        {(isUnpaidDraft(listing) || listing.status === 'active') && (
                             <Link to={createPageUrl(`CreateListing?edit=${listing.id}`)} className="flex-1">
                                 <Button size="sm" variant="outline" className="w-full h-9 text-sm font-medium">
                                     <Pencil className="w-4 h-4 mr-1.5" />
@@ -691,10 +708,10 @@ export default function Profile() {
                         )}
 
                         {/* Pay Button (for drafts) */}
-                        {listing.status === 'draft' && (
+                        {isUnpaidDraft(listing) && (
                             <Link to={createPageUrl(`Payment?id=${listing.id}`)} className="flex-1">
                                 <Button size="sm" className="w-full h-9 text-sm font-medium bg-[#1e3a5f] hover:bg-[#152a45]">
-                                    Pay $10
+                                    Pay {formatAud(LISTING_FEE_AUD)}
                                 </Button>
                             </Link>
                         )}
@@ -1022,6 +1039,29 @@ export default function Profile() {
                                 </>
                             )}
                         </Button>
+
+                        <Button
+                            onClick={user?.two_fa_enabled ? undefined : () => setTwoFADialogOpen(true)}
+                            disabled={user?.two_fa_enabled}
+                            size="sm"
+                            className={`gap-2 flex-1 font-medium ${
+                                user?.two_fa_enabled
+                                ? 'bg-green-100 border border-green-300 text-green-700 hover:bg-green-100 cursor-not-allowed opacity-75'
+                                : 'bg-[#1e3a5f] text-white hover:bg-[#152a45]'
+                            }`}
+                        >
+                            {user?.two_fa_enabled ? (
+                                <>2FA On <span className="text-lg ml-0.5">✓</span></>
+                            ) : (
+                                'Enable 2FA'
+                            )}
+                        </Button>
+                        <TwoFactorSetupDialog
+                            open={twoFADialogOpen}
+                            onOpenChange={setTwoFADialogOpen}
+                            defaultPhone={user?.phone || ''}
+                            onEnabled={handle2FAEnabled}
+                        />
                     </div>
                     </div>
 

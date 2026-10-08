@@ -2,6 +2,7 @@
 
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/sale.dart';
@@ -39,7 +40,7 @@ class TapToPayService {
       final user = _auth.currentUser;
 
       final response = await http.post(
-        Uri.parse('$apiBaseUrl/urbanPayment/initializeTapToPayReader'),
+        Uri.parse('$apiBaseUrl/api/urbanPayment/initializeTapToPayReader'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -49,7 +50,7 @@ class TapToPayService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['readerRegistrationToken'] ?? '';
+        return data['sellerId'] ?? '';
       } else {
         throw Exception('Failed to initialize reader: ${response.body}');
       }
@@ -73,7 +74,7 @@ class TapToPayService {
 
       // Record the sale in backend
       final response = await http.post(
-        Uri.parse('$apiBaseUrl/urbanPayment/recordTapToPaySale'),
+        Uri.parse('$apiBaseUrl/api/urbanPayment/recordTapToPaySale'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -129,30 +130,27 @@ class TapToPayService {
 
   /// Get seller statistics including Tap to Pay earnings
   Future<SellerStats> getSellerStats() async {
-    try {
-      final token = await _getAuthToken();
-      final user = _auth.currentUser;
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('User not authenticated');
 
-      final response = await http.get(
-        Uri.parse('$apiBaseUrl/urbanPayment/sellerStats?sellerId=${user?.uid}'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+    // Sellers can read their own stats and sales directly (see firestore.rules).
+    final db = FirebaseFirestore.instance;
+    final stats = (await db.collection('sellerStats').doc(uid).get()).data() ?? {};
+    final tapSales = await db
+        .collection('sales')
+        .where('sellerId', isEqualTo: uid)
+        .where('paymentMethod', isEqualTo: 'tap_to_pay')
+        .get();
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return SellerStats(
-          totalEarnings: (data['totalEarnings'] as num?)?.toDouble() ?? 0.0,
-          totalSales: data['totalSales'] ?? 0,
-          tapToPayEarnings:
-              (data['tapToPayEarnings'] as num?)?.toDouble() ?? 0.0,
-          tapToPayTransactions: data['tapToPayTransactions'] ?? 0,
-        );
-      } else {
-        throw Exception('Failed to fetch stats: ${response.body}');
-      }
-    } catch (e) {
-      rethrow;
-    }
+    return SellerStats(
+      totalEarnings: (stats['totalEarnings'] as num?)?.toDouble() ?? 0.0,
+      totalSales: (stats['totalSales'] as num?)?.toInt() ?? 0,
+      tapToPayEarnings: tapSales.docs.fold<double>(
+        0.0,
+        (sum, doc) => sum + ((doc.data()['amount'] as num?)?.toDouble() ?? 0.0),
+      ),
+      tapToPayTransactions: tapSales.docs.length,
+    );
   }
 }
 

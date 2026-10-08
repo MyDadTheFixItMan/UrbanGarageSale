@@ -1,5 +1,5 @@
 // Reset card payments for testing
-import { getFirebaseAdmin } from './api/firebase-admin.js';
+import { getFirebaseAdmin } from './api/_shared/firebase-admin.js';
 
 async function resetCardPayments(userId) {
   try {

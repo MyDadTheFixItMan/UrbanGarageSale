@@ -64,12 +64,13 @@ class _UrbanPayDashboardState extends State<UrbanPayDashboard> {
   }
 
   String _formatCurrency(double amount) {
-    final formatter = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+    final formatter =
+        NumberFormat.currency(locale: 'en_AU', symbol: '\$', decimalDigits: 2);
     return formatter.format(amount);
   }
 
   String _formatTime(DateTime date) {
-    final formatter = DateFormat('MMM dd, hh:mm a');
+    final formatter = DateFormat('d MMM, h:mm a', 'en_AU');
     return formatter.format(date);
   }
 

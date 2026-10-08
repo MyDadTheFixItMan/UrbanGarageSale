@@ -1,102 +1,64 @@
 #!/usr/bin/env node
 /**
- * Admin script to enable 2FA for all users
- * Usage: node enable-2fa-for-users.js
+ * Admin script: brings every account's 2FA flag in line with Firebase multi-factor enrolment.
+ *
+ *  - Account has an SMS second factor enrolled  -> two_fa_enabled claim + profile field = true
+ *  - Account has no second factor enrolled       -> claim + profile field = false
+ *    (these users turn 2FA on again from their Profile)
+ *  - With --unlink-phone: removes the "sign in with phone number" method that the old sign-up
+ *    flow attached. It let anyone with access to the SIM sign in without the password.
+ *
+ * Usage (needs an admin service account via GOOGLE_APPLICATION_CREDENTIALS):
+ *   node enable-2fa-for-users.js                         # dry run
+ *   node enable-2fa-for-users.js --apply                 # update claims and profiles
+ *   node enable-2fa-for-users.js --apply --unlink-phone  # also remove phone sign-in
  */
+import { initializeApp, applicationDefault } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
-import admin from 'firebase-admin';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const apply = process.argv.includes('--apply');
+const unlinkPhone = process.argv.includes('--unlink-phone');
+initializeApp({
+  credential: applicationDefault(),
+  projectId: process.env.FIREBASE_PROJECT_ID || 'urbangaragesale',
+});
+const auth = getAuth();
+const db = getFirestore();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '.env') });
+const counts = { enabled: 0, disabled: 0, phoneUnlinked: 0, unchanged: 0 };
+let pageToken;
+do {
+  const page = await auth.listUsers(1000, pageToken);
+  for (const user of page.users) {
+    const enrolled = (user.multiFactor?.enrolledFactors?.length ?? 0) > 0;
+    const claim = user.customClaims?.two_fa_enabled === true;
+    const hasPhoneSignIn = user.providerData.some((p) => p.providerId === 'phone');
+    let changed = false;
 
-// Initialize Firebase Admin SDK
-const serviceAccount = {
-  type: 'service_account',
-  project_id: process.env.FIREBASE_PROJECT_ID || 'urbangaragesa-43f04',
-  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  client_id: process.env.FIREBASE_CLIENT_ID,
-  auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-  token_uri: 'https://oauth2.googleapis.com/token',
-  auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
-  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
-};
-
-try {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com`,
-  });
-  console.log('✅ Firebase Admin SDK initialized');
-} catch (error) {
-  console.error('❌ Failed to initialize Firebase Admin SDK:', error.message);
-  console.log('\nThis script requires Firebase Admin credentials in your .env file:');
-  console.log('  FIREBASE_PROJECT_ID');
-  console.log('  FIREBASE_PRIVATE_KEY');
-  console.log('  FIREBASE_CLIENT_EMAIL');
-  console.log('\nYou can also enable 2FA manually in the Firebase Console:');
-  console.log('1. Go to Firebase Console > Firestore > users collection');
-  console.log('2. Open each user document');
-  console.log('3. Set two_fa_enabled to true');
-  process.exit(1);
-}
-
-async function enableTwoFAForAllUsers() {
-  try {
-    const db = admin.firestore();
-    const usersRef = db.collection('users');
-    const snapshot = await usersRef.get();
-
-    if (snapshot.empty) {
-      console.log('❌ No users found in Firestore');
-      return;
-    }
-
-    console.log(`\n📋 Found ${snapshot.size} user(s). Enabling 2FA for all...\n`);
-
-    let updatedCount = 0;
-    const updates = [];
-
-    for (const doc of snapshot.docs) {
-      const userId = doc.id;
-      const userData = doc.data();
-      const is2FAEnabled = userData.two_fa_enabled || false;
-
-      console.log(`📝 User: ${userData.email || userId}`);
-      console.log(`   Current 2FA status: ${is2FAEnabled ? '✅ Enabled' : '❌ Disabled'}`);
-
-      if (!is2FAEnabled) {
-        updates.push(
-          usersRef.doc(userId).update({
-            two_fa_enabled: true,
-            updated_at: new Date(),
-          })
-        );
-        console.log(`   → Setting 2FA to enabled`);
-        updatedCount++;
-      } else {
-        console.log(`   → Already enabled (no change)`);
+    if (enrolled !== claim) {
+      changed = true;
+      counts[enrolled ? 'enabled' : 'disabled']++;
+      console.log(`${apply ? '' : '[dry run] '}${user.uid}: set two_fa_enabled = ${enrolled}`);
+      if (apply) {
+        await auth.setCustomUserClaims(user.uid, { ...(user.customClaims || {}), two_fa_enabled: enrolled });
+        await db.collection('users').doc(user.uid).set({ two_fa_enabled: enrolled }, { merge: true });
       }
-      console.log();
     }
 
-    if (updates.length > 0) {
-      await Promise.all(updates);
-      console.log(`✅ Successfully enabled 2FA for ${updatedCount} user(s)`);
-    } else {
-      console.log('✅ All users already have 2FA enabled');
+    if (unlinkPhone && hasPhoneSignIn) {
+      changed = true;
+      counts.phoneUnlinked++;
+      console.log(`${apply ? '' : '[dry run] '}${user.uid}: remove phone-number sign-in`);
+      if (apply) {
+        await auth.updateUser(user.uid, { providersToUnlink: ['phone'] });
+      }
     }
 
-  } catch (error) {
-    console.error('❌ Error updating users:', error.message);
-    process.exit(1);
-  } finally {
-    await admin.app().delete();
+    if (!changed) counts.unchanged++;
   }
-}
+  pageToken = page.pageToken;
+} while (pageToken);
 
-enableTwoFAForAllUsers();
+console.log(JSON.stringify(counts));
+if (!apply) console.log('Dry run only. Re-run with --apply to make changes.');

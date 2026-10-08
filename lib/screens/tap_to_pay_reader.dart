@@ -106,12 +106,13 @@ class _TapToPayReaderState extends State<TapToPayReader> {
         body: jsonEncode({
           'amount': amount,
           'description': description,
-          'currency': 'aud',
+          'channel': 'terminal',
         }),
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Failed to create payment intent');
+        final error = (jsonDecode(response.body) as Map?)?['error'];
+        throw Exception(error ?? 'Failed to create payment intent');
       }
 
       final paymentData = jsonDecode(response.body);
@@ -166,30 +167,30 @@ class _TapToPayReaderState extends State<TapToPayReader> {
     String paymentIntentId,
     Map<String, dynamic> paymentResult,
   ) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) return;
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not authenticated');
 
-      final idToken = await user.getIdToken();
+    final idToken = await user.getIdToken();
 
-      await http.post(
-        Uri.parse(
-          'https://urban-garage-sale.vercel.app/api/urbanPayment/recordTapToPaySale',
-        ),
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'amount': amount,
-          'description': description,
-          'paymentIntentId': paymentIntentId,
-          'currency': 'aud',
-          'paymentMethod': 'tap_to_pay',
-        }),
-      );
-    } catch (e) {
-      debugPrint('Error recording payment: $e');
+    // The server reads the amount and status from Stripe; only succeeded payments are recorded.
+    final response = await http.post(
+      Uri.parse(
+        'https://urban-garage-sale.vercel.app/api/urbanPayment/recordTapToPaySale',
+      ),
+      headers: {
+        'Authorization': 'Bearer $idToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'description': description,
+        'paymentIntentId': paymentIntentId,
+        'paymentMethod': 'tap_to_pay',
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      final error = (jsonDecode(response.body) as Map?)?['error'];
+      throw Exception(error ?? 'Payment taken but could not be recorded');
     }
   }
 

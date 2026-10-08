@@ -1,0 +1,40 @@
+# Keep the API deployment to the serverless handlers only.
+# Every file under api/ becomes a public endpoint on Vercel, so exclude local-only files.
+api/server.js
+api/street-addresses.json
+api/.env*
+
+# Retired, insecure endpoints (kept on disk until deleted): collects Stripe secret keys /
+# unauthenticated mock checkout. Never deploy them.
+api/urbanPayment/linkExistingStripeAccount.js
+api/urbanPayment/createStripeCheckout.js
+
+# Local admin scripts, dev servers and docs are never deployed
+server.js
+scripts/
+cleanup-*.js
+enable-2fa-for-users.js
+reset-card-payments.js
+seed-db.*
+test-*.js
+validate.js
+*.md
+Screen shots & logo/
+Marketing Docs/
+.env*
+
+# Other apps in this repo are deployed separately (web-app has its own Vercel project)
+web-app/
+lib/
+test/
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+build/
+poster-template/
+
+# Dev-only test endpoint (returns 404 in production anyway)
+api/test.js

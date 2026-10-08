@@ -12,15 +12,40 @@ The application now uses **Google Places API** instead of HandyAPI for address a
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project (or select an existing one)
-3. Enable the following APIs:
+3. Enable only the APIs this app uses:
    - **Maps JavaScript API**
    - **Places API**
+   - **Geocoding API**
 4. Create an API key:
    - Go to **Credentials** → **Create Credentials** → **API Key**
    - Restrict the key to:
      - **Application restrictions**: HTTP referrers (web sites)
-     - **API restrictions**: Select "Places API" and "Maps JavaScript API"
-     - **HTTP referrers**: Add your domain(s) (e.g., `localhost:5173`, `yoursite.com`)
+     - **API restrictions**: Select only:
+       - `Maps JavaScript API`
+       - `Places API`
+       - `Geocoding API`
+     - **HTTP referrers**: Add only required origins:
+       - `https://www.urbangaragesale.com.au/*`
+       - `https://urbangaragesale.com.au/*`
+       - `https://web-app-pied-eta.vercel.app/*`
+       - `https://*.vercel.app/*` (optional, only if Preview deployments must use this key)
+       - `http://localhost:5173/*` (development only)
+
+### 1.1 Key Segmentation (Recommended)
+
+Use separate keys per environment/surface:
+
+- **Web Browser Key (required)**
+  - Variable: `VITE_GOOGLE_PLACES_API_KEY`
+  - Restriction type: **HTTP referrers**
+  - APIs: Maps JavaScript API, Places API, Geocoding API
+
+- **Server Key (optional; only if backend calls Google APIs)**
+  - Variable: `GOOGLE_PLACES_API_KEY`
+  - Restriction type: **IP allowlist** (only when static egress IP exists)
+  - APIs: only backend-required APIs
+
+If you run on serverless egress without static IPs, avoid IP-restricted server keys until static egress is in place.
 
 ### 2. Configure Environment Variables
 
@@ -134,7 +159,14 @@ import GooglePlacesAutocomplete from '@/components/GooglePlacesAutocomplete';
 ### API Key Issues
 - Ensure the API key has the correct restrictions
 - Check that your domain is whitelisted in HTTP referrers
-- Verify the key has Maps JavaScript API and Places API enabled
+- Verify the key has only Maps JavaScript API, Places API, and Geocoding API enabled
+
+### Restriction Validation Checklist
+- In Google Cloud Console → APIs & Services → Credentials → your key:
+  - Application restriction = `HTTP referrers (web sites)`
+  - API restrictions = `Restrict key` with only the 3 required APIs
+  - Remove wildcard/unneeded referrers
+  - Delete unused old keys after cutover
 
 ### Script Loading
 - Open browser DevTools → Network tab

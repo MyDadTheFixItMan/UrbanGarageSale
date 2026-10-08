@@ -1,6 +1,8 @@
 // Verify the actual Stripe Connect account status
 import Stripe from 'stripe';
-import { getFirebaseAdmin, verifyToken } from '../firebase-admin.js';
+import { getFirebaseAdmin } from '../_shared/firebase-admin.js';
+import { requireUser, sendError } from '../_shared/http.js';
+import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 
 const getStripe = async () => {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -10,15 +12,9 @@ const getStripe = async () => {
   return new Stripe(stripeSecretKey);
 };
 
-function setCorsHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Content-Type', 'application/json');
-}
 
 export default async (req, res) => {
-  setCorsHeaders(res);
+  applyCors(res, getTrustedOrigin(req.headers.origin, process.env.FRONTEND_URL || 'http://localhost:5174'), 'POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -29,34 +25,7 @@ export default async (req, res) => {
   }
 
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing authorization token' });
-    }
-
-    const idToken = authHeader.substring(7);
-    
-    // Verify user
-    let userId;
-    try {
-      userId = await verifyToken(idToken);
-    } catch (tokenError) {
-      // Development fallback
-      if (process.env.NODE_ENV !== 'production') {
-        try {
-          const parts = idToken.split('.');
-          if (parts.length !== 3) throw new Error('Invalid token format');
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-          userId = payload.uid || payload.sub;
-          if (!userId) throw new Error('No uid in token');
-          console.log('✓ Using dev token parsing for userId:', userId);
-        } catch (decodeError) {
-          throw new Error(`Token verification failed: ${tokenError.message}`);
-        }
-      } else {
-        throw tokenError;
-      }
-    }
+    const { uid: userId } = await requireUser(req);
 
     // Get user's Stripe Connect ID from Firestore
     const admin = getFirebaseAdmin();
@@ -86,7 +55,7 @@ export default async (req, res) => {
     const hasRequirements = account.requirements?.currently_due?.length > 0;
 
     // If fully enabled and was marked as pending, update Firestore
-    if (isFullyEnabled && userData.stripeConnectSetup?.status === 'pending') {
+    if (isFullyEnabled && userData.cardPaymentsEnabled !== true) {
       console.log('✓ Account completed onboarding, updating Firestore...');
       await db.collection('users').doc(userId).update({
         cardPaymentsEnabled: true,
@@ -123,10 +92,6 @@ export default async (req, res) => {
       status: isFullyEnabled ? 'active' : hasRequirements ? 'pending_requirements' : 'pending',
     });
   } catch (error) {
-    console.error('Verify Stripe status error:', error);
-    return res.status(500).json({
-      error: 'Failed to verify card payments status',
-      message: error.message,
-    });
+    return sendError(res, error, 'Failed to verify card payments status');
   }
 };

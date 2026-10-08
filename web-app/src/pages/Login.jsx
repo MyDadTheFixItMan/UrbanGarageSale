@@ -9,31 +9,6 @@ import { Mail } from 'lucide-react';
 import GooglePlacesAutocomplete from '@/components/GooglePlacesAutocomplete';
 import toast from 'react-hot-toast';
 
-// Country code mapping
-const countryCallingCodes = {
-  'AU': '+61',
-  'US': '+1',
-  'CA': '+1',
-  'GB': '+44',
-  'NZ': '+64',
-  'JP': '+81',
-  'CN': '+86',
-  'IN': '+91',
-  'DE': '+49',
-  'FR': '+33',
-  'IT': '+39',
-  'ES': '+34',
-  'BR': '+55',
-  'MX': '+52',
-  'SG': '+65',
-  'MY': '+60',
-  'TH': '+66',
-  'PH': '+63',
-  'VN': '+84',
-  'ID': '+62',
-  'ZA': '+27',
-};
-
 const countryPlaceholders = {
   'AU': '+61 412 345 678',
   'US': '+1 (234) 567-8900',
@@ -58,7 +33,7 @@ export default function Login() {
   const [twoFACode, setTwoFACode] = useState('');
   const [twoFAError, setTwoFAError] = useState('');
   const [twoFALoading, setTwoFALoading] = useState(false);
-  const [tempUserData, setTempUserData] = useState(null);
+  const [mfaPhoneHint, setMfaPhoneHint] = useState('');
   
   // Sign Up state
   const [signUpFullName, setSignUpFullName] = useState('');
@@ -72,13 +47,9 @@ export default function Login() {
   const [signUpError, setSignUpError] = useState('');
   const [signUpSuccess, setSignUpSuccess] = useState('');
   const [signUpLoading, setSignUpLoading] = useState(false);
-  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [verificationError, setVerificationError] = useState('');
   const [userCountry, setUserCountry] = useState('');
   const [phonePlaceholder, setPhonePlaceholder] = useState(countryPlaceholders['default']);
   const [isSignUpComplete, setIsSignUpComplete] = useState(false);
-  const [enable2FAOnSignup, setEnable2FAOnSignup] = useState(false);
   
   // Active tab
   const [activeTab, setActiveTab] = useState('signin');
@@ -107,27 +78,8 @@ export default function Login() {
 
   // Auto-detect user's country on component mount
   useEffect(() => {
+    // Urban Garage Sale is an Australian service, so phone numbers default to +61.
     const detectCountry = async () => {
-      try {
-        // Only attempt detection in production (skip for local dev)
-        if (process.env.NODE_ENV !== 'development') {
-          const response = await fetch('/.netlify/functions/detectCountry');
-          const data = await response.json();
-          const countryCode = data.country_code;
-          
-          if (countryCode && countryCallingCodes[countryCode]) {
-            setUserCountry(countryCode);
-            const callingCode = countryCallingCodes[countryCode];
-            setSignUpPhone(callingCode + ' ');
-            setPhonePlaceholder(countryPlaceholders[countryCode] || countryPlaceholders['default']);
-            return;
-          }
-        }
-      } catch (error) {
-        console.log('Country detection not available, using default');
-      }
-      
-      // Fallback to Australia (default for UrbanGarageSale)
       setUserCountry('AU');
       setSignUpPhone('+61 ');
       setPhonePlaceholder(countryPlaceholders['AU']);
@@ -136,33 +88,37 @@ export default function Login() {
     detectCountry();
   }, []);
 
+  // Firebase refuses to finish signing in a 2FA account until the SMS code is confirmed,
+  // so there is no session to use until completeMfaSignIn() succeeds.
+  const startSecondFactor = async (mfaError) => {
+    setActiveTab('signin');
+    setMfaPhoneHint(mfaError.phoneHint || 'your mobile');
+    setTwoFACode('');
+    setTwoFAError('');
+    setShow2FAVerification(true);
+    await firebase.auth.sendMfaSignInCode('recaptcha-container-login');
+    toast.success('Verification code sent to your phone');
+  };
+
   const handleSignIn = async (e) => {
     e.preventDefault();
     setSignInError('');
     setSignInLoading(true);
 
     try {
-      const user = await firebase.auth.login(signInEmail, signInPassword);
-      
-      // Check if 2FA is enabled for this user
-      const is2FAEnabled = await firebase.auth.is2FAEnabled();
-      
-      if (is2FAEnabled) {
-        // 2FA is enabled, store temp user data and show 2FA form
-        const userData = await firebase.auth.me();
-        setTempUserData(userData);
-        
-        // Send 2FA code to user's phone
-        await firebase.auth.send2FACode(userData.phone);
-        
-        setShow2FAVerification(true);
-        toast.success('Verification code sent to your phone');
-      } else {
-        // No 2FA, proceed directly to home
-        await checkAppState();
-        navigate(createPageUrl('Home'));
-      }
+      await firebase.auth.login(signInEmail, signInPassword);
+      await checkAppState();
+      navigate(createPageUrl('Home'));
     } catch (err) {
+      if (err.mfaRequired) {
+        try {
+          await startSecondFactor(err);
+        } catch (smsError) {
+          setTwoFAError(smsError.message);
+          toast.error(smsError.message);
+        }
+        return;
+      }
       setSignInError(err.message || 'Sign in failed');
       toast.error(err.message || 'Sign in failed');
     } finally {
@@ -170,33 +126,35 @@ export default function Login() {
     }
   };
 
+  const handleResend2FA = async () => {
+    setTwoFAError('');
+    try {
+      await firebase.auth.sendMfaSignInCode('recaptcha-container-login');
+      toast.success('A new code has been sent');
+    } catch (err) {
+      setTwoFAError(err.message);
+    }
+  };
+
   const handleVerify2FA = async (e) => {
     e.preventDefault();
     setTwoFAError('');
+
+    if (!twoFACode || twoFACode.length !== 6) {
+      setTwoFAError('Please enter the 6-digit code');
+      return;
+    }
+
     setTwoFALoading(true);
-
     try {
-      if (!twoFACode) {
-        setTwoFAError('Please enter the verification code');
-        return;
-      }
-
-      // Verify the 2FA code
-      const verified = await firebase.auth.verify2FACode(twoFACode);
-      
-      if (verified) {
-        setShow2FAVerification(false);
-        setTwoFACode('');
-        await checkAppState();
-        navigate(createPageUrl('Home'));
-        toast.success('2FA verification successful!');
-      } else {
-        setTwoFAError('Invalid verification code');
-        toast.error('Invalid verification code');
-      }
+      await firebase.auth.completeMfaSignIn(twoFACode);
+      setShow2FAVerification(false);
+      setTwoFACode('');
+      await checkAppState();
+      navigate(createPageUrl('Home'));
+      toast.success('Signed in');
     } catch (err) {
       setTwoFAError(err.message || '2FA verification failed');
-      toast.error(err.message || '2FA verification failed');
     } finally {
       setTwoFALoading(false);
     }
@@ -269,45 +227,25 @@ export default function Login() {
         }
       }
       
-      // Clear any existing reCAPTCHA from previous attempts
-      firebase.auth.clearRecaptcha();
-      
-      // Create email/password account FIRST
+      // Create the account. Firebase emails a verification link; a verified email is needed
+      // before the mobile number can be enrolled for 2FA in the Profile page.
       await firebase.auth.signUp(signUpEmail, signUpPassword);
-      console.log('✓ Firebase Auth user created');
-      
-      // Store signup data for phone verification (don't create profile yet)
-      const signupToStore = {
-        normalizedPhone: normalizedPhone,
+
+      await firebase.auth.updateProfile({
+        phone: normalizedPhone,
+        phone_verified: false,
         full_name: signUpFullName,
         address: signUpAddress,
         postcode: finalPostcode,
-        state: finalState
-      };
-      sessionStorage.setItem('signupData', JSON.stringify(signupToStore));
-      console.log('Stored signup data for phone verification');
-      
-      // For development: Use Firebase test phone number for SMS verification
-      // Real phone numbers will work in production with proper reCAPTCHA configuration
-      const isDev = import.meta.env.MODE === 'development';
-      if (isDev) {
-        console.log('Development mode detected - using test SMS flow');
-        // In development, we'll auto-confirm the phone
-        setShowPhoneVerification(true);
-        setSignUpSuccess('Test mode: Phone verification skipped. Enter any code to continue.');
-        window.scrollTo(0, 0);
-      } else {
-        // Production: Setup reCAPTCHA for phone verification
-        await firebase.auth.setupRecaptcha('recaptcha-container');
-        
-        // Send SMS verification code
-        console.log('Sending SMS to:', signUpPhone);
-        await firebase.auth.sendPhoneVerification(signUpPhone);
-        
-        setShowPhoneVerification(true);
-        setSignUpSuccess('Verification code sent to your phone!');
-        window.scrollTo(0, 0);
-      }
+        state: finalState,
+        created_date: new Date().toISOString(),
+        role: 'user'
+      });
+
+      setIsSignUpComplete(true);
+      setTimeout(() => {
+        navigate(createPageUrl('Profile'));
+      }, 5000);
     } catch (err) {
       console.error('Sign up error:', err);
       
@@ -323,126 +261,11 @@ export default function Login() {
         setSignUpError(err.message || 'Failed to create account or send verification code');
         toast.error(err.message || 'Failed to create account');
       }
-      firebase.auth.clearRecaptcha();
     } finally {
       setSignUpLoading(false);
     }
   };
 
-  const handleVerifyPhoneCode = async (e) => {
-    e.preventDefault();
-    setVerificationError('');
-    
-    if (!verificationCode) {
-      setVerificationError('Please enter the verification code');
-      return;
-    }
-
-    setSignUpLoading(true);
-
-    try {
-      // In development mode, skip Firebase phone verification
-      // In production, verify the actual SMS code
-      const isDev = import.meta.env.MODE === 'development';
-      
-      if (!isDev) {
-        // Production: Verify the phone code with Firebase
-        await firebase.auth.verifyPhoneCode(verificationCode);
-        console.log('✓ Phone code verified');
-      } else {
-        // Development: Accept any code
-        console.log('Development mode: Skipping Firebase verification, accepting code:', verificationCode);
-      }
-      
-      // Get signup data from sessionStorage (stored during signup step)
-      const signupDataStr = sessionStorage.getItem('signupData');
-      let signupData = null;
-      
-      if (signupDataStr) {
-        signupData = JSON.parse(signupDataStr);
-        console.log('Retrieved signup data from session:', signupData);
-      } else {
-        console.warn('⚠️ No signup data found in session, using form values');
-      }
-      
-      const profileData = {
-        phone: signupData?.normalizedPhone || signUpPhone.replace(/[\s\-\(\)]/g, ''),
-        phone_verified: true,  // Mark as verified (development uses test mode, production uses real SMS)
-        full_name: signupData?.full_name || signUpFullName,
-        address: signupData?.address || signUpAddress,
-        postcode: signupData?.postcode || signUpPostcode,
-        state: signupData?.state || signUpState,
-        created_date: new Date().toISOString(),
-        role: 'user'
-      };
-      
-      console.log('Profile data to save:', {
-        phone: profileData.phone,
-        full_name: profileData.full_name,
-        address: profileData.address,
-        postcode: profileData.postcode,
-        state: profileData.state,
-        phone_verified: profileData.phone_verified
-      });
-      
-      // Update user profile to mark phone as verified and ensure all fields are set
-      const user = firebase.auth.getCurrentUser();
-      if (user) {
-        console.log('Phone verification complete - updating Firestore profile:', profileData);
-        await firebase.auth.updateProfile(profileData);
-        console.log('✓ Profile updated with phone verification');
-      }
-
-      // Verify profile was created and contains address
-      const verifyProfile = await firebase.auth.me();
-      console.log('✓ Verified profile after update:', {
-        full_name: verifyProfile.full_name,
-        address: verifyProfile.address,
-        postcode: verifyProfile.postcode,
-        state: verifyProfile.state,
-        phone_verified: verifyProfile.phone_verified
-      });
-      
-      if (!verifyProfile.full_name) {
-        console.warn('⚠️ Profile created but full_name is missing!');
-      }
-      if (!verifyProfile.address) {
-        console.warn('⚠️ Profile created but address is missing!');
-      }
-      
-      // Enable 2FA if user opted in during signup
-      if (enable2FAOnSignup) {
-        try {
-          await firebase.auth.enable2FA();
-          console.log('✓ 2FA enabled during signup');
-        } catch (error) {
-          console.error('Error enabling 2FA:', error);
-          // Don't fail signup if 2FA enable fails, just proceed
-        }
-      }
-      
-      // Clean up session storage
-      sessionStorage.removeItem('signupData');
-      
-      // Show success screen only
-      setIsSignUpComplete(true);
-      setVerificationCode('');
-      setShowPhoneVerification(false);
-      setEnable2FAOnSignup(false);
-      firebase.auth.clearRecaptcha();
-      
-      // Auto-navigate to Home after 3 seconds
-      setTimeout(() => {
-        navigate(createPageUrl('Home'));
-      }, 3000);
-    } catch (err) {
-      setVerificationError(err.message || 'Verification failed');
-    } finally {
-      setSignUpLoading(false);
-    }
-  };
-
-  
   // OAuth sign in/sign up handlers
   const handleOAuthSignIn = async (provider) => {
     setSignInLoading(true);
@@ -493,6 +316,10 @@ export default function Login() {
       toast.success(`Signed in with ${provider}!`);
       navigate(createPageUrl('Home'));
     } catch (err) {
+      if (err.mfaRequired) {
+        await startSecondFactor(err).catch((smsError) => setTwoFAError(smsError.message));
+        return;
+      }
       console.error(`${provider} OAuth error:`, err);
       let errorMsg = err.message || `Failed to sign in with ${provider}`;
       
@@ -564,6 +391,10 @@ export default function Login() {
       
       toast.success(`Account created with ${provider}!`);
     } catch (err) {
+      if (err.mfaRequired) {
+        await startSecondFactor(err).catch((smsError) => setTwoFAError(smsError.message));
+        return;
+      }
       console.error(`${provider} OAuth error:`, err);
       let errorMsg = err.message || `Failed to sign up with ${provider}`;
       
@@ -659,6 +490,9 @@ export default function Login() {
             </button>
           </div>
 
+          {/* Invisible reCAPTCHA for 2FA SMS codes (always mounted) */}
+          <div id="recaptcha-container-login"></div>
+
           {/* Sign In Tab */}
           {activeTab === 'signin' && (
             <>
@@ -717,7 +551,7 @@ export default function Login() {
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">Enter Verification Code</h3>
                   <p className="text-sm text-slate-600 mb-4">
                     We sent a 6-digit code to your phone: <br />
-                    <span className="font-medium">{tempUserData?.phone}</span>
+                    <span className="font-medium">{mfaPhoneHint}</span>
                   </p>
 
                   {twoFAError && (
@@ -752,11 +586,19 @@ export default function Login() {
 
                     <button
                       type="button"
+                      onClick={handleResend2FA}
+                      className="w-full text-slate-600 hover:text-slate-800 text-sm py-1"
+                    >
+                      Resend code
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => {
                         setShow2FAVerification(false);
                         setTwoFACode('');
                         setTwoFAError('');
-                        setTempUserData(null);
+                        setMfaPhoneHint('');
                         setSignInEmail('');
                         setSignInPassword('');
                       }}
@@ -835,9 +677,6 @@ export default function Login() {
           {/* Sign Up Tab */}
           {activeTab === 'signup' && (
             <>
-              {/* reCAPTCHA container - must persist across both form and verification */}
-              <div id="recaptcha-container" className="mb-4"></div>
-
               {isSignUpComplete && (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="text-center">
@@ -848,14 +687,15 @@ export default function Login() {
                         </svg>
                       </div>
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Authentication Successful!</h2>
-                    <p className="text-slate-600 mb-6">Your account has been created successfully.</p>
-                    <p className="text-sm text-slate-500">Redirecting to home...</p>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Account created</h2>
+                    <p className="text-slate-600 mb-2">We've emailed you a verification link.</p>
+                    <p className="text-slate-600 mb-6">Once your email is verified, turn on two-factor authentication in your Profile to create listings and use Urban Pay.</p>
+                    <p className="text-sm text-slate-500">Taking you to your Profile...</p>
                   </div>
                 </div>
               )}
 
-              {!isSignUpComplete && !showPhoneVerification && (
+              {!isSignUpComplete && (
                 <>
                   {signUpError && (
                     <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -956,26 +796,12 @@ export default function Login() {
                   />
                 </div>
 
-                <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <input
-                    type="checkbox"
-                    id="enable2FA"
-                    checked={enable2FAOnSignup}
-                    onChange={(e) => setEnable2FAOnSignup(e.target.checked)}
-                    className="w-4 h-4 text-[#1e3a5f] rounded"
-                  />
-                  <label htmlFor="enable2FA" className="text-sm text-slate-700 cursor-pointer">
-                    <span className="font-medium">Enable Two-Factor Authentication</span>
-                    <span className="block text-xs text-slate-500 mt-0.5">Add extra security with SMS verification</span>
-                  </label>
-                </div>
-
                 <Button
                   type="submit"
                   disabled={signUpLoading}
                   className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2 rounded-lg"
                 >
-                  {signUpLoading ? 'Sending verification code...' : 'Continue'}
+                  {signUpLoading ? 'Creating account...' : 'Create Account'}
                 </Button>
 
                 {/* OAuth Divider */}
@@ -1043,60 +869,6 @@ export default function Login() {
               <p className="text-xs text-slate-500 mt-4 text-center">
                 By signing up, you agree to our Terms of Service and Privacy Policy
               </p>
-                </>
-              )}
-
-              {!isSignUpComplete && showPhoneVerification && (
-                <>
-                  {verificationError && (
-                    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-red-700 text-sm">{verificationError}</p>
-                    </div>
-                  )}
-
-                  <div className="text-center mb-6">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-2">Verify Your Phone</h3>
-                    <p className="text-sm text-slate-600">
-                      We sent a verification code to<br />
-                      <span className="font-medium">{signUpPhone}</span>
-                    </p>
-                  </div>
-
-                  <form onSubmit={handleVerifyPhoneCode} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Verification Code
-                      </label>
-                      <input
-                        type="text"
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="000000"
-                        maxLength="6"
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent text-center text-2xl tracking-widest"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Enter the 6-digit code</p>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      disabled={signUpLoading}
-                      className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2 rounded-lg"
-                    >
-                      {signUpLoading ? 'Verifying...' : 'Verify & Create Account'}
-                    </Button>
-                  </form>
-
-                  <button
-                    onClick={() => {
-                      setShowPhoneVerification(false);
-                      setVerificationCode('');
-                      firebase.auth.clearRecaptcha();
-                    }}
-                    className="w-full mt-4 text-[#1e3a5f] hover:text-[#152a45] text-sm font-medium"
-                  >
-                    Back to Sign Up
-                  </button>
                 </>
               )}
             </>

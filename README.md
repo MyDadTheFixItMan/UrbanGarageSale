@@ -197,6 +197,25 @@ urbangarageSale/
 - Payments verified with Stripe servers
 - HTTPS required for production
 
+### Google API Key Hardening Checklist
+
+- Use a dedicated browser key for `VITE_GOOGLE_PLACES_API_KEY`
+- Set **Application restrictions** to `HTTP referrers (web sites)`
+- Allow only required referrers:
+   - `https://www.urbangaragesale.com.au/*`
+   - `https://urbangaragesale.com.au/*`
+   - `https://web-app-pied-eta.vercel.app/*`
+   - `https://*.vercel.app/*` (only if preview builds need Google Maps)
+   - `http://localhost:5173/*` (dev only)
+- Set **API restrictions** to only:
+   - `Maps JavaScript API`
+   - `Places API`
+   - `Geocoding API`
+- Do not use unrestricted browser keys in production
+- Rotate and delete older Google keys after cutover
+- Store keys in deployment environment variables, not committed files
+- Keep server-only Google keys separate; use IP allowlist only when static egress IPs exist
+
 ## 🚀 Production Deployment
 
 Ready to go live? See [LIVE_TESTING_SETUP.md](LIVE_TESTING_SETUP.md#production-checklist)

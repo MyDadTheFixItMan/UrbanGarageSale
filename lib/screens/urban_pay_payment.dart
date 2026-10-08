@@ -63,7 +63,6 @@ class _UrbanPayPaymentScreenState extends State<UrbanPayPaymentScreen> {
       final paymentIntent = await _urbanPayService.createPaymentIntent(
         amount: _selectedAmount,
         description: _descriptionController.text,
-        currency: 'aud',
       );
 
       // Step 2: Initialize Payment Sheet
@@ -78,12 +77,10 @@ class _UrbanPayPaymentScreenState extends State<UrbanPayPaymentScreen> {
       // Step 3: Present Payment Sheet
       await Stripe.instance.presentPaymentSheet();
 
-      // Step 4: Record the sale
-      await _urbanPayService.recordSale(
-        amount: _selectedAmount,
-        description: _descriptionController.text,
-        paymentMethod: 'card',
+      // Step 4: Record the sale (server confirms the payment with Stripe)
+      await _urbanPayService.recordCardSale(
         paymentIntentId: paymentIntent.paymentIntentId,
+        description: _descriptionController.text,
       );
 
       // Success

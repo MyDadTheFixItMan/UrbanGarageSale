@@ -81,62 +81,79 @@ export default function Privacy() {
                     <div>
                         <h1 className="text-3xl font-bold text-[#001f3f] mb-2">Privacy Policy</h1>
                         <p className="text-slate-600 mb-6">Urban Garage Sale</p>
-                        <p className="text-sm text-slate-500 mb-6">Last updated: February 2026</p>
+                        <p className="text-sm text-slate-500 mb-6">Last updated: October 2026</p>
 
                         <div className="prose prose-sm max-w-none text-slate-700 space-y-4">
-                            <p className="italic">Urban Garage Sale values your privacy. This Privacy Policy explains how your information is collected, used, and protected.</p>
+                            <p className="italic">Urban Garage Sale values your privacy. This policy explains how we collect, use, disclose and protect your personal information in line with the Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs).</p>
 
                             <div>
                                 <h3 className="font-bold text-[#001f3f] mt-6 mb-2">1. Information We Collect</h3>
                                 <ul className="list-disc list-inside space-y-1">
-                                    <li>Listing information (sale description, postcode/suburb, date/time).</li>
-                                    <li>Optional user contact details such as email (if provided voluntarily).</li>
-                                    <li>Technical data such as IP address, device type, or cookies for platform optimisation.</li>
+                                    <li>Account details: name, email address, mobile phone number, residential address, suburb, postcode and state.</li>
+                                    <li>Listing details: sale description, address, dates and times, and any photos you upload.</li>
+                                    <li>Urban Pay records: amounts, descriptions and dates of sales you record. Card details are entered directly with Stripe; we never see or store card numbers.</li>
+                                    <li>Stripe account status if you enable card payments (Stripe collects identity and bank details directly for its own verification).</li>
+                                    <li>Messages you send us through the contact form.</li>
+                                    <li>Technical data such as IP address, device type and cookies.</li>
                                 </ul>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">2. How We Use Your Information</h3>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">2. Why We Collect It</h3>
                                 <p>We use your information to:</p>
                                 <ul className="list-disc list-inside space-y-1 ml-4">
-                                    <li>display and promote garage sale listings;</li>
-                                    <li>improve platform performance;</li>
-                                    <li>ensure safe and responsible use of the website.</li>
+                                    <li>create and secure your account, including SMS verification and two-factor authentication;</li>
+                                    <li>publish and show garage sale listings on the map and in search;</li>
+                                    <li>process listing fees and Urban Pay card payments;</li>
+                                    <li>respond to your enquiries and send service emails (such as listing approvals);</li>
+                                    <li>prevent misuse of the platform and meet our legal obligations.</li>
                                 </ul>
+                                <p className="mt-2">If you do not provide this information, we may not be able to create your account or publish your listing.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">3. What We Do Not Do</h3>
-                                <ul className="list-disc list-inside space-y-1">
-                                    <li>We do not sell or trade your personal data.</li>
-                                    <li>We do not collect unnecessary sensitive information.</li>
-                                    <li>We do not share user data with third parties except where legally required.</li>
-                                </ul>
-                            </div>
-
-                            <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">4. User Control</h3>
-                                <p>You can:</p>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">3. Who We Share It With</h3>
+                                <p>We do not sell or trade your personal information. We share it only with service providers who help us run the platform, and where required by law:</p>
                                 <ul className="list-disc list-inside space-y-1 ml-4">
-                                    <li>request removal of your listing;</li>
-                                    <li>request correction of inaccurate details;</li>
-                                    <li>request deletion of optional personal data.</li>
+                                    <li><strong>Google (Firebase and Google Maps)</strong> – account login, data storage, photo storage and address lookup;</li>
+                                    <li><strong>Stripe</strong> – listing fee and card payment processing, and seller account verification;</li>
+                                    <li><strong>Twilio SendGrid</strong> – sending service emails;</li>
+                                    <li><strong>Vercel</strong> – hosting our payment services.</li>
                                 </ul>
+                                <p className="mt-2">Listing details you choose to publish (including the sale address) are visible to the public.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">5. Data Security</h3>
-                                <p>We take reasonable security measures but cannot guarantee complete protection. You should avoid including unnecessary private details in your listing.</p>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">4. Overseas Disclosure</h3>
+                                <p>Our service providers may store or process your information outside Australia, including in the United States and other countries where they operate data centres. We take reasonable steps to ensure these providers handle your information consistently with the APPs.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">6. Data Sharing</h3>
-                                <p>We may share information only when required by law or to investigate misuse of the platform.</p>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">5. Access, Correction and Deletion</h3>
+                                <p>You can update most details in your Profile at any time. You can also ask us to:</p>
+                                <ul className="list-disc list-inside space-y-1 ml-4">
+                                    <li>give you access to the personal information we hold about you;</li>
+                                    <li>correct inaccurate information;</li>
+                                    <li>delete your account and listings.</li>
+                                </ul>
+                                <p className="mt-2">When an account is deleted we remove the profile, listings, saved listings, sales records and contact messages. Payment records are kept in de-identified form where we are required to keep financial records by law.</p>
+                            </div>
+
+                            <div>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">6. Data Security and Breaches</h3>
+                                <p>We take reasonable steps to protect your information from misuse, loss and unauthorised access, including encrypted connections, access controls and two-factor authentication. No system is completely secure, so please avoid including unnecessary private details in your listing.</p>
+                                <p className="mt-2">If a data breach is likely to result in serious harm, we will notify affected individuals and the OAIC as required by the Notifiable Data Breaches scheme.</p>
                             </div>
 
                             <div>
                                 <h3 className="font-bold text-[#001f3f] mt-6 mb-2">7. Cookies</h3>
-                                <p>Urban Garage Sale may use cookies for functionality and analytics. You can disable cookies via your browser settings.</p>
+                                <p>Urban Garage Sale uses cookies and similar browser storage to keep you signed in and remember your preferences. You can disable cookies in your browser settings, but some features may stop working.</p>
+                            </div>
+
+                            <div>
+                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">8. Complaints and Contact</h3>
+                                <p>To request access or correction of personal information, or to make a privacy complaint, contact Urban Garage Sale at support@urbangaragesales.com.au.</p>
+                                <p className="mt-2">We aim to respond within 30 days. If you are not satisfied with our response, you may contact the Office of the Australian Information Commissioner (OAIC) at www.oaic.gov.au or on 1300 363 992.</p>
                             </div>
                         </div>
                     </div>

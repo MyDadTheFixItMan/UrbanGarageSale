@@ -58,10 +58,9 @@ class _ManualCashEntryScreenState extends State<ManualCashEntryScreen> {
     });
 
     try {
-      await _urbanPayService.recordSale(
+      await _urbanPayService.recordCashSale(
         amount: _selectedAmount,
         description: _descriptionController.text,
-        paymentMethod: 'cash',
       );
 
       if (mounted) {

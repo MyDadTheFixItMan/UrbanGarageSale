@@ -26,8 +26,8 @@ Both servers are now running and ready for live Stripe payment testing!
 | Setting | Status | Value |
 |---------|--------|-------|
 | Stripe Public Key | ✅ Set | `pk_test_51SsiIg7hRwXmBUxSj4nA0S5Cd0V5h3B7...` |
-| Stripe Secret Key | ✅ Set | `sk_test_51SsiIg7hRwXmBUxSkEjJ8K9lL0mN1oP2...` |
-| Google Places API | ✅ Set | `AIzaSyAQOInrJXkCNRBB5QdzW7vFerRoVO4AfP4` |
+| Stripe Secret Key | ✅ Set | `sk_test_… (redacted)` |
+| Google Places API | ✅ Set | `YOUR_GOOGLE_PLACES_API_KEY` |
 | API Base URL | ✅ Set | `http://localhost:3000` |
 | Node Modules | ✅ Installed | All dependencies ready |
 | Setup Validation | ✅ Passed | All 7 checks passed |

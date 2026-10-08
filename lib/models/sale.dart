@@ -1,5 +1,14 @@
 // lib/models/sale.dart
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+DateTime? _toDateTime(dynamic value) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is String) return DateTime.tryParse(value);
+  return null;
+}
+
 class Sale {
   final String id;
   final String sellerId;
@@ -31,6 +40,21 @@ class Sale {
       timestamp: DateTime.parse(json['timestamp'] as String),
       status: json['status'] as String,
       paymentIntentId: json['paymentIntentId'] as String?,
+    );
+  }
+
+  /// Builds a Sale from a document in the `sales` collection.
+  factory Sale.fromFirestore(String id, Map<String, dynamic> data) {
+    return Sale(
+      id: id,
+      sellerId: data['sellerId'] as String? ?? '',
+      amount: (data['amount'] as num?)?.toDouble() ?? 0.0,
+      description: data['description'] as String? ?? '',
+      paymentMethod: data['paymentMethod'] as String? ?? 'cash',
+      timestamp: _toDateTime(data['createdAt'] ?? data['timestamp']) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      status: data['status'] as String? ?? 'completed',
+      paymentIntentId: data['paymentIntentId'] as String?,
     );
   }
 
@@ -74,6 +98,17 @@ class SellerStats {
       lastSaleTime: json['lastSaleTime'] != null
           ? DateTime.parse(json['lastSaleTime'] as String)
           : null,
+    );
+  }
+
+  /// Builds stats from a `sellerStats/{sellerId}` document.
+  /// [totalSales] is the dollar total; [transactionCount] is the number of sales.
+  factory SellerStats.fromFirestore(String sellerId, Map<String, dynamic> data) {
+    return SellerStats(
+      sellerId: sellerId,
+      totalSales: (data['totalEarnings'] as num?)?.toDouble() ?? 0.0,
+      transactionCount: (data['totalSales'] as num?)?.toInt() ?? 0,
+      lastSaleTime: _toDateTime(data['lastSaleDate']),
     );
   }
 

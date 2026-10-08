@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, nextSaturday, nextSunday } from 'date-fns';
+import { AU_DAY_MONTH } from '@/lib/format';
 
 export default function SearchFilters({ filters, onFiltersChange }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -204,7 +205,7 @@ export default function SearchFilters({ filters, onFiltersChange }) {
                     )}
                     {localFilters.date && (
                         <Badge variant="secondary" className="gap-1 bg-slate-100">
-                            {format(localFilters.date, 'MMM d')}
+                            {format(localFilters.date, AU_DAY_MONTH)}
                             <X
                                 className="w-3 h-3 cursor-pointer"
                                 onClick={() => {

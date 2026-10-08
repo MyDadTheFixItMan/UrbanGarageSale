@@ -8,6 +8,7 @@ import { createPageUrl } from '../utils';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import SaleMap from '../components/map/SaleMap';
+import { formatDateAU } from '@/lib/format';
 
 export default function Home() {
     const queryClient = useQueryClient();
@@ -199,6 +200,7 @@ export default function Home() {
         setIsSearching(true);
         try {
             const filters = {
+                status: 'active',
                 saleType: searchFilters.saleType !== 'all' ? searchFilters.saleType : undefined,
                 distance: searchFilters.distance || '25',
                 userLatitude: location.latitude,
@@ -270,6 +272,7 @@ export default function Home() {
             try {
                 // Build filter object
                 const searchFilters = {
+                    status: 'active',
                     saleType: filters.saleType !== 'all' ? filters.saleType : undefined,
                     distance: filters.distance,
                 };
@@ -534,7 +537,7 @@ export default function Home() {
                                                     </span>
                                                     {sale.start_date && (
                                                         <span className="text-xs text-slate-500">
-                                                            {new Date(sale.start_date).toLocaleDateString()}
+                                                            {formatDateAU(sale.start_date)}
                                                         </span>
                                                     )}
                                                 </div>

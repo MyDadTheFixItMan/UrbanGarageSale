@@ -1,4 +1,7 @@
 // jest.config.cjs
+// Referenced by path (not required here) so the plugin survives being passed to parallel Jest workers.
+const importMetaEnvTransform = require.resolve('./test-utils/babel-import-meta-env-transform.cjs');
+
 module.exports = {
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/src'],
@@ -18,6 +21,10 @@ module.exports = {
         ['@babel/preset-env', { targets: { node: 'current' } }],
         ['@babel/preset-react', { runtime: 'automatic' }],
         '@babel/preset-typescript'
+      ],
+      plugins: [
+        '@babel/plugin-syntax-import-meta',
+        importMetaEnvTransform,
       ]
     }],
   },

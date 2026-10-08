@@ -13,7 +13,7 @@ import { AuthProvider } from '@/lib/AuthContext';
 export function renderWithProviders(ui, options = {}) {
   const Wrapper = ({ children }) => {
     return (
-      <BrowserRouter future={{ v7_startTransition: true }}>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <QueryClientProvider client={queryClientInstance}>
           <AuthProvider>
             {children}

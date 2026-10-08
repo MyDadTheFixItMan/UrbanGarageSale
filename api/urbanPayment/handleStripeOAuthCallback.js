@@ -1,6 +1,8 @@
 // Handle Stripe OAuth callback
 import Stripe from 'stripe';
-import { getFirebaseAdmin, verifyToken } from '../firebase-admin.js';
+import { getFirebaseAdmin } from '../_shared/firebase-admin.js';
+import { requireUser, requireSecondFactor, sendError } from '../_shared/http.js';
+import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 
 const getStripe = async () => {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -10,15 +12,9 @@ const getStripe = async () => {
   return new Stripe(stripeSecretKey);
 };
 
-function setCorsHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Content-Type', 'application/json');
-}
 
 export default async (req, res) => {
-  setCorsHeaders(res);
+  applyCors(res, getTrustedOrigin(req.headers.origin, process.env.FRONTEND_URL || 'http://localhost:5174'), 'POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -29,33 +25,7 @@ export default async (req, res) => {
   }
 
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing authorization token' });
-    }
-
-    const idToken = authHeader.substring(7);
-    
-    // Verify user
-    let userId;
-    try {
-      userId = await verifyToken(idToken);
-    } catch (tokenError) {
-      // Development fallback
-      if (process.env.NODE_ENV !== 'production') {
-        try {
-          const parts = idToken.split('.');
-          if (parts.length !== 3) throw new Error('Invalid token format');
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-          userId = payload.uid || payload.sub;
-          if (!userId) throw new Error('No uid in token');
-        } catch (decodeError) {
-          throw new Error(`Token verification failed: ${tokenError.message}`);
-        }
-      } else {
-        throw tokenError;
-      }
-    }
+    const { uid: userId } = requireSecondFactor(await requireUser(req));
 
     // Get authorization code from request
     const body = req.body || {};
@@ -79,12 +49,15 @@ export default async (req, res) => {
     }
 
     const stateData = stateDoc.data();
+    // State tokens are single use and expire after 10 minutes
+    await db.collection('oauth_states').doc(state).delete();
+
     if (stateData.userId !== userId) {
       return res.status(401).json({ error: 'State token user mismatch' });
     }
-
-    // Clean up state token
-    await db.collection('oauth_states').doc(state).delete();
+    if (stateData.expiresAt && stateData.expiresAt.toMillis() < Date.now()) {
+      return res.status(401).json({ error: 'Link expired. Please try connecting Stripe again.' });
+    }
 
     // Exchange authorization code for access token
     const stripe = await getStripe();
@@ -140,10 +113,6 @@ export default async (req, res) => {
       cardPaymentsEnabled: account.charges_enabled && account.payouts_enabled,
     });
   } catch (error) {
-    console.error('OAuth callback error:', error);
-    return res.status(500).json({
-      error: 'Failed to complete OAuth',
-      message: error.message,
-    });
+    return sendError(res, error, 'Failed to complete OAuth');
   }
 };

@@ -28,6 +28,34 @@ console.log(`🔑 SENDGRID_API_KEY loaded: ${process.env.SENDGRID_API_KEY ? '✓
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const defaultDevOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+];
+
+const configuredOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? configuredOrigins
+  : [...new Set([...configuredOrigins, ...defaultDevOrigins])];
+
+const defaultFrontendUrl = process.env.FRONTEND_URL || defaultDevOrigins[0];
+
+function isAllowedOrigin(origin) {
+  return allowedOrigins.includes(origin);
+}
+
+function getTrustedFrontendBaseUrl(originHeader) {
+  if (originHeader && isAllowedOrigin(originHeader)) {
+    return originHeader;
+  }
+  return defaultFrontendUrl;
+}
+
 // Initialize Stripe safely
 let stripe = null;
 try {
@@ -71,9 +99,13 @@ if (process.env.SENDGRID_API_KEY) {
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.ALLOWED_ORIGINS?.split(',') || ['https://yourdomain.com']
-    : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+  origin: (origin, callback) => {
+    if (!origin || isAllowedOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('Origin not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -170,6 +202,12 @@ app.get('/health', (req, res) => {
 app.post('/createStripeCheckout', async (req, res) => {
   try {
     const { saleId, saleTitle } = req.body;
+    const frontendBaseUrl = getTrustedFrontendBaseUrl(req.get('origin'));
+
+    if (!stripe) {
+      return res.status(503).json({ error: 'Payment service is not configured' });
+    }
+
     if (!saleId) {
       return res.status(400).json({ error: 'Sale ID is required' });
     }
@@ -190,8 +228,8 @@ app.post('/createStripeCheckout', async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: `${req.get('origin') || 'http://localhost:5173'}/Payment?id=${saleId}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.get('origin') || 'http://localhost:5173'}/CreateListing?edit=${saleId}`,
+      success_url: `${frontendBaseUrl}/Payment?id=${saleId}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendBaseUrl}/CreateListing?edit=${saleId}`,
       metadata: {
         urbangaragesale_app_id: process.env.URBANGARAGESALE_APP_ID || 'urbangarageSale-dev',
         sale_id: saleId,
@@ -213,6 +251,11 @@ app.post('/createStripeCheckout', async (req, res) => {
 app.post('/verifyStripePayment', async (req, res) => {
   try {
     const { sessionId, saleId } = req.body;
+
+    if (!stripe) {
+      return res.status(503).json({ error: 'Payment service is not configured' });
+    }
+
     if (!sessionId || !saleId) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
@@ -313,6 +356,24 @@ app.post('/deleteUser', async (req, res) => {
 app.post('/sendContactResponseEmail', async (req, res) => {
   try {
     const { userEmail, userName, originalMessage, responseMessage } = req.body;
+    const authHeader = req.headers.authorization;
+
+    if (!auth || !db) {
+      return res.status(503).json({ error: 'Firebase service unavailable' });
+    }
+
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized - missing token' });
+    }
+
+    const token = authHeader.substring(7);
+    const decodedToken = await auth.verifyIdToken(token);
+    const adminDoc = await db.collection('users').doc(decodedToken.uid).get();
+    const adminUser = adminDoc.data();
+
+    if (adminUser?.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can send response emails' });
+    }
     
     if (!userEmail || !responseMessage) {
       return res.status(400).json({ error: 'Missing required parameters: userEmail, responseMessage' });
@@ -353,7 +414,7 @@ app.post('/sendContactResponseEmail', async (req, res) => {
 
           <p style="font-size: 14px; color: #666; margin-top: 30px;">
             If you have any follow-up questions, feel free to contact us again.<br>
-            <a href="http://localhost:5173" style="color: #FF9500; text-decoration: none;">Visit Urban Garage Sale</a>
+            <a href="${defaultFrontendUrl}" style="color: #FF9500; text-decoration: none;">Visit Urban Garage Sale</a>
           </p>
         </div>
         <div style="text-align: center; padding: 15px; font-size: 12px; color: #999;">

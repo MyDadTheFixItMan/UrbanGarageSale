@@ -1,6 +1,7 @@
 // Link an existing Stripe account to user profile
 import Stripe from 'stripe';
-import { getFirebaseAdmin, verifyToken } from '../firebase-admin.js';
+import { getFirebaseAdmin, verifyToken } from '../_shared/firebase-admin.js';
+import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 
 const getStripe = (apiKey) => {
   if (!apiKey) {
@@ -30,9 +31,7 @@ async function getBody(req) {
 
 export default async function linkExistingStripeAccount(req, res) {
   // Enable CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  applyCors(res, getTrustedOrigin(req.headers.origin, process.env.FRONTEND_URL || 'http://localhost:5174'), 'POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -53,34 +52,7 @@ export default async function linkExistingStripeAccount(req, res) {
     }
 
     const idToken = authHeader.substring(7);
-    
-    // For local development without full Firebase setup, extract uid from token
-    let userId;
-    try {
-      userId = await verifyToken(idToken);
-    } catch (tokenError) {
-      console.warn('Token verification failed:', tokenError.message);
-      
-      // Development fallback: decode token to get uid (less secure, local only)
-      if (process.env.NODE_ENV !== 'production') {
-        try {
-          const parts = idToken.split('.');
-          if (parts.length !== 3) throw new Error('Invalid token format');
-          
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-          userId = payload.uid || payload.sub;
-          
-          if (!userId) throw new Error('No uid in token');
-          console.log('Using development mode token parsing for userId:', userId);
-        } catch (decodeError) {
-          res.status(401).json({ message: `Token verification failed: ${tokenError.message}` });
-          return;
-        }
-      } else {
-        res.status(401).json({ message: `Token verification failed: ${tokenError.message}` });
-        return;
-      }
-    }
+    const userId = await verifyToken(idToken);
 
     console.log('✓ userId verified:', userId);
     

@@ -3,6 +3,8 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import { formatAud } from '@/lib/format';
+import { LISTING_FEE_AUD } from '@/lib/pricing';
 import { Check, Loader2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -84,7 +86,7 @@ export default function Payment() {
                 if (saleId) {
                     try {
                         const sales = await firebase.entities.GarageSale.filter({ id: saleId });
-                        if (sales[0] && sales[0].created_by === userData.email) {
+                        if (sales[0] && sales[0].user_id === userData.id) {
                             setSale(sales[0]);
                         }
                     } catch (error) {
@@ -102,23 +104,9 @@ export default function Payment() {
                             saleId: saleId,
                         });
 
+                        // The server checks the session with Stripe, records the payment and
+                        // marks the listing paid; the browser is not trusted to do either.
                         if (result?.success) {
-                            // Create payment record in Firestore
-                            await firebase.entities.Payment.create({
-                                garage_sale_id: saleId,
-                                user_email: userData.email,
-                                amount: 10,
-                                status: 'completed',
-                                payment_method: 'stripe',
-                                transaction_id: sessionId,
-                            });
-
-                            // Update listing status to pending_approval
-                            await firebase.entities.GarageSale.update(saleId, {
-                                status: 'pending_approval',
-                                payment_status: 'paid',
-                            });
-
                             setPaymentSuccess(true);
                             // Invalidate queries to refresh data in admin dashboard
                             await queryClient.invalidateQueries({ queryKey: ['allPayments'] });
@@ -278,7 +266,7 @@ export default function Payment() {
 
                         <div className="bg-slate-100 rounded-lg p-4 text-center">
                             <p className="text-sm text-slate-600 mb-2">Listing Fee</p>
-                            <p className="text-3xl font-bold text-[#1e3a5f]">$10.00</p>
+                            <p className="text-3xl font-bold text-[#1e3a5f]">{formatAud(LISTING_FEE_AUD, { withCode: true })}</p>
                             <p className="text-xs text-slate-500 mt-2">One-time fee to list your garage sale</p>
                         </div>
 
@@ -289,7 +277,7 @@ export default function Payment() {
                                 className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
                             >
                                 {processingPayment && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                {processingPayment ? 'Processing...' : 'Pay $10.00 with Stripe'}
+                                {processingPayment ? 'Processing...' : `Pay ${formatAud(LISTING_FEE_AUD, { withCode: true })} with Stripe`}
                             </Button>
                             <Link to={createPageUrl('Profile')}>
                                 <Button variant="outline" className="w-full">

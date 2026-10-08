@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, isAfter, isBefore, startOfDay } from 'date-fns';
 import { createPageUrl } from '../utils';
+import { formatAud, AU_DATE, AU_DATE_TIME } from '@/lib/format';
 import {
     Dialog,
     DialogContent,
@@ -98,6 +99,12 @@ export default function AdminDashboard() {
             const userData = await firebase.auth.me();
             if (userData.role !== 'admin') {
                 window.location.href = createPageUrl('Home');
+                return;
+            }
+            // Admin data is only released to sessions that passed SMS 2FA (firestore.rules).
+            if (!(await firebase.auth.hasSecondFactorSession())) {
+                toast.error('Admin access requires two-factor authentication. Turn on 2FA in your Profile, then sign in again.');
+                window.location.href = createPageUrl('Profile');
                 return;
             }
             setUser(userData);
@@ -278,58 +285,6 @@ export default function AdminDashboard() {
         }
     }, [appSettings]);
 
-    // Initialize test payment data if none exist
-    useEffect(() => {
-        const initializeTestData = async () => {
-            if (loading || !user || user.role !== 'admin') {
-                console.log('Waiting for admin auth...');
-                return;
-            }
-
-            try {
-                const payments = await firebase.entities.Payment.filter();
-                console.log('Existing payments:', payments);
-                
-                // Check if there are any COMPLETED payments
-                const completedPayments = payments.filter(p => p.status === 'completed');
-                
-                if (completedPayments.length === 0 && payments.length > 0) {
-                    console.log('No completed payments found, updating first payment to completed...');
-                    // Update the first payment to 'completed' for demo purposes
-                    const firstPayment = payments[0];
-                    if (firstPayment.id) {
-                        await firebase.entities.Payment.update(firstPayment.id, {
-                            status: 'completed',
-                            amount: 49.99,
-                        });
-                        console.log('Payment updated to completed');
-                        
-                        // Invalidate queries to refresh
-                        queryClient.invalidateQueries({ queryKey: ['allPayments'] });
-                    }
-                } else if (completedPayments.length === 0 && payments.length === 0) {
-                    console.log('No payments found, creating test payment...');
-                    // Create some test payments with 'completed' status
-                    const result = await firebase.entities.Payment.create({
-                        amount: 49.99,
-                        status: 'completed',
-                        payment_method: 'stripe',
-                        transaction_id: 'test_stripe_' + Date.now(),
-                    });
-                    console.log('Test payment created:', result);
-                    
-                    // Invalidate queries to refresh
-                    queryClient.invalidateQueries({ queryKey: ['allPayments'] });
-                }
-            } catch (error) {
-                console.error('Error initializing test data:', error);
-                // Silent fail
-            }
-        };
-        
-        initializeTestData();
-    }, [loading, user, queryClient]);
-
     // Load listing data for payments
     useEffect(() => {
         const loadPaymentListingData = async () => {
@@ -500,11 +455,10 @@ export default function AdminDashboard() {
                 console.log('🟦 Update returned:', result);
                 
                 // Send approval email to listing creator
-                if (listing.created_by) {
+                if (listing.user_id) {
                     try {
                         await firebase.functions.invoke('sendApprovalEmail', {
-                            userEmail: listing.created_by,
-                            listingTitle: listing.title,
+                            saleId: listingId,
                         });
                     } catch (emailError) {
                         console.error('⚠️  Failed to send approval email:', emailError);
@@ -766,7 +720,7 @@ export default function AdminDashboard() {
 
             // Send email notification
             try {
-                await firebase.firebaseFunctions.invoke('sendContactResponseEmail', {
+                await firebase.functions.invoke('sendContactResponseEmail', {
                     userEmail: message.email,
                     userName: message.name,
                     originalMessage: message.message,
@@ -910,7 +864,7 @@ export default function AdminDashboard() {
                         📍 {listing.address} • {listing.suburb} {listing.postcode} {listing.state}
                     </p>
                     <p className="text-sm text-slate-500 break-words">
-                        📅 {listing.start_date ? format(parseISO(listing.start_date), 'MMM d, yyyy') : 'No date'}{listing.start_time && ` ${listing.start_time}`}{listing.end_time && ` - ${listing.end_time}`}
+                        📅 {listing.start_date ? format(parseISO(listing.start_date), AU_DATE) : 'No date'}{listing.start_time && ` ${listing.start_time}`}{listing.end_time && ` - ${listing.end_time}`}
                     </p>
                 </div>
             </div>
@@ -1034,13 +988,13 @@ export default function AdminDashboard() {
                     />
                     <StatCard
                         title="Monthly Revenue"
-                        value={`$${monthlyRevenue.toFixed(2)}`}
+                        value={formatAud(monthlyRevenue)}
                         icon={DollarSign}
                         color="bg-[#1e3a5f]"
                     />
                     <StatCard
                         title="Total Revenue"
-                        value={`$${totalRevenue.toFixed(2)}`}
+                        value={formatAud(totalRevenue)}
                         icon={TrendingUp}
                         color="bg-purple-500"
                     />
@@ -1369,10 +1323,10 @@ export default function AdminDashboard() {
                                                         {u.state && <span>{u.state}</span>}
                                                         {u.postcode && <span>• {u.postcode}</span>}
                                                         {u.last_login && (
-                                                            <span>• Last login: {format(parseISO(u.last_login), 'MMM d, yyyy h:mm a')}</span>
+                                                            <span>• Last login: {format(parseISO(u.last_login), AU_DATE_TIME)}</span>
                                                         )}
                                                         {!u.last_login && u.created_date && (
-                                                            <span>• Joined: {format(parseISO(u.created_date), 'MMM d, yyyy')}</span>
+                                                            <span>• Joined: {format(parseISO(u.created_date), AU_DATE)}</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -1520,7 +1474,7 @@ export default function AdminDashboard() {
                                                 >
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <div>
-                                                            <p className="font-semibold text-[#1e3a5f]">${payment.amount?.toFixed(2)}</p>
+                                                            <p className="font-semibold text-[#1e3a5f]">{formatAud(payment.amount)}</p>
                                                             <p className="text-sm text-slate-600 mt-1">
                                                                 {sale?.title || 'Unknown Listing'}
                                                             </p>
@@ -1542,7 +1496,7 @@ export default function AdminDashboard() {
                                                                         } else if (typeof payment.created_at === 'string') {
                                                                             date = parseISO(payment.created_at);
                                                                         }
-                                                                        return date ? format(date, 'MMM d, yyyy') : 'N/A';
+                                                                        return date ? format(date, AU_DATE) : 'N/A';
                                                                     })() : 'N/A'}
                                                                 </p>
                                                                 <p className="text-slate-600 text-xs">
@@ -1847,7 +1801,7 @@ export default function AdminDashboard() {
                                                 {isFreePeriodActive() ? '✅ FREE PERIOD ACTIVE TODAY!' : '⏳ Free period scheduled'}
                                             </p>
                                             <p className="text-sm mt-2">
-                                                <strong>Period:</strong> {format(parseISO(freeListingStart), 'MMM d, yyyy')} - {format(parseISO(freeListingEnd), 'MMM d, yyyy')}
+                                                <strong>Period:</strong> {format(parseISO(freeListingStart), AU_DATE)} - {format(parseISO(freeListingEnd), AU_DATE)}
                                             </p>
                                             <p className="text-xs text-slate-500 mt-2">
                                                 During this period, all new listings will be published for $0.00 instead of $10.00
@@ -1917,7 +1871,7 @@ export default function AdminDashboard() {
                                                                             ? message.created_at 
                                                                             : message.created_at.toDate?.()
                                                                         , 
-                                                                        'MMM d, yyyy h:mm a'
+                                                                        AU_DATE_TIME
                                                                     )}
                                                                 </p>
                                                                 {message.status === 'unread' && (
@@ -1939,7 +1893,7 @@ export default function AdminDashboard() {
                                                                                 ? message.response_at 
                                                                                 : message.response_at.toDate?.()
                                                                             , 
-                                                                            'MMM d, yyyy h:mm a'
+                                                                            AU_DATE_TIME
                                                                         )}
                                                                     </p>
                                                                 )}
@@ -2084,7 +2038,7 @@ export default function AdminDashboard() {
                                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Joined</p>
                                     <p className="text-base text-slate-900">
                                         {selectedUserDetails.created_date 
-                                            ? format(parseISO(selectedUserDetails.created_date), 'MMM d, yyyy') 
+                                            ? format(parseISO(selectedUserDetails.created_date), AU_DATE) 
                                             : 'Unknown'}
                                     </p>
                                 </div>
@@ -2092,7 +2046,7 @@ export default function AdminDashboard() {
                                     <div>
                                         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Login</p>
                                         <p className="text-base text-slate-900">
-                                            {format(parseISO(selectedUserDetails.last_login), 'MMM d, yyyy h:mm a')}
+                                            {format(parseISO(selectedUserDetails.last_login), AU_DATE_TIME)}
                                         </p>
                                     </div>
                                 )}

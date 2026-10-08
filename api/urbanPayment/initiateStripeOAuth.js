@@ -25,9 +25,10 @@ export default async (req, res) => {
       return res.status(500).json({ error: 'Stripe OAuth not configured' });
     }
 
-    // Get the redirect URI from request body, use base URL for Stripe
-    const body = req.body || {};
-    const redirectUri = getTrustedOrigin(body.redirectUri || req.headers.origin, process.env.FRONTEND_URL || 'http://localhost:5173');
+    // Stripe only accepts redirect URIs registered in Connect settings (exact match), so use the
+    // canonical site address (FRONTEND_URL) rather than whichever host the browser is on.
+    // The web app forwards the return from the home page to Profile, which completes the link.
+    const redirectUri = process.env.FRONTEND_URL || getTrustedOrigin(req.headers.origin, 'http://localhost:5173');
 
     // Generate a state token for security (CSRF protection)
     const stateToken = crypto.randomBytes(32).toString('hex');

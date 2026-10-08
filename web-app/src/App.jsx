@@ -4,7 +4,8 @@ import { queryClientInstance } from '@/lib/query-client'
 import NavigationTracker from '@/lib/NavigationTracker'
 import ErrorBoundary from '@/lib/ErrorBoundary'
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { Analytics } from '@vercel/analytics/react';
@@ -53,6 +54,20 @@ const AuthenticatedApp = () => {
 };
 
 
+// Stripe Connect sends sellers back to the registered site address (the home page) with
+// ?code&state, or ?error. The Profile page completes the link, so forward them there.
+function StripeOAuthReturn() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (location.pathname === '/' && params.get('state') && (params.get('code') || params.get('error'))) {
+      navigate('/Profile' + location.search, { replace: true });
+    }
+  }, [location, navigate]);
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -60,6 +75,7 @@ function App() {
         <AuthProvider>
           <QueryClientProvider client={queryClientInstance}>
             <NavigationTracker />
+            <StripeOAuthReturn />
             <AuthenticatedApp />
             <Toaster richColors closeButton position="top-center" />
             <Analytics />

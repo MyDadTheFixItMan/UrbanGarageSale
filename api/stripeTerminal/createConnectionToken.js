@@ -2,6 +2,7 @@
 import Stripe from 'stripe';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { requireUser, requireSecondFactor, sendError } from '../_shared/http.js';
+import { rateLimit } from '../_shared/rateLimit.js';
 
 let stripe = null;
 function getStripe() {
@@ -25,7 +26,8 @@ export default async (req, res) => {
   }
 
   try {
-    requireSecondFactor(await requireUser(req));
+    const { uid } = requireSecondFactor(await requireUser(req));
+    await rateLimit(uid, 'createConnectionToken', 30);
     const connectionToken = await getStripe().terminal.connectionTokens.create();
     return res.status(200).json({ success: true, secret: connectionToken.secret });
   } catch (error) {

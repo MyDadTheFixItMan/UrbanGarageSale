@@ -107,8 +107,7 @@ export default function Payment() {
                         if (result?.success) {
                             setPaymentSuccess(true);
                             // Invalidate queries to refresh data in admin dashboard
-                            await queryClient.invalidateQueries({ queryKey: ['allPayments'] });
-                            await queryClient.invalidateQueries({ queryKey: ['allListings'] });
+                            await queryClient.invalidateQueries({ queryKey: ['admin'] });
                             if (userData?.email) {
                                 await queryClient.invalidateQueries({ queryKey: ['userListings', userData.email] });
                             }

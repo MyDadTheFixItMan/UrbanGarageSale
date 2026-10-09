@@ -34,6 +34,6 @@ export function applyCors(res, origin, methods = 'POST, OPTIONS') {
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', methods);
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Firebase-AppCheck');
   res.setHeader('Content-Type', 'application/json');
 }

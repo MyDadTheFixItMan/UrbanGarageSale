@@ -1,6 +1,7 @@
 import { getFirebaseAdmin } from './_shared/firebase-admin.js';
 import { applyCors, getTrustedOrigin } from './_shared/security.js';
 import { HttpError, readJsonBody, requireUser, sendError } from './_shared/http.js';
+import { rateLimit } from './_shared/rateLimit.js';
 
 /**
  * Turns two-factor authentication on or off for the signed-in user.
@@ -22,6 +23,7 @@ const setUserClaimsHandler = async (req: any, res: any) => {
 
   try {
     const { uid } = await requireUser(req);
+    await rateLimit(uid, 'setUserClaims', 10);
     const { action } = await readJsonBody(req);
 
     if (action !== 'enable' && action !== 'disable') {

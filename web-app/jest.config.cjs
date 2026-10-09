@@ -6,7 +6,7 @@ module.exports = {
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/src'],
   extensionsToTreatAsEsm: ['.jsx'],
-  testMatch: ['**/__tests__/**/*.test.js', '**/?(*.)+(spec|test).js'],
+  testMatch: ['**/__tests__/**/*.test.{js,jsx}'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
@@ -43,10 +43,11 @@ module.exports = {
   ],
   coverageThreshold: {
     global: {
-      branches: 2,      // Allow iteration on complex features
-      functions: 2,
-      lines: 2,
-      statements: 2,
+      // Floor just under current real coverage (~16%) so it can only go up.
+      branches: 15,
+      functions: 15,
+      lines: 15,
+      statements: 15,
     },
     './src/utils/index.ts': {
       branches: 100,    // Already achieved

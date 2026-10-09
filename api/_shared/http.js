@@ -44,11 +44,30 @@ export async function requireUser(req) {
     throw new HttpError(401, 'Missing authorization token');
   }
 
+  await requireAppCheck(req);
   try {
     const admin = getFirebaseAdmin();
     return await admin.auth().verifyIdToken(authHeader.substring(7), true);
   } catch {
     throw new HttpError(401, 'Invalid or expired token');
+  }
+}
+
+// App Check: the website sends a token proving the request came from the real site.
+// A token that is present but invalid is always refused. A missing token is refused only once
+// APP_CHECK_ENFORCE=true, because the mobile app does not send App Check tokens yet.
+async function requireAppCheck(req) {
+  const token = req.headers['x-firebase-appcheck'];
+  if (!token) {
+    if (process.env.APP_CHECK_ENFORCE === 'true') {
+      throw new HttpError(401, 'App verification failed. Please refresh the page and try again.');
+    }
+    return;
+  }
+  try {
+    await getFirebaseAdmin().appCheck().verifyToken(token);
+  } catch {
+    throw new HttpError(401, 'App verification failed. Please refresh the page and try again.');
   }
 }
 

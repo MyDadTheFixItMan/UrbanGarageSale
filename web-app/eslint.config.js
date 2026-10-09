@@ -39,7 +39,11 @@ export default [
       "react-hooks": pluginReactHooks,
       "unused-imports": pluginUnusedImports,
     },
+    // Spreading the recommended configs above would otherwise be undone by this `rules` key,
+    // which replaces (not merges) theirs, so they are merged in explicitly.
     rules: {
+      ...pluginJs.configs.recommended.rules,
+      ...pluginReact.configs.flat.recommended.rules,
       "no-unused-vars": "off",
       "react/jsx-uses-vars": "error",
       "react/jsx-uses-react": "error",
@@ -54,6 +58,8 @@ export default [
         },
       ],
       "react/prop-types": "off",
+      // Apostrophes in JSX text render correctly; escaping them only hurts readability.
+      "react/no-unescaped-entities": "off",
       "react/react-in-jsx-scope": "off",
       "react/no-unknown-property": [
         "error",

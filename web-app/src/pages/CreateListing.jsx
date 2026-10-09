@@ -52,8 +52,7 @@ export default function CreateListing() {
         queryKey: ['allPromotions'],
         queryFn: async () => {
             try {
-                // TODO: Fix getDocs syntax - currently disabled
-                return [];
+                return await firebase.firestore.collection('promotions').getDocs('sequence', 'asc');
             } catch (error) {
                 console.error('Error fetching promotions:', error);
                 return [];
@@ -97,7 +96,6 @@ export default function CreateListing() {
 
     // Rotate promotional messages every 5 seconds
     useEffect(() => {
-        if (process.env.NODE_ENV === 'test') return;
         if (allPromotions.length === 0) return;
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
@@ -106,7 +104,6 @@ export default function CreateListing() {
     }, [allPromotions.length]);
 
     useEffect(() => {
-        if (process.env.NODE_ENV === 'test') return;
         // Google Maps is already loaded in index.html
         // Just verify it's available, if not wait for it
         if (!window.google?.maps?.Geocoder) {
@@ -120,7 +117,6 @@ export default function CreateListing() {
     }, []);
 
     useEffect(() => {
-        if (process.env.NODE_ENV === 'test') return;
         const init = async () => {
             const authenticated = await firebase.auth.isAuthenticated();
             if (!authenticated) {

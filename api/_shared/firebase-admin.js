@@ -2,6 +2,7 @@
 // the old namespaced `admin.auth()` / `admin.firestore()` exports).
 import { initializeApp, getApps, cert, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getAppCheck } from 'firebase-admin/app-check';
 import { getFirestore as getAdminFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 const projectId = process.env.FIREBASE_PROJECT_ID || 'urbangaragesale';
@@ -29,13 +30,13 @@ function getApp() {
 }
 
 // Returns an object with the same shape the handlers use:
-// admin.auth(), admin.firestore(), admin.firestore.FieldValue, admin.firestore.Timestamp
+// admin.auth(), admin.appCheck(), admin.firestore(), admin.firestore.FieldValue, admin.firestore.Timestamp
 export function getFirebaseAdmin() {
   const app = getApp();
   const firestore = () => getAdminFirestore(app);
   firestore.FieldValue = FieldValue;
   firestore.Timestamp = Timestamp;
-  return { auth: () => getAuth(app), firestore };
+  return { auth: () => getAuth(app), appCheck: () => getAppCheck(app), firestore };
 }
 
 // Verify Firebase ID token and return the uid. Revoked tokens are rejected too.

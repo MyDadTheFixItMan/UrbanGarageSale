@@ -139,8 +139,27 @@ service cloud.firestore {
     }
 
     // ---------- Contact messages ----------
+    // Rate limit: a user may send one contact message per minute. The message and this marker
+    // are written in one batch, and the message is accepted only if the marker was updated
+    // in that same write (getAfter) and the previous one is at least 60 seconds old.
+    match /contactRateLimits/{uid} {
+      allow create, update: if signedIn() && request.auth.uid == uid &&
+                               request.resource.data.keys().hasOnly(['last']) &&
+                               request.resource.data.last == request.time &&
+                               (resource == null || request.time > resource.data.last + duration.value(60, 's'));
+    }
+
     match /contactMessages/{messageId} {
-      allow create: if signedIn();
+      allow create: if signedIn() &&
+                       request.resource.data.keys().hasOnly(['name', 'email', 'message', 'user_id', 'status', 'created_at']) &&
+                       request.resource.data.user_id == request.auth.uid &&
+                       request.resource.data.status == 'unread' &&
+                       request.resource.data.created_at == request.time &&
+                       request.resource.data.name is string && request.resource.data.name.size() <= 100 &&
+                       request.resource.data.email is string && request.resource.data.email.size() <= 254 &&
+                       request.resource.data.message is string &&
+                       request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 4000 &&
+                       getAfter(/databases/$(database)/documents/contactRateLimits/$(request.auth.uid)).data.last == request.time;
       allow read, update, delete: if isAdmin();
     }
 

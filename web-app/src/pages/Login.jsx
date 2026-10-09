@@ -8,6 +8,7 @@ import { createPageUrl } from '../utils';
 import { Mail } from 'lucide-react';
 import GooglePlacesAutocomplete from '@/components/GooglePlacesAutocomplete';
 import { toast } from 'sonner';
+import { passwordProblem, MIN_PASSWORD_LENGTH } from '@/lib/password';
 
 const countryPlaceholders = {
   'AU': '+61 412 345 678',
@@ -180,13 +181,14 @@ export default function Login() {
       return;
     }
     
-    if (signUpPassword.length < 6) {
-      setSignUpError('Password must be at least 6 characters');
+    const signUpPasswordProblem = passwordProblem(signUpPassword);
+    if (signUpPasswordProblem) {
+      setSignUpError(signUpPasswordProblem);
       return;
     }
 
     // Clean and normalize phone number before validation
-    let cleanedPhone = signUpPhone.replace(/[\s\-\(\)]/g, ''); // Remove spaces, dashes, parentheses
+    let cleanedPhone = signUpPhone.replace(/[\s\-()]/g, ''); // Remove spaces, dashes, parentheses
     
     // Validate phone number is complete (not just country code)
     if (cleanedPhone === '+61' || cleanedPhone.length < 10) {
@@ -774,7 +776,7 @@ export default function Login() {
                     placeholder="••••••••"
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
                   />
-                  <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
+                  <p className="text-xs text-slate-500 mt-1">At least {MIN_PASSWORD_LENGTH} characters, with letters and numbers</p>
                 </div>
 
                 <div>

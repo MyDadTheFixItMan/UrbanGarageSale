@@ -4,6 +4,7 @@ import {
   HttpError, readJsonBody, requireUser, requireSecondFactor, parseAudAmount, cleanText, sendError,
 } from '../_shared/http.js';
 import { writeSaleWithStats, assertOwnsGarageSale } from '../_shared/sales.js';
+import { rateLimit } from '../_shared/rateLimit.js';
 
 export default async (req, res) => {
   applyCors(res, getTrustedOrigin(req.headers.origin), 'POST, OPTIONS');
@@ -17,6 +18,7 @@ export default async (req, res) => {
 
   try {
     const decoded = requireSecondFactor(await requireUser(req));
+    await rateLimit(decoded.uid, 'recordSale', 60);
     const body = await readJsonBody(req);
 
     // Card sales must go through recordTapToPaySale so Stripe can confirm them.

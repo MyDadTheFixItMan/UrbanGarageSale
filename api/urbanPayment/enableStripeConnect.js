@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { getFirebaseAdmin } from '../_shared/firebase-admin.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { HttpError, readJsonBody, requireUser, requireSecondFactor, cleanText, sendError } from '../_shared/http.js';
+import { rateLimit } from '../_shared/rateLimit.js';
 
 const AU_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
 
@@ -31,6 +32,7 @@ export default async (req, res) => {
 
   try {
     const decoded = requireSecondFactor(await requireUser(req));
+    await rateLimit(decoded.uid, 'enableStripeConnect', 5);
     const userId = decoded.uid;
     const body = await readJsonBody(req);
 

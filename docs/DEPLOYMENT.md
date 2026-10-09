@@ -69,7 +69,9 @@ npx firebase-tools deploy --only firestore:rules,firestore:indexes,storage --pro
 ```
 
 Radius search needs the `garageSales` (status, geohash) index in `firestore.indexes.json`; a new
-index takes a few minutes to build after deploying.
+index takes a few minutes to build after deploying. The admin dashboard's totals (Firestore
+count/sum aggregations) and the `expireListings` job need the other indexes in that file, so
+deploy indexes before the web app and functions that use them.
 
 Rules require admins to have 2FA enabled — make sure every admin has enrolled before
 deploying rule changes.
@@ -89,6 +91,8 @@ deploying rule changes.
   (through the `reportClientError` function). Turn on its email notifications in the Google
   Cloud console.
 - `healthCheck` runs every 10 minutes and reports an error if the website or API is down.
+- `expireListings` runs daily at 00:15 (Melbourne) and marks listings whose end date has passed
+  as completed, so they leave public search and the admin dashboard's active counts.
 
 ## Admin scripts
 

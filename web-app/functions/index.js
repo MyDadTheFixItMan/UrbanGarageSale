@@ -394,9 +394,11 @@ exports.reportClientError = functions.https.onRequest((req, res) => {
     const source = REPORT_SOURCES.includes(body?.source) ? body.source : 'unknown';
     const message = text(body?.stack, 4000) || text(body?.message, 500) || 'Unknown error';
 
-    logReportedError(source, message, {
+    // Error Reporting needs a stack trace in `message`; an empty reportLocation makes it drop
+    // the entry, so the React component trail is appended to the message instead.
+    const componentStack = text(body?.componentStack, 2000);
+    logReportedError(source, componentStack ? `${message}\n\nReact component stack:${componentStack}` : message, {
         httpRequest: { url: text(body?.url, 300), userAgent: text(body?.userAgent, 300) },
-        reportLocation: { functionName: text(body?.componentStack, 2000) || undefined },
     });
     res.status(204).send('');
 });

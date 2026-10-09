@@ -36,8 +36,11 @@ import {
   getDoc,
   setDoc,
   orderBy,
-  QueryConstraint
+  startAt,
+  endAt,
+  limit
 } from 'firebase/firestore';
+import { geohashForLocation, geohashQueryBounds } from 'geofire-common';
 import {
   getStorage,
   ref,
@@ -142,6 +145,21 @@ async function setTwoFactor(action) {
   }
 
   await user.getIdToken(true);
+}
+
+// Search limits: radius searches read only the geohash cells covering the radius, capped per
+// cell; searches without a location are capped outright, so no search downloads every listing.
+const MAX_LISTINGS_PER_CELL = 100;
+const MAX_LISTINGS_UNLOCATED = 200;
+
+// Adds a geohash (used for radius search) whenever a write carries coordinates.
+function withGeohash(data) {
+  const lat = Number(data.latitude);
+  const lng = Number(data.longitude);
+  if (data.latitude == null || data.longitude == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return data;
+  }
+  return { ...data, geohash: geohashForLocation([lat, lng]) };
 }
 
 // Authentication functions
@@ -616,7 +634,7 @@ export const firebaseEntities = {
       
       const garageSalesRef = collection(db, 'garageSales');
       const docRef = await addDoc(garageSalesRef, {
-        ...data,
+        ...withGeohash(data),
         user_id: user.uid,
         created_at: new Date(),
         status: data.status || 'draft'
@@ -650,15 +668,27 @@ export const firebaseEntities = {
         constraints.push(where('postcode', '==', filters.postcode));
       }
 
-      if (constraints.length > 0) {
-        q = query(garageSalesRef, ...constraints);
-      }
+      const hasLocation = filters.distance && filters.userLatitude !== undefined && filters.userLongitude !== undefined;
+      let results;
 
-      const querySnapshot = await getDocs(q);
-      let results = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      if (filters.status === 'active' && hasLocation) {
+        // Radius search: only the geohash cells covering the radius are read.
+        const radiusKm = parseInt(filters.distance) || 25;
+        const bounds = geohashQueryBounds([filters.userLatitude, filters.userLongitude], radiusKm * 1000);
+        const snapshots = await Promise.all(bounds.map(([start, end]) => getDocs(query(
+          garageSalesRef, ...constraints, orderBy('geohash'), startAt(start), endAt(end), limit(MAX_LISTINGS_PER_CELL)
+        ))));
+        results = snapshots.flatMap((snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      } else {
+        // Public searches without a location are capped; owner and admin views are not.
+        const capped = filters.status === 'active' && !filters.user_id;
+        q = query(garageSalesRef, ...constraints, ...(capped ? [limit(MAX_LISTINGS_UNLOCATED)] : []));
+        const querySnapshot = await getDocs(q);
+        results = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
 
       // Filter out past listings (where end_date has passed) unless explicitly requested
       if (!filters.includePast) {
@@ -721,9 +751,16 @@ export const firebaseEntities = {
       return uniqueResults;
     },
 
+    // Loads the given listings one by one; ones the user may not read (no longer live) are skipped.
+    getByIds: async (ids = []) => {
+      const unique = [...new Set(ids.filter(Boolean))];
+      const docs = await Promise.all(unique.map((id) => getDoc(doc(db, 'garageSales', id)).catch(() => null)));
+      return docs.filter((d) => d && d.exists()).map((d) => ({ id: d.id, ...d.data() }));
+    },
+
     update: async (id, data) => {
       const docRef = doc(db, 'garageSales', id);
-      await updateDoc(docRef, data);
+      await updateDoc(docRef, withGeohash(data));
       const docSnap = await getDoc(docRef);
       return { id: docSnap.id, ...docSnap.data() };
     },

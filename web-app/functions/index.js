@@ -334,3 +334,100 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
     console.log(`✓ User ${userId} and personal data deleted by admin ${adminUid}`);
     return { success: true, message: 'User deleted successfully' };
 });
+
+// ---------------------------------------------------------------------------
+// Monitoring
+// Errors are written in Google Cloud Error Reporting's format, so they are grouped there and
+// (with notifications on) emailed to the project owners when a new kind of error appears.
+// ---------------------------------------------------------------------------
+
+const ERROR_EVENT_TYPE = 'type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent';
+const REPORT_SOURCES = ['web-app', 'urban-pay-api'];
+const REPORT_ORIGINS = ['https://urbangaragesales.com.au', 'https://www.urbangaragesales.com.au'];
+
+function logReportedError(service, message, context = {}) {
+    functions.logger.write({
+        severity: 'ERROR',
+        '@type': ERROR_EVENT_TYPE,
+        serviceContext: { service },
+        message,
+        context,
+    });
+}
+
+// Crude per-instance flood guard: a public endpoint must not be usable to fill the logs.
+let reportWindowStart = 0;
+let reportsInWindow = 0;
+function reportAllowed() {
+    const now = Date.now();
+    if (now - reportWindowStart > 60000) {
+        reportWindowStart = now;
+        reportsInWindow = 0;
+    }
+    reportsInWindow++;
+    return reportsInWindow <= 60;
+}
+
+// Receives error reports from the website (browser) and the Urban Pay API (server).
+exports.reportClientError = functions.https.onRequest((req, res) => {
+    const origin = req.get('origin');
+    if (origin && REPORT_ORIGINS.includes(origin)) {
+        res.set('Access-Control-Allow-Origin', origin);
+        res.set('Vary', 'Origin');
+    }
+    if (req.method === 'OPTIONS') {
+        res.set('Access-Control-Allow-Methods', 'POST');
+        res.set('Access-Control-Allow-Headers', 'Content-Type');
+        res.status(204).send('');
+        return;
+    }
+    if (req.method !== 'POST' || (req.rawBody && req.rawBody.length > 16384) || !reportAllowed()) {
+        res.status(400).send('');
+        return;
+    }
+
+    let body = req.body;
+    if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch { body = {}; }
+    }
+    const text = (value, max) => String(value ?? '').slice(0, max);
+    const source = REPORT_SOURCES.includes(body?.source) ? body.source : 'unknown';
+    const message = text(body?.stack, 4000) || text(body?.message, 500) || 'Unknown error';
+
+    logReportedError(source, message, {
+        httpRequest: { url: text(body?.url, 300), userAgent: text(body?.userAgent, 300) },
+        reportLocation: { functionName: text(body?.componentStack, 2000) || undefined },
+    });
+    res.status(204).send('');
+});
+
+// Uptime check every 10 minutes: the website loads, the API answers, and the API still refuses
+// requests without a login. A failure is logged as an error, which Error Reporting emails out.
+exports.healthCheck = functions.pubsub.schedule('every 10 minutes').timeZone('Australia/Melbourne').onRun(async () => {
+    const checks = [
+        { name: 'Website home page', url: 'https://www.urbangaragesales.com.au/', method: 'GET', expect: 200 },
+        { name: 'Urban Pay API health', url: 'https://urban-garage-sale.vercel.app/api/urbanPayment', method: 'GET', expect: 200 },
+        { name: 'Urban Pay API refuses anonymous sales', url: 'https://urban-garage-sale.vercel.app/api/urbanPayment/recordSale', method: 'POST', expect: 401 },
+    ];
+
+    const failures = [];
+    for (const check of checks) {
+        try {
+            const res = await fetch(check.url, {
+                method: check.method,
+                headers: { 'Content-Type': 'application/json' },
+                body: check.method === 'POST' ? '{}' : undefined,
+                signal: AbortSignal.timeout(15000),
+            });
+            if (res.status !== check.expect) failures.push(`${check.name}: HTTP ${res.status}, expected ${check.expect}`);
+        } catch (error) {
+            failures.push(`${check.name}: ${error.message}`);
+        }
+    }
+
+    if (failures.length) {
+        const error = new Error(`Health check failed - ${failures.join('; ')}`);
+        logReportedError('health-check', error.stack);
+    }
+    return null;
+});

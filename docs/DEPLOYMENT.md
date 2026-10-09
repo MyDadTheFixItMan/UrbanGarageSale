@@ -62,11 +62,14 @@ npx firebase-tools deploy --only functions --project urbangaragesale
 - Stripe webhook endpoint: `https://us-central1-urbangaragesale.cloudfunctions.net/stripeWebhook`
   (events `checkout.session.completed`, `checkout.session.async_payment_succeeded`).
 
-## 4. Security rules (Firebase)
+## 4. Security rules and indexes (Firebase)
 
 ```bash
-npx firebase-tools deploy --only firestore:rules,storage --project urbangaragesale
+npx firebase-tools deploy --only firestore:rules,firestore:indexes,storage --project urbangaragesale
 ```
+
+Radius search needs the `garageSales` (status, geohash) index in `firestore.indexes.json`; a new
+index takes a few minutes to build after deploying.
 
 Rules require admins to have 2FA enabled — make sure every admin has enrolled before
 deploying rule changes.
@@ -76,6 +79,16 @@ deploying rule changes.
 - Identity Platform enabled, **SMS multi-factor authentication** on.
 - SMS region policy: allow **Australia** only.
 - Authorized domains include `urbangaragesales.com.au` and `www.urbangaragesales.com.au`.
+
+## Backups and monitoring
+
+- Firestore: point-in-time recovery (7 days), daily backups kept 14 days, delete protection.
+  Restore from the Firebase console (Firestore → Disaster recovery) or
+  `npx firebase-tools firestore:databases:restore`.
+- Errors from the website, the API and Cloud Functions go to Google Cloud **Error Reporting**
+  (through the `reportClientError` function). Turn on its email notifications in the Google
+  Cloud console.
+- `healthCheck` runs every 10 minutes and reports an error if the website or API is down.
 
 ## Admin scripts
 

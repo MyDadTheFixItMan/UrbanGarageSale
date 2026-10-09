@@ -73,7 +73,7 @@ service cloud.firestore {
     function lockedFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(
         ['start_date', 'end_date', 'start_time', 'end_time',
-         'address', 'suburb', 'postcode', 'state', 'latitude', 'longitude']);
+         'address', 'suburb', 'postcode', 'state', 'latitude', 'longitude', 'geohash']);
     }
 
     // Unpaid listings the owner controls. Paid/approved states are set by the server or an admin.

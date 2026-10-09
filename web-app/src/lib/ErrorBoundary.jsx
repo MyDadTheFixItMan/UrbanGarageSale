@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { reportError } from '@/lib/errorReporting';
 
 /**
  * Error Boundary Component
@@ -22,6 +23,7 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
+    reportError(error, { componentStack: String(errorInfo?.componentStack || '').slice(0, 2000) });
     this.setState({
       error,
       errorInfo,

@@ -402,7 +402,7 @@ export default function CreateListing() {
                 // Dates and location of a paid/approved listing can't change (firestore.rules).
                 if (editId && isActiveEdit) {
                     ['start_date', 'end_date', 'start_time', 'end_time', 'address', 'suburb',
-                     'postcode', 'state', 'latitude', 'longitude'].forEach((field) => delete saleData[field]);
+                     'postcode', 'state', 'latitude', 'longitude', 'geohash'].forEach((field) => delete saleData[field]);
                 }
 
                 console.log('💾 Saving with saleData:', saleData);

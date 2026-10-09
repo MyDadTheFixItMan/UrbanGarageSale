@@ -89,11 +89,35 @@ export function cleanText(value, maxLength, fallback = '') {
   return trimmed || fallback;
 }
 
+const ERROR_REPORT_URL = 'https://us-central1-urbangaragesale.cloudfunctions.net/reportClientError';
+
+// Forwards an unexpected server error to Error Reporting (via the reportClientError function).
+// Waits at most 2 seconds so reporting can never hold up or break the response.
+async function reportServerError(error, context) {
+  if (process.env.NODE_ENV !== 'production') return;
+  try {
+    await fetch(ERROR_REPORT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: 'urban-pay-api',
+        message: `${context}: ${error?.message || error}`,
+        stack: `${context}: ${error?.stack || error}`,
+      }),
+      signal: AbortSignal.timeout(2000),
+    });
+  } catch {
+    // Reporting failures are ignored; the error is still in the platform logs
+  }
+}
+
 // Sends HttpErrors with their message; hides internal error details from clients.
-export function sendError(res, error, context = 'Request failed') {
+// Unexpected errors are logged and reported to Error Reporting.
+export async function sendError(res, error, context = 'Request failed') {
   if (error instanceof HttpError) {
     return res.status(error.status).json({ error: error.message });
   }
   console.error(`${context}:`, error);
+  await reportServerError(error, context);
   return res.status(500).json({ error: context });
 }

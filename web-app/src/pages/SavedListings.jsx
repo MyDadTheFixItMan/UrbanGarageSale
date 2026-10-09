@@ -77,14 +77,12 @@ export default function SavedListings() {
         enabled: !!user?.email,
     });
 
+    // Load only the listings this user saved (not every live listing)
+    const savedIds = savedListings.map(saved => saved.garage_sale_id).filter(Boolean);
     const { data: allSales = [] } = useQuery({
-        queryKey: ['allSales'],
-        queryFn: async () => {
-            const results = await firebase.entities.GarageSale.filter({ status: 'active' });
-            console.log('SavedListings.jsx: Fetched all sales:', results);
-            return results;
-        },
-        enabled: !!user?.email,
+        queryKey: ['savedSales', savedIds.join(',')],
+        queryFn: () => firebase.entities.GarageSale.getByIds(savedIds),
+        enabled: !!user?.email && savedIds.length > 0,
     });
 
     const savedSales = savedListings

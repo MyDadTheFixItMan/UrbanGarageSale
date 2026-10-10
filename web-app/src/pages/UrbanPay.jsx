@@ -1,638 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { API_BASE_URL } from '@/lib/api-base';
-import { formatAud, formatDateAU, formatDateTimeAU } from '@/lib/format';
-import { escapeHtml } from '@/lib/escape';
-import { Smartphone, RefreshCw, CreditCard, DollarSign, FileText, Printer } from 'lucide-react';
+import { formatAud } from '@/lib/format';
+import { Smartphone, RefreshCw, CreditCard, DollarSign, FileText } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from "@/components/ui/dialog";
+import CashSaleDialog from './urbanpay/CashSaleDialog';
+import SalesHistoryDialog from './urbanpay/SalesHistoryDialog';
+import { sortSalesNewestFirst } from './urbanpay/salesReport';
 
-export default function UrbanPay() {
+const EMPTY_STATS = { totalEarnings: 0, totalSales: 0 };
+
+// The web dashboard has no card reader, so it cannot take card payments itself.
+// Card sales are taken in the Urban Pay mobile app (Tap to Pay), which records them
+// only after Stripe confirms the payment succeeded.
+const CARD_PAYMENT_NOTICE = 'Card payments are taken with Tap to Pay in the Urban Pay mobile app. They will appear here once completed.';
+
+// Urban Pay needs a signed-in user whose current session completed SMS 2FA.
+function useUrbanPayUser() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [sellerStats, setSellerStats] = useState({ totalEarnings: 0, totalSales: 0 });
-    const [promoIndex, setPromoIndex] = useState(0);
-    const [cashAmount, setCashAmount] = useState('');
-    const [cashDescription, setCashDescription] = useState('');
-    const [isRecordingCash, setIsRecordingCash] = useState(false);
-    const [isRefreshingStats, setIsRefreshingStats] = useState(false);
-    const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
-    const [cardAmount, setCardAmount] = useState('');
-    const [cardDescription, setCardDescription] = useState('');
-    const [isProcessingCard] = useState(false);
-    const [showCashModal, setShowCashModal] = useState(false);
-    const [showCardModal, setShowCardModal] = useState(false);
-    const [showSalesListModal, setShowSalesListModal] = useState(false);
-    const [salesList, setSalesList] = useState([]);
-    const [isLoadingSales, setIsLoadingSales] = useState(false);
-    const [garageSales, setGarageSales] = useState([]);
-    const [selectedGarageSaleId, setSelectedGarageSaleId] = useState('');
-    const [isLoadingGarageSales, setIsLoadingGarageSales] = useState(false);
-
-    const { data: allPromotions = [] } = useQuery({
-        queryKey: ['allPromotions'],
-        queryFn: async () => {
-            try {
-                return await firebase.firestore.collection('promotions').getDocs('sequence', 'asc');
-            } catch (error) {
-                console.error('Error fetching promotions:', error);
-                return [];
-            }
-        },
-        staleTime: 1000 * 60 * 5,
-    });
-
-    // Fetch seller stats from Firestore
-    async function refreshSellerStats() {
-        if (!user || !user.id) {
-            console.warn('refreshSellerStats: No user or user.id');
-            return;
-        }
-        
-        console.log('Refreshing seller stats for user:', user.id);
-        setIsRefreshingStats(true);
-        try {
-            const statsDoc = await firebase.firestore.collection('sellerStats').doc(user.id).get();
-            console.log('Stats doc exists:', statsDoc.exists);
-            
-            if (statsDoc.exists) {
-                const data = statsDoc.data();
-                console.log('Seller stats data:', data);
-                setSellerStats(data);
-            } else {
-                console.log('No stats document yet, initializing with zeros');
-                // If document doesn't exist yet, initialize with zeros
-                setSellerStats({ totalEarnings: 0, totalSales: 0 });
-            }
-        } catch (error) {
-            console.error('Error fetching seller stats:', error.message, error.code);
-            toast.error(`Failed to load seller stats: ${error.message}`);
-        } finally {
-            setIsRefreshingStats(false);
-        }
-    }
-
-    // Load user's garage sales
-    async function loadGarageSales() {
-        if (!user || !user.id) {
-            return;
-        }
-
-        setIsLoadingGarageSales(true);
-        try {
-            console.log('[loadGarageSales] Fetching garage sales for user:', user.id);
-            const sales = await firebase.firestore.collection('garageSales').queryDocs('user_id', '==', user.id);
-            console.log('[loadGarageSales] Loaded', sales.length, 'garage sales');
-            setGarageSales(sales);
-            
-            // Auto-select first garage sale if available
-            if (sales.length > 0 && !selectedGarageSaleId) {
-                setSelectedGarageSaleId(sales[0].id);
-            }
-        } catch (error) {
-            console.error('Error loading garage sales:', error);
-        } finally {
-            setIsLoadingGarageSales(false);
-        }
-    }
-
-    // Fetch sales list for the current user
-    async function loadSalesList() {
-        if (!user || !user.id) {
-            toast.error('User not authenticated');
-            return;
-        }
-
-        setIsLoadingSales(true);
-        try {
-            console.log('[loadSalesList] Fetching sales for user:', user.id);
-            
-            // Get sales for this user using a where query
-            // This respects Firestore security rules that only allow reading own sales
-            console.log('[loadSalesList] Calling queryDocs with where clause...');
-            const userSales = await firebase.firestore.collection('sales').queryDocs('sellerId', '==', user.id);
-            console.log('[loadSalesList] queryDocs returned:', userSales.length, 'documents');
-            
-            // Sort by date descending (newest first)
-            userSales.sort((a, b) => {
-                const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
-                const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
-                return dateB - dateA;
-            });
-            
-            console.log('[loadSalesList] Sorted', userSales.length, 'sales');
-            setSalesList(userSales);
-            setShowSalesListModal(true);
-        } catch (error) {
-            console.error('Error loading sales list:', error);
-            toast.error('Failed to load sales list: ' + error.message);
-        } finally {
-            setIsLoadingSales(false);
-        }
-    }
-
-    // Print sales list
-    function printSalesList() {
-        const printWindow = window.open('', '', 'width=1000,height=600');
-        const total = salesList.reduce((sum, sale) => sum + (sale.amount || 0), 0);
-        
-        let html = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <meta http-equiv="X-UA-Compatible" content="IE=edge">
-                <title>Urban Garage Sale - Sales Report</title>
-                <style>
-                    * { margin: 0; padding: 0; box-sizing: border-box; }
-                    
-                    html, body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                        background: #f8fafc !important;
-                        color: #1e293b;
-                        line-height: 1.6;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    @page {
-                        margin: 0.5in;
-                        size: letter;
-                        background: #f8fafc !important;
-                    }
-                    
-                    .content {
-                        position: relative;
-                        z-index: 10;
-                        padding: 20px;
-                    }
-                    
-                    .header {
-                        background: white !important;
-                        padding: 5px 40px 0 40px;
-                        margin-bottom: 35px;
-                        text-align: center;
-                        page-break-inside: avoid;
-                    }
-                    
-                    .header img {
-                        display: none;
-                    }
-                    
-                    .ribbon {
-                        background: linear-gradient(to right, #f97316 0%, #fb923c 100%) !important;
-                        color: white !important;
-                        padding: 12px 40px;
-                        margin: 0 -40px -35px -40px;
-                        border-radius: 0;
-                        text-align: center;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    .ribbon img {
-                        display: none;
-                    }
-                    
-                    .ribbon-text {
-                        display: block;
-                    }
-                    
-                    .ribbon h1 {
-                        font-size: 28px;
-                        margin: 0 0 4px 0;
-                        font-weight: 800;
-                        letter-spacing: 0.5px;
-                        color: white !important;
-                    }
-                    
-                    .ribbon p {
-                        opacity: 1;
-                        font-size: 14px;
-                        font-weight: 500;
-                        letter-spacing: 0.3px;
-                        margin: 0;
-                        color: white !important;
-                    }
-                    
-                    .logo-badge {
-                        display: none;
-                    }
-                    
-                    .report-meta {
-                        background: white !important;
-                        padding: 30px;
-                        border-left: 6px solid #f97316 !important;
-                        margin-bottom: 35px;
-                        border-radius: 10px;
-                        page-break-inside: avoid;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    .report-meta-grid {
-                        display: grid;
-                        grid-template-columns: repeat(3, 1fr);
-                        gap: 30px;
-                    }
-                    
-                    .meta-item {
-                        text-align: center;
-                        padding: 15px 0;
-                        border-right: 1px solid #e2e8f0;
-                    }
-                    
-                    .meta-item:last-child {
-                        border-right: none;
-                    }
-                    
-                    .meta-label {
-                        color: #64748b !important;
-                        font-size: 11px;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                        letter-spacing: 1.5px;
-                        margin-bottom: 12px;
-                    }
-                    
-                    .meta-value {
-                        font-size: 26px;
-                        font-weight: 900;
-                        color: white !important;
-                        background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8c 100%) !important;
-                        padding: 12px 16px;
-                        border-radius: 6px;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    .section-title {
-                        font-size: 17px;
-                        color: white !important;
-                        background: linear-gradient(to right, #1e3a5f 0%, #2d5a8c 100%) !important;
-                        padding: 16px 24px;
-                        margin: 35px 0 20px 0;
-                        border-radius: 8px;
-                        font-weight: 800;
-                        letter-spacing: 0.3px;
-                        page-break-inside: avoid;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin-bottom: 28px;
-                        border-radius: 8px;
-                        overflow: hidden;
-                        page-break-inside: avoid;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    th {
-                        background: #1e3a5f !important;
-                        color: white !important;
-                        padding: 16px 14px;
-                        text-align: left;
-                        font-weight: 800;
-                        font-size: 12px;
-                        text-transform: uppercase;
-                        letter-spacing: 0.7px;
-                        border: none;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    td {
-                        padding: 14px;
-                        border-bottom: 1px solid #e2e8f0 !important;
-                        background: white !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    tr:nth-child(even) td {
-                        background-color: #f8fafc !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    .subtotal-row td {
-                        background: linear-gradient(to right, #e0f2fe 0%, #f0f9ff 100%) !important;
-                        font-weight: 800;
-                        color: #1e3a5f !important;
-                        border-top: 3px solid #0284c7 !important;
-                        border-bottom: 3px solid #0284c7 !important;
-                        padding: 16px 14px;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    .amount-cell {
-                        text-align: right;
-                        font-weight: 700;
-                        color: #1e3a5f !important;
-                        font-family: 'Courier New', monospace;
-                        font-size: 15px;
-                    }
-                    
-                    .date-cell {
-                        color: #64748b !important;
-                        font-size: 13px;
-                        font-weight: 500;
-                    }
-                    
-                    .type-badge {
-                        display: inline-block;
-                        padding: 6px 14px;
-                        border-radius: 6px;
-                        font-size: 12px;
-                        font-weight: 800;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    .type-cash {
-                        background: #dcfce7 !important;
-                        color: #15803d !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    .type-card {
-                        background: #cffafe !important;
-                        color: #0369a1 !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    .grand-total {
-                        margin-top: 45px;
-                        padding: 20px;
-                        background: linear-gradient(135deg, #f97316 0%, #fb923c 100%) !important;
-                        color: white !important;
-                        border-radius: 12px;
-                        text-align: center;
-                        page-break-inside: avoid;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    .grand-total-label {
-                        font-size: 15px;
-                        font-weight: 800;
-                        letter-spacing: 1.8px;
-                        text-transform: uppercase;
-                        margin-bottom: 8px;
-                        color: white !important;
-                    }
-                    
-                    .grand-total-value {
-                        font-size: 56px;
-                        font-weight: 900;
-                        font-family: 'Courier New', monospace;
-                        letter-spacing: 3px;
-                        color: white !important;
-                    }
-                    
-                    .footer {
-                        margin-top: 45px;
-                        padding-top: 25px;
-                        border-top: 3px solid #f97316 !important;
-                        text-align: center;
-                        color: #64748b !important;
-                        font-size: 11px;
-                        page-break-inside: avoid;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    
-                    .footer-text {
-                        margin: 6px 0;
-                        font-weight: 600;
-                        color: #64748b !important;
-                    }
-                    
-                    @media print {
-                        html, body { 
-                            background: #f8fafc !important;
-                            margin: 0;
-                            padding: 0;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
-                        }
-                        * { 
-                            box-shadow: none !important;
-                            page-break-inside: avoid !important;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
-                        }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="content">
-                    <div class="header">
-                        <div class="ribbon">
-                            <div class="ribbon-text">
-                                <h1>Urban Garage Sale</h1>
-                                <p>Sales Performance Report</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="report-meta">
-                        <div class="report-meta-grid">
-                            <div class="meta-item">
-                                <div class="meta-label">Generated</div>
-                                <div class="meta-value">${formatDateAU(new Date())}</div>
-                            </div>
-                            <div class="meta-item">
-                                <div class="meta-label">Total Transactions</div>
-                                <div class="meta-value">${salesList.length}</div>
-                            </div>
-                            <div class="meta-item">
-                                <div class="meta-label">Period Revenue</div>
-                                <div class="meta-value">${formatAud(total)}</div>
-                            </div>
-                        </div>
-                    </div>
-        `;
-        
-        // Generate flat report with all sales in one table
-        html += `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date & Time</th>
-                        <th>Payment Type</th>
-                        <th>Item Description</th>
-                        <th style="text-align: right;">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        
-        salesList.forEach(sale => {
-            // Convert Firestore Timestamp to Date
-            let dateObj = sale.createdAt;
-            if (sale.createdAt && typeof sale.createdAt.toDate === 'function') {
-                dateObj = sale.createdAt.toDate();
-            } else if (sale.createdAt instanceof Date) {
-                dateObj = sale.createdAt;
-            } else if (typeof sale.createdAt === 'string') {
-                dateObj = new Date(sale.createdAt);
-            }
-            const date = formatDateTimeAU(dateObj, 'Unknown date');
-            const type = sale.paymentMethod === 'cash' ? 'Cash' : 'Card';
-            const badgeClass = sale.paymentMethod === 'cash' ? 'type-cash' : 'type-card';
-            const badgeEmoji = sale.paymentMethod === 'cash' ? '💵' : '💳';
-            
-            html += `
-                    <tr>
-                        <td class="date-cell">${date}</td>
-                        <td><span class="type-badge ${badgeClass}">${badgeEmoji} ${type}</span></td>
-                        <td>${escapeHtml(sale.description || '—')}</td>
-                        <td class="amount-cell">${formatAud(sale.amount)}</td>
-                    </tr>
-            `;
-        });
-        
-        html += `
-                </tbody>
-            </table>
-        `;
-        
-        html += `
-                    <div class="grand-total">
-                        <div class="grand-total-label">💰 Grand Total Revenue</div>
-                        <div class="grand-total-value">${formatAud(total)}</div>
-                    </div>
-                    
-                    <div class="footer">
-                        <div class="footer-text">Urban Garage Sale Platform © 2026 — Your Local Garage Sale Hub</div>
-                        <div class="footer-text">Find & List Garage Sales Locally | This report is confidential and for your records only</div>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `;
-        
-        printWindow.document.write(html);
-        printWindow.document.close();
-        
-        // Wait for document to render before printing
-        setTimeout(() => {
-            printWindow.print();
-        }, 250);
-    }
-
-    useEffect(() => {
-        if (allPromotions.length === 0) return;
-        const interval = setInterval(() => {
-            setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-        }, 5000);
-        return () => clearInterval(interval);
-    }, [allPromotions.length]);
-
-    // The web dashboard has no card reader, so it cannot take card payments itself.
-    // Card sales are taken in the Urban Pay mobile app (Tap to Pay), which records them
-    // only after Stripe confirms the payment succeeded.
-    async function recordCardPayment() {
-        toast.error('Card payments are taken with Tap to Pay in the Urban Pay mobile app. They will appear here once completed.');
-        setShowCardModal(false);
-    }
-
-    async function recordCashSale() {
-        const amount = Number(cashAmount);
-        if (!Number.isFinite(amount) || amount <= 0) {
-            toast.error('Please enter a valid amount');
-            return;
-        }
-
-        if (!cashDescription || !cashDescription.trim()) {
-            toast.error('Please enter a description');
-            return;
-        }
-
-        if (!selectedGarageSaleId) {
-            toast.error('Please select a garage sale');
-            return;
-        }
-
-        setIsRecordingCash(true);
-
-        try {
-            const currentUser = firebase.auth.getCurrentUser();
-            if (!currentUser) {
-                throw new Error('User not authenticated');
-            }
-            const token = await currentUser.getIdToken();
-
-            // Recorded server-side so the sale and both stats documents update atomically.
-            const response = await fetch(`${API_BASE_URL}/api/urbanPayment/recordSale`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    amount,
-                    description: cashDescription.trim(),
-                    paymentMethod: 'cash',
-                    garageSaleId: selectedGarageSaleId,
-                }),
-            });
-
-            const result = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(result.error || `Failed to record sale (${response.status})`);
-            }
-
-            toast.success(`Cash sale recorded! ${formatAud(result.amount ?? amount)}`);
-
-            // Reset form
-            setCashAmount('');
-            setCashDescription('');
-            setShowCashModal(false);
-
-            // Refresh stats
-            await refreshSellerStats();
-        } catch (error) {
-            console.error('Error recording cash sale:', error);
-            toast.error('Failed to record cash sale: ' + error.message);
-        } finally {
-            setIsRecordingCash(false);
-        }
-    }
-
     useEffect(() => {
         const init = async () => {
             try {
-                const authenticated = await firebase.auth.isAuthenticated();
-                if (!authenticated) {
+                if (!(await firebase.auth.isAuthenticated())) {
                     window.location.href = '/login';
                     return;
                 }
-
-                // Enforce 2FA - redirect if not enabled
-                const is2FAEnabled = await firebase.auth.is2FAEnabled();
-                if (!is2FAEnabled) {
+                if (!(await firebase.auth.is2FAEnabled())) {
                     toast.error('Two-Factor Authentication is required for Urban Pay. Please enable 2FA on your Profile page.');
                     setTimeout(() => {
                         window.location.href = '/profile';
@@ -646,31 +44,132 @@ export default function UrbanPay() {
                     window.location.href = '/login';
                     return;
                 }
-
-                const userData = await firebase.auth.me();
-                setUser(userData);
-
-                // Load seller stats after user is set
-                await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay to ensure state update
-                setLoading(false);
+                setUser(await firebase.auth.me());
             } catch (error) {
                 console.error('Urban Pay page init error:', error);
                 toast.error('An error occurred');
+            } finally {
                 setLoading(false);
             }
         };
         init();
     }, []);
+    return { user, loading };
+}
 
-    // Load seller stats and card payments status when user is available
+function usePromoRotation(count) {
+    const [index, setIndex] = useState(0);
     useEffect(() => {
-        if (user) {
-            refreshSellerStats();
-            loadGarageSales();
-            // Check if card payments are enabled
-            setCardPaymentsEnabled(user.cardPaymentsEnabled === true && !!user.stripeConnectId);
+        if (count === 0) return;
+        const interval = setInterval(() => setIndex((i) => (i + 1) % count), 5000);
+        return () => clearInterval(interval);
+    }, [count]);
+    return index;
+}
+
+// Full class names (not built from the tone) so Tailwind keeps them in the build.
+const TONES = {
+    amber: { box: 'bg-amber-50 border-amber-200', iconBox: 'bg-amber-100', icon: 'text-amber-700', title: 'text-amber-900', text: 'text-amber-800' },
+    blue: { box: 'bg-blue-50 border-blue-200', iconBox: 'bg-blue-100', icon: 'text-blue-700', title: 'text-blue-900', text: 'text-blue-800' },
+    purple: { box: 'bg-purple-50 border-purple-200', iconBox: 'bg-purple-100', icon: 'text-purple-700', title: 'text-purple-900', text: 'text-purple-800' },
+};
+
+function PaymentOptionCard({ tone, icon: Icon, title, children, action }) {
+    const t = TONES[tone];
+    return (
+        <div className={`${t.box} border rounded-lg p-4 sm:p-6 flex flex-col`}>
+            <div className="flex items-center gap-3 mb-4">
+                <div className={`w-10 h-10 rounded-lg ${t.iconBox} flex items-center justify-center`}>
+                    <Icon className={`w-5 h-5 ${t.icon}`} />
+                </div>
+                <h3 className={`text-base sm:text-lg font-semibold ${t.title}`}>{title}</h3>
+            </div>
+            <p className={`text-xs sm:text-sm ${t.text} mb-6 flex-1`}>{children}</p>
+            {action}
+        </div>
+    );
+}
+
+export default function UrbanPay() {
+    const { user, loading } = useUrbanPayUser();
+    const [sellerStats, setSellerStats] = useState(EMPTY_STATS);
+    const [isRefreshingStats, setIsRefreshingStats] = useState(false);
+    const [garageSales, setGarageSales] = useState([]);
+    const [selectedGarageSaleId, setSelectedGarageSaleId] = useState('');
+    const [isLoadingGarageSales, setIsLoadingGarageSales] = useState(false);
+    const [salesList, setSalesList] = useState([]);
+    const [isLoadingSales, setIsLoadingSales] = useState(false);
+    const [showCashModal, setShowCashModal] = useState(false);
+    const [showSalesListModal, setShowSalesListModal] = useState(false);
+
+    const { data: allPromotions = [] } = useQuery({
+        queryKey: ['allPromotions'],
+        queryFn: async () => {
+            try {
+                return await firebase.firestore.collection('promotions').getDocs('sequence', 'asc');
+            } catch (error) {
+                console.error('Error fetching promotions:', error);
+                return [];
+            }
+        },
+        staleTime: 1000 * 60 * 5,
+    });
+    const promoIndex = usePromoRotation(allPromotions.length);
+
+    const refreshSellerStats = useCallback(async () => {
+        if (!user?.id) return;
+        setIsRefreshingStats(true);
+        try {
+            const statsDoc = await firebase.firestore.collection('sellerStats').doc(user.id).get();
+            setSellerStats(statsDoc.exists ? statsDoc.data() : EMPTY_STATS);
+        } catch (error) {
+            console.error('Error fetching seller stats:', error.message, error.code);
+            toast.error(`Failed to load seller stats: ${error.message}`);
+        } finally {
+            setIsRefreshingStats(false);
         }
     }, [user]);
+
+    const loadGarageSales = useCallback(async () => {
+        if (!user?.id) return;
+        setIsLoadingGarageSales(true);
+        try {
+            const sales = await firebase.firestore.collection('garageSales').queryDocs('user_id', '==', user.id);
+            setGarageSales(sales);
+            // Auto-select the first garage sale
+            setSelectedGarageSaleId((current) => current || sales[0]?.id || '');
+        } catch (error) {
+            console.error('Error loading garage sales:', error);
+        } finally {
+            setIsLoadingGarageSales(false);
+        }
+    }, [user]);
+
+    async function loadSalesList() {
+        if (!user?.id) {
+            toast.error('User not authenticated');
+            return;
+        }
+        setIsLoadingSales(true);
+        try {
+            // Firestore rules only allow reading your own sales.
+            const userSales = await firebase.firestore.collection('sales').queryDocs('sellerId', '==', user.id);
+            setSalesList(sortSalesNewestFirst(userSales));
+            setShowSalesListModal(true);
+        } catch (error) {
+            console.error('Error loading sales list:', error);
+            toast.error('Failed to load sales list: ' + error.message);
+        } finally {
+            setIsLoadingSales(false);
+        }
+    }
+
+    useEffect(() => {
+        refreshSellerStats();
+        loadGarageSales();
+    }, [refreshSellerStats, loadGarageSales]);
+
+    const cardPaymentsEnabled = user?.cardPaymentsEnabled === true && !!user?.stripeConnectId;
 
     if (loading) {
         return (
@@ -683,41 +182,40 @@ export default function UrbanPay() {
 
     return (
         <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen overflow-hidden pb-24 md:pb-0">
-                {/* Watermark */}
-                <style>{`
-                    @media (min-width: 768px) {
-                        .watermark-page {
-                            top: -90px !important;
-                        }
+            {/* Watermark */}
+            <style>{`
+                @media (min-width: 768px) {
+                    .watermark-page {
+                        top: -90px !important;
                     }
-                `}</style>
-                <img
-                    src="/Logo Webpage.png"
-                    alt="watermark"
-                    className="fixed left-0 pointer-events-none watermark-page"
-                    style={{
-                        width: '1200px',
-                        height: 'auto',
-                        clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
-                        top: '60px',
-                        zIndex: 1,
-                        opacity: 0.4,
-                        objectFit: 'contain'
-                    }}
-                />
+                }
+            `}</style>
+            <img
+                src="/Logo Webpage.png"
+                alt=""
+                className="fixed left-0 pointer-events-none watermark-page"
+                style={{
+                    width: '1200px',
+                    height: 'auto',
+                    clipPath: 'polygon(0 0, 46% 0, 46% 100%, 0 100%)',
+                    top: '60px',
+                    zIndex: 1,
+                    opacity: 0.4,
+                    objectFit: 'contain'
+                }}
+            />
 
-                {/* Advertising Ribbon */}
-                {allPromotions.length > 0 && (
-                    <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
-                        <p className="text-sm sm:text-base font-semibold">
-                            {allPromotions[promoIndex]?.message}
-                        </p>
-                    </div>
-                )}
-                
-                <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+            {/* Advertising Ribbon */}
+            {allPromotions.length > 0 && (
+                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                    <p className="text-sm sm:text-base font-semibold">
+                        {allPromotions[promoIndex]?.message}
+                    </p>
+                </div>
+            )}
+
+            <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
                 <div className="max-w-4xl mx-auto pt-2 md:pt-4 relative z-10">
-                    {/* Header */}
                     <div className="flex items-center gap-3 mb-8">
                         <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center flex-shrink-0">
                             <Smartphone className="w-6 h-6 text-white" />
@@ -730,356 +228,119 @@ export default function UrbanPay() {
 
                     <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 relative z-20 mt-8">
                         <div className="space-y-6">
-                        {/* Seller Stats */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-semibold text-slate-700">Your Earnings</h3>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => loadSalesList()}
-                                        disabled={isLoadingSales}
-                                        className="h-8 px-2"
-                                        title="View sales list"
-                                    >
-                                        <FileText className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={refreshSellerStats}
-                                        disabled={isRefreshingStats}
-                                        className="h-8 w-8 p-0"
-                                    >
-                                        <RefreshCw className={`w-4 h-4 ${isRefreshingStats ? 'animate-spin' : ''}`} />
-                                    </Button>
+                            {/* Seller Stats */}
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-sm font-semibold text-slate-700">Your Earnings</h3>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={loadSalesList}
+                                            disabled={isLoadingSales}
+                                            className="h-8 px-2"
+                                            title="View sales list"
+                                            aria-label="View sales list"
+                                        >
+                                            <FileText className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={refreshSellerStats}
+                                            disabled={isRefreshingStats}
+                                            className="h-8 w-8 p-0"
+                                            aria-label="Refresh earnings"
+                                        >
+                                            <RefreshCw className={`w-4 h-4 ${isRefreshingStats ? 'animate-spin' : ''}`} />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
+                                        <p className="text-xs text-slate-600 font-semibold">Total Earnings</p>
+                                        <p className="text-2xl font-bold text-[#1e3a5f] mt-1">{formatAud(sellerStats.totalEarnings)}</p>
+                                    </div>
+                                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
+                                        <p className="text-xs text-slate-600 font-semibold">Total Sales</p>
+                                        <p className="text-2xl font-bold text-green-600 mt-1">{typeof sellerStats.totalSales === 'number' ? sellerStats.totalSales : 0}</p>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
-                                    <p className="text-xs text-slate-600 font-semibold">Total Earnings</p>
-                                    <p className="text-2xl font-bold text-[#1e3a5f] mt-1">{formatAud(sellerStats.totalEarnings)}</p>
-                                </div>
-                                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
-                                    <p className="text-xs text-slate-600 font-semibold">Total Sales</p>
-                                    <p className="text-2xl font-bold text-green-600 mt-1">{typeof sellerStats.totalSales === 'number' ? sellerStats.totalSales : 0}</p>
-                                </div>
-                            </div>
-                        </div>
 
-
-
-                        {/* Cash Sale & Card Payments - Side by Side */}
-                        <div className="grid grid-cols-2 gap-4 sm:gap-6">
-                            {/* Cash Sale Box */}
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 sm:p-6 flex flex-col">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                                        <DollarSign className="w-5 h-5 text-amber-700" />
-                                    </div>
-                                    <h3 className="text-base sm:text-lg font-semibold text-amber-900">Cash Sale</h3>
-                                </div>
-                                <p className="text-xs sm:text-sm text-amber-800 mb-6 flex-1">Record cash payments from your customers right away.</p>
-                                <Button 
-                                    onClick={() => setShowCashModal(true)}
-                                    className="w-full bg-green-600 hover:bg-green-700 text-sm sm:text-base"
-                                >
-                                    Add Cash Sale
-                                </Button>
-                            </div>
-
-                            {/* Card Payments Box */}
-                            {cardPaymentsEnabled ? (
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6 flex flex-col">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                                            <CreditCard className="w-5 h-5 text-blue-700" />
-                                        </div>
-                                        <h3 className="text-base sm:text-lg font-semibold text-blue-900">Tap to Pay</h3>
-                                    </div>
-                                    <p className="text-xs sm:text-sm text-blue-800 mb-6 flex-1">Process card payments using your phone with Tap to Pay.</p>
-                                    <Button 
-                                        onClick={() => setShowCardModal(true)}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-sm sm:text-base"
-                                    >
-                                        Add Card Payment
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 sm:p-6 flex flex-col">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                                            <CreditCard className="w-5 h-5 text-purple-700" />
-                                        </div>
-                                        <h3 className="text-base sm:text-lg font-semibold text-purple-900">Tap to Pay</h3>
-                                    </div>
-                                    <p className="text-xs sm:text-sm text-purple-800 mb-6 flex-1">Enable card payments in your <Link to={createPageUrl('Profile')} className="underline font-semibold">Profile Settings</Link> to accept Tap to Pay.</p>
-                                    <Button 
-                                        disabled
-                                        variant="outline"
-                                        className="w-full opacity-50 cursor-not-allowed text-sm sm:text-base"
-                                    >
-                                        Disabled
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Cash Sale Modal */}
-                        <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Record Cash Sale</DialogTitle>
-                                    <DialogDescription>
-                                        Enter the amount and item description for this cash transaction.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Garage Sale</label>
-                                        <select 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                            value={selectedGarageSaleId}
-                                            onChange={(e) => setSelectedGarageSaleId(e.target.value)}
-                                            disabled={isRecordingCash || isLoadingGarageSales}
-                                        >
-                                            <option value="">-- Select a garage sale --</option>
-                                            {garageSales.map(sale => (
-                                                <option key={sale.id} value={sale.id}>
-                                                    {sale.title || 'Untitled'} {sale.date ? `(${formatDateAU(sale.date)})` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {garageSales.length === 0 && (
-                                            <p className="text-xs text-amber-600 mt-1">No garage sales found. Create one first.</p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Amount ($)</label>
-                                        <input 
-                                            type="number" 
-                                            placeholder="0.00" 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                            value={cashAmount}
-                                            onChange={(e) => setCashAmount(e.target.value)}
-                                            disabled={isRecordingCash}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Item Description</label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="e.g., Vintage lamp, Books bundle, Furniture" 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                            value={cashDescription}
-                                            onChange={(e) => setCashDescription(e.target.value)}
-                                            disabled={isRecordingCash}
-                                        />
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button 
-                                        variant="outline" 
-                                        onClick={() => setShowCashModal(false)}
-                                        disabled={isRecordingCash}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button 
-                                        onClick={() => {
-                                            recordCashSale();
-                                        }}
-                                        disabled={isRecordingCash}
-                                        className="bg-green-600 hover:bg-green-700"
-                                    >
-                                        {isRecordingCash ? 'Recording...' : 'Record Sale'}
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-
-                        {/* Card Payment Modal */}
-                        <Dialog open={showCardModal} onOpenChange={setShowCardModal}>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Process Card Payment</DialogTitle>
-                                    <DialogDescription>
-                                        Enter the amount and item description for this card transaction.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Garage Sale</label>
-                                        <select 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            value={selectedGarageSaleId}
-                                            onChange={(e) => setSelectedGarageSaleId(e.target.value)}
-                                            disabled={isProcessingCard || isLoadingGarageSales}
-                                        >
-                                            <option value="">-- Select a garage sale --</option>
-                                            {garageSales.map(sale => (
-                                                <option key={sale.id} value={sale.id}>
-                                                    {sale.title || 'Untitled'} {sale.date ? `(${formatDateAU(sale.date)})` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {garageSales.length === 0 && (
-                                            <p className="text-xs text-amber-600 mt-1">No garage sales found. Create one first.</p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Amount ($)</label>
-                                        <input 
-                                            type="number" 
-                                            placeholder="0.00" 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            value={cardAmount}
-                                            onChange={(e) => setCardAmount(e.target.value)}
-                                            disabled={isProcessingCard}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Item Description</label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="e.g., Vintage lamp, Books bundle, Furniture" 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            value={cardDescription}
-                                            onChange={(e) => setCardDescription(e.target.value)}
-                                            disabled={isProcessingCard}
-                                        />
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button 
-                                        variant="outline" 
-                                        onClick={() => setShowCardModal(false)}
-                                        disabled={isProcessingCard}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button 
-                                        onClick={() => {
-                                            recordCardPayment();
-                                        }}
-                                        disabled={isProcessingCard}
-                                        className="bg-blue-600 hover:bg-blue-700"
-                                    >
-                                        {isProcessingCard ? 'Processing...' : 'Process Payment'}
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-
-                        {/* Sales List Modal */}
-                        <Dialog open={showSalesListModal} onOpenChange={setShowSalesListModal}>
-                            <DialogContent className="max-w-2xl max-h-96 overflow-y-auto">
-                                <DialogHeader>
-                                    <DialogTitle>Sales History</DialogTitle>
-                                    <DialogDescription>
-                                        All your sales transactions
-                                    </DialogDescription>
-                                </DialogHeader>
-                                
-                                {salesList.length === 0 ? (
-                                    <div className="py-8 text-center">
-                                        <p className="text-slate-600">No sales recorded yet.</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
-                                            <div>
-                                                <p className="text-xs text-slate-600 font-semibold">Total Sales</p>
-                                                <p className="text-xl font-bold text-slate-900">{salesList.length}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-slate-600 font-semibold">Total Amount</p>
-                                                <p className="text-xl font-bold text-green-600">
-                                                    {formatAud(salesList.reduce((sum, sale) => sum + (sale.amount || 0), 0))}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        <div className="max-h-64 overflow-y-auto">
-                                            <table className="w-full text-sm">
-                                                <thead>
-                                                    <tr className="border-b border-slate-200 bg-slate-50">
-                                                        <th className="text-left py-2 px-3 font-semibold text-xs">Date</th>
-                                                        <th className="text-left py-2 px-3 font-semibold text-xs">Type</th>
-                                                        <th className="text-left py-2 px-3 font-semibold text-xs">Garage Sale</th>
-                                                        <th className="text-left py-2 px-3 font-semibold text-xs">Description</th>
-                                                        <th className="text-right py-2 px-3 font-semibold text-xs">Amount</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {salesList.map((sale, idx) => {
-                                                        // Convert Firestore Timestamp to Date
-                                                        let dateObj = sale.createdAt;
-                                                        if (sale.createdAt && typeof sale.createdAt.toDate === 'function') {
-                                                            dateObj = sale.createdAt.toDate();
-                                                        } else if (sale.createdAt instanceof Date) {
-                                                            dateObj = sale.createdAt;
-                                                        } else if (typeof sale.createdAt === 'string') {
-                                                            dateObj = new Date(sale.createdAt);
-                                                        }
-                                                        const date = formatDateTimeAU(dateObj, 'Unknown date');
-                                                        const type = sale.paymentMethod === 'cash' ? '💵 Cash' : '💳 Card';
-                                                        
-                                                        // Find garage sale name
-                                                        const garageSale = garageSales.find(gs => gs.id === sale.garageSaleId);
-                                                        const garageSaleName = garageSale?.title || 'Unknown Sale';
-                                                        
-                                                        return (
-                                                            <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
-                                                                <td className="py-2 px-3 text-xs text-slate-700 whitespace-nowrap">{date}</td>
-                                                                <td className="py-2 px-3">{type}</td>
-                                                                <td className="py-2 px-3 text-xs text-slate-700">{garageSaleName}</td>
-                                                                <td className="py-2 px-3 text-slate-700 max-w-xs truncate">{sale.description || '-'}</td>
-                                                                <td className="py-2 px-3 text-right font-semibold text-slate-900 whitespace-nowrap">{formatAud(sale.amount)}</td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <DialogFooter className="gap-2">
-                                    <Button 
-                                        variant="outline" 
-                                        onClick={() => setShowSalesListModal(false)}
-                                    >
-                                        Close
-                                    </Button>
-                                    {salesList.length > 0 && (
-                                        <Button 
-                                            onClick={printSalesList}
-                                            className="bg-blue-600 hover:bg-blue-700 gap-2"
-                                        >
-                                            <Printer className="w-4 h-4" />
-                                            Print Report
+                            <div className="grid grid-cols-2 gap-4 sm:gap-6">
+                                <PaymentOptionCard
+                                    tone="amber"
+                                    icon={DollarSign}
+                                    title="Cash Sale"
+                                    action={(
+                                        <Button onClick={() => setShowCashModal(true)} className="w-full bg-green-600 hover:bg-green-700 text-sm sm:text-base">
+                                            Add Cash Sale
                                         </Button>
                                     )}
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
+                                >
+                                    Record cash payments from your customers right away.
+                                </PaymentOptionCard>
 
-                        {/* Urban Pay Info */}
-                        <Alert className="border-blue-200 bg-blue-50">
-                            <Smartphone className="w-4 h-4 text-blue-600" />
-                            <AlertDescription className="text-sm text-blue-900">
-                                <strong>Urban Pay:</strong> Real-time payment processing with Tap to Pay. Accept contactless payments directly on your phone with live earnings tracking.
-                            </AlertDescription>
-                        </Alert>
-                        <div className="flex gap-2">
-                            <Link to={createPageUrl('Home')} className="flex-1">
-                                <Button variant="outline" className="w-full">
-                                    Back to Home
-                                </Button>
-                            </Link>
-                        </div>
+                                {cardPaymentsEnabled ? (
+                                    <PaymentOptionCard
+                                        tone="blue"
+                                        icon={CreditCard}
+                                        title="Tap to Pay"
+                                        action={(
+                                            <Button onClick={() => toast.info(CARD_PAYMENT_NOTICE)} className="w-full bg-blue-600 hover:bg-blue-700 text-sm sm:text-base">
+                                                Add Card Payment
+                                            </Button>
+                                        )}
+                                    >
+                                        Process card payments using your phone with Tap to Pay.
+                                    </PaymentOptionCard>
+                                ) : (
+                                    <PaymentOptionCard
+                                        tone="purple"
+                                        icon={CreditCard}
+                                        title="Tap to Pay"
+                                        action={(
+                                            <Button disabled variant="outline" className="w-full opacity-50 cursor-not-allowed text-sm sm:text-base">
+                                                Disabled
+                                            </Button>
+                                        )}
+                                    >
+                                        Enable card payments in your <Link to={createPageUrl('Profile')} className="underline font-semibold">Profile Settings</Link> to accept Tap to Pay.
+                                    </PaymentOptionCard>
+                                )}
+                            </div>
+
+                            <CashSaleDialog
+                                open={showCashModal}
+                                onOpenChange={setShowCashModal}
+                                garageSales={garageSales}
+                                garageSalesLoading={isLoadingGarageSales}
+                                garageSaleId={selectedGarageSaleId}
+                                onGarageSaleChange={setSelectedGarageSaleId}
+                                onRecorded={refreshSellerStats}
+                            />
+
+                            <SalesHistoryDialog
+                                open={showSalesListModal}
+                                onOpenChange={setShowSalesListModal}
+                                sales={salesList}
+                                garageSales={garageSales}
+                            />
+
+                            <Alert className="border-blue-200 bg-blue-50">
+                                <Smartphone className="w-4 h-4 text-blue-600" />
+                                <AlertDescription className="text-sm text-blue-900">
+                                    <strong>Urban Pay:</strong> Real-time payment processing with Tap to Pay. Accept contactless payments directly on your phone with live earnings tracking.
+                                </AlertDescription>
+                            </Alert>
+                            <div className="flex gap-2">
+                                <Link to={createPageUrl('Home')} className="flex-1">
+                                    <Button variant="outline" className="w-full">
+                                        Back to Home
+                                    </Button>
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 </div>

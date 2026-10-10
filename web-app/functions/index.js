@@ -3,7 +3,7 @@ const functions = require('firebase-functions/v1');
 const Stripe = require('stripe');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const sgMail = require('@sendgrid/mail');
 
 initializeApp();
@@ -12,7 +12,11 @@ const auth = getAuth();
 
 // Secrets live in Google Secret Manager (firebase functions:secrets:set NAME) and are only
 // exposed to the functions that declare them with withSecrets() below.
-const withSecrets = (...names) => functions.runWith({ secrets: names });
+//
+// App Check: callables refuse requests without a valid App Check token once this is true.
+// Turn on only after the website (and the mobile app, if it calls these) sends tokens.
+const ENFORCE_APP_CHECK = false;
+const withSecrets = (...names) => functions.runWith({ secrets: names, enforceAppCheck: ENFORCE_APP_CHECK });
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = new Stripe(stripeSecretKey || 'sk_missing');
@@ -28,6 +32,21 @@ const LISTING_FEE_CENTS = 1000;
 const APP_URL = process.env.APP_URL;
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'notification@urbangaragesales.com.au';
 const BUSINESS_FOOTER = 'Urban Garage Sale · urbangaragesales.com.au · support@urbangaragesales.com.au';
+
+// Per-user rate limit (fixed one-minute window counted in Firestore, so it holds across
+// instances). Counters expire through the TTL policy on rateLimits.expiresAt.
+async function rateLimit(uid, action, perMinute) {
+    const windowId = Math.floor(Date.now() / 60000);
+    const ref = db.collection('rateLimits').doc(`${action}_${uid}_${windowId}`);
+    const count = await db.runTransaction(async (tx) => {
+        const n = ((await tx.get(ref)).data()?.n ?? 0) + 1;
+        tx.set(ref, { n, expiresAt: Timestamp.fromMillis(Date.now() + 120000) });
+        return n;
+    });
+    if (count > perMinute) {
+        throw new functions.https.HttpsError('resource-exhausted', 'Too many requests. Please wait a minute and try again.');
+    }
+}
 
 function requireAuth(context) {
     if (!context.auth) {
@@ -108,6 +127,7 @@ async function recordListingPayment(session) {
 // Create Stripe Checkout for the listing fee
 exports.createStripeCheckout = withSecrets('STRIPE_SECRET_KEY').https.onCall(async (data, context) => {
     const { uid } = requireAuth(context);
+    await rateLimit(uid, 'createStripeCheckout', 10);
     const listing = await getOwnedListing(data?.saleId, uid);
     const listingData = listing.data();
 
@@ -155,6 +175,7 @@ exports.createStripeCheckout = withSecrets('STRIPE_SECRET_KEY').https.onCall(asy
 // Verify a completed Checkout session when the seller returns from Stripe
 exports.verifyStripePayment = withSecrets('STRIPE_SECRET_KEY').https.onCall(async (data, context) => {
     const { uid } = requireAuth(context);
+    await rateLimit(uid, 'verifyStripePayment', 20);
     const { sessionId, saleId } = data || {};
 
     if (typeof sessionId !== 'string' || !sessionId.startsWith('cs_') || typeof saleId !== 'string') {
@@ -205,7 +226,7 @@ exports.stripeWebhook = withSecrets('STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'
 
 // Send listing-approved email (admin only)
 exports.sendApprovalEmail = withSecrets('SENDGRID_API_KEY').https.onCall(async (data, context) => {
-    await requireAdmin(context);
+    await rateLimit(await requireAdmin(context), 'sendApprovalEmail', 60);
 
     const saleId = data?.saleId;
     if (typeof saleId !== 'string' || !saleId) {
@@ -245,7 +266,7 @@ exports.sendApprovalEmail = withSecrets('SENDGRID_API_KEY').https.onCall(async (
 
 // Email a reply to a contact-form message (admin only)
 exports.sendContactResponseEmail = withSecrets('SENDGRID_API_KEY').https.onCall(async (data, context) => {
-    await requireAdmin(context);
+    await rateLimit(await requireAdmin(context), 'sendContactResponseEmail', 30);
 
     const { userEmail, userName, originalMessage, responseMessage } = data || {};
     if (typeof userEmail !== 'string' || !userEmail.includes('@') || typeof responseMessage !== 'string' || !responseMessage.trim()) {
@@ -294,8 +315,9 @@ async function deleteQueryInBatches(query) {
 // Delete a user and their personal information (admin only).
 // Payment records are kept for tax record-keeping but de-identified (APP 11.2 allows
 // retention where required by law).
-exports.deleteUser = functions.https.onCall(async (data, context) => {
+exports.deleteUser = withSecrets().https.onCall(async (data, context) => {
     const adminUid = await requireAdmin(context);
+    await rateLimit(adminUid, 'deleteUser', 10);
     const userId = data?.userId;
 
     if (typeof userId !== 'string' || !userId) {
@@ -386,11 +408,31 @@ exports.reportClientError = functions.https.onRequest((req, res) => {
         return;
     }
 
+    const text = (value, max) => String(value ?? '').slice(0, max);
+
+    // Content-Security-Policy violation reports (report-uri and report-to). Logged as warnings,
+    // not errors: browser extensions trigger many of these, so they must not send alert emails.
+    const contentType = req.get('content-type') || '';
+    if (contentType.includes('csp-report') || contentType.includes('reports+json')) {
+        let reports = [];
+        try { reports = [].concat(JSON.parse(req.rawBody.toString('utf8'))); } catch { /* malformed */ }
+        for (const entry of reports.slice(0, 10)) {
+            const r = entry?.['csp-report'] || entry?.body || {};
+            functions.logger.warn('CSP violation', {
+                directive: text(r['effective-directive'] || r.effectiveDirective || r['violated-directive'], 100),
+                blocked: text(r['blocked-uri'] || r.blockedURL, 300),
+                page: text(r['document-uri'] || r.documentURL, 300),
+                source: text(r['source-file'] || r.sourceFile, 300),
+            });
+        }
+        res.status(204).send('');
+        return;
+    }
+
     let body = req.body;
     if (typeof body === 'string') {
         try { body = JSON.parse(body); } catch { body = {}; }
     }
-    const text = (value, max) => String(value ?? '').slice(0, max);
     const source = REPORT_SOURCES.includes(body?.source) ? body.source : 'unknown';
     const message = text(body?.stack, 4000) || text(body?.message, 500) || 'Unknown error';
 
@@ -432,4 +474,53 @@ exports.healthCheck = functions.pubsub.schedule('every 10 minutes').timeZone('Au
         logReportedError('health-check', error.stack);
     }
     return null;
+});
+
+// ---------------------------------------------------------------------------
+// Listings housekeeping and admin analytics
+// ---------------------------------------------------------------------------
+
+// Once a sale's end date has passed it is marked completed, so it drops out of public search
+// and admin counts. Runs just after midnight Melbourne time (end_date is a YYYY-MM-DD string).
+exports.expireListings = functions.pubsub.schedule('every day 00:15').timeZone('Australia/Melbourne').onRun(async () => {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne' }).format(new Date());
+    const query = db.collection('garageSales')
+        .where('status', 'in', ['active', 'pending_approval', 'pending_payment', 'draft'])
+        .where('end_date', '<', today);
+
+    // Updated listings leave the query, so each pass reads the next batch.
+    let expired = 0;
+    for (;;) {
+        const snap = await query.limit(400).get();
+        if (snap.empty) break;
+        const batch = db.batch();
+        snap.docs.forEach((doc) => batch.update(doc.ref, { status: 'completed' }));
+        await batch.commit();
+        expired += snap.size;
+    }
+    console.log(`✓ Marked ${expired} ended listing(s) completed`);
+    return null;
+});
+
+// Top 10 postcodes by number of listings (optionally within one state) for the admin
+// dashboard. Only the postcode field is read, and only counts are returned.
+exports.adminTopPostcodes = withSecrets().https.onCall(async (data, context) => {
+    const adminUid = await requireAdmin(context);
+    await rateLimit(adminUid, 'adminTopPostcodes', 20);
+    const state = typeof data?.state === 'string' && data.state ? data.state : null;
+
+    let query = db.collection('garageSales');
+    if (state) query = query.where('state', '==', state);
+    const snap = await query.select('postcode').get();
+
+    const counts = {};
+    snap.docs.forEach((doc) => {
+        const postcode = doc.get('postcode') || 'Unknown';
+        counts[postcode] = (counts[postcode] || 0) + 1;
+    });
+    const postcodes = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([name, count]) => ({ name, count }));
+    return { postcodes };
 });

@@ -4,6 +4,7 @@
 import Stripe from 'stripe';
 import { getFirestore } from '../_shared/firebase-admin.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
+import { rateLimit } from '../_shared/rateLimit.js';
 import {
   HttpError, readJsonBody, requireUser, requireSecondFactor, parseAudAmount, toCents, cleanText, sendError,
 } from '../_shared/http.js';
@@ -31,6 +32,7 @@ export default async (req, res) => {
 
   try {
     const { uid } = requireSecondFactor(await requireUser(req));
+    await rateLimit(uid, 'createPaymentIntent', 30);
     const body = await readJsonBody(req);
 
     const amount = parseAudAmount(body.amount);

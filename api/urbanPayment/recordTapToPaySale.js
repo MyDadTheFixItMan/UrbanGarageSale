@@ -5,6 +5,7 @@ import Stripe from 'stripe';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { HttpError, readJsonBody, requireUser, requireSecondFactor, cleanText, sendError } from '../_shared/http.js';
 import { writeSaleWithStats, assertOwnsGarageSale } from '../_shared/sales.js';
+import { rateLimit } from '../_shared/rateLimit.js';
 
 let stripe = null;
 function getStripe() {
@@ -29,6 +30,7 @@ export default async function handler(req, res) {
 
   try {
     const { uid } = requireSecondFactor(await requireUser(req));
+    await rateLimit(uid, 'recordTapToPaySale', 60);
     const body = await readJsonBody(req);
 
     const paymentIntentId = cleanText(body.paymentIntentId, 255);

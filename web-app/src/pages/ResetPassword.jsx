@@ -7,6 +7,7 @@ import { Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { passwordProblem, MIN_PASSWORD_LENGTH } from '@/lib/password';
 
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();
@@ -80,8 +81,9 @@ export default function ResetPassword() {
             setError('Please enter a new password');
             return;
         }
-        if (newPassword.length < 6) {
-            setError('Password must be at least 6 characters');
+        const newPasswordProblem = passwordProblem(newPassword);
+        if (newPasswordProblem) {
+            setError(newPasswordProblem);
             return;
         }
         if (newPassword !== confirmPassword) {
@@ -236,7 +238,7 @@ export default function ResetPassword() {
                                             placeholder="Enter new password"
                                             className="mt-1.5"
                                         />
-                                        <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
+                                        <p className="text-xs text-slate-500 mt-1">At least {MIN_PASSWORD_LENGTH} characters, with letters and numbers</p>
                                     </div>
 
                                     <div>

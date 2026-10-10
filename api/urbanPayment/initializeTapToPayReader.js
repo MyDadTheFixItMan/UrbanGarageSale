@@ -3,6 +3,7 @@
 import { getFirestore } from '../_shared/firebase-admin.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { HttpError, requireUser, requireSecondFactor, sendError } from '../_shared/http.js';
+import { rateLimit } from '../_shared/rateLimit.js';
 
 export default async function handler(req, res) {
   applyCors(res, getTrustedOrigin(req.headers.origin), 'POST, OPTIONS');
@@ -16,6 +17,7 @@ export default async function handler(req, res) {
 
   try {
     const { uid } = requireSecondFactor(await requireUser(req));
+    await rateLimit(uid, 'initializeTapToPayReader', 30);
     const user = (await getFirestore().collection('users').doc(uid).get()).data() || {};
 
     if (!user.stripeConnectId || user.cardPaymentsEnabled !== true) {

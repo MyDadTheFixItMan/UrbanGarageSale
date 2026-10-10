@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { getFirebaseAdmin } from '../_shared/firebase-admin.js';
 import { requireUser, requireSecondFactor, sendError } from '../_shared/http.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
+import { rateLimit } from '../_shared/rateLimit.js';
 
 
 export default async (req, res) => {
@@ -18,6 +19,7 @@ export default async (req, res) => {
 
   try {
     const { uid: userId } = requireSecondFactor(await requireUser(req));
+    await rateLimit(userId, 'initiateStripeOAuth', 5);
 
     // Get Stripe Client ID from environment
     const stripeClientId = process.env.STRIPE_CLIENT_ID;

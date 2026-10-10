@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { getFirebaseAdmin } from '../_shared/firebase-admin.js';
 import { requireUser, requireSecondFactor, sendError } from '../_shared/http.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
+import { rateLimit } from '../_shared/rateLimit.js';
 
 const getStripe = async () => {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -26,6 +27,7 @@ export default async (req, res) => {
 
   try {
     const { uid: userId } = requireSecondFactor(await requireUser(req));
+    await rateLimit(userId, 'handleStripeOAuthCallback', 10);
 
     // Get authorization code from request
     const body = req.body || {};

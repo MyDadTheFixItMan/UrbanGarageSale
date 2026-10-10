@@ -13,16 +13,23 @@ jobs:
   gitleaks:
     name: Secret Scan (Gitleaks)
     runs-on: ubuntu-latest
+    # Pull request scans read the PR's commit list through the GitHub API.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # gitleaks-action v2 takes no inputs (findings are redacted by default) and needs a token
+      # to scan pull requests. PR comments are off so the token can stay read-only.
       - name: Run Gitleaks
         uses: zricethezav/gitleaks-action@v2
-        with:
-          args: detect --source . --verbose --redact
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
 
   link-safety:
     name: Link Safety Check

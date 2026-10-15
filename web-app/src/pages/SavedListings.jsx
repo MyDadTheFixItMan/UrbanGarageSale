@@ -67,7 +67,7 @@ export default function SavedListings() {
     const { data: savedListings = [], isLoading: savedLoading } = useQuery({
         queryKey: ['savedListings', user?.email],
         queryFn: async () => {
-            const results = await firebase.entities.SavedListing.filter({ user_email: user?.email });
+            const results = await firebase.entities.SavedListing.mine();
             console.log('SavedListings.jsx: Fetched saved listings:', results);
             results.forEach(sl => {
                 console.log('SavedListings.jsx: Saved listing details -', sl);

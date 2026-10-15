@@ -147,23 +147,22 @@ export const firebaseEntities = {
     }
   },
 
+  // Saved listings belong to an account by user_id only, so they survive an email change.
   SavedListing: {
-    create: async (data) => {
+    create: async ({ garage_sale_id }) => {
       const user = requireUser();
       const docRef = await addDoc(collection(db, 'savedListings'), {
-        ...data,
-        user_email: user.email,
+        garage_sale_id,
         user_id: user.uid,
         created_at: new Date()
       });
-      return { id: docRef.id, ...data };
+      return { id: docRef.id, garage_sale_id };
     },
 
-    filter: async (filters = {}) => {
+    // The signed-in user's saved listings.
+    mine: async () => {
       const user = requireUser();
-      // Always filter by current user ID for security
-      const constraints = [where('user_id', '==', user.uid), ...equalityConstraints(filters, ['user_email', 'user_id'])];
-      return toRecords(await getDocs(query(collection(db, 'savedListings'), ...constraints)));
+      return toRecords(await getDocs(query(collection(db, 'savedListings'), where('user_id', '==', user.uid))));
     },
 
     delete: async (id) => {

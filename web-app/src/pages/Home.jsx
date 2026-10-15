@@ -82,7 +82,7 @@ export default function Home() {
         queryKey: ['savedListings', user?.email],
         queryFn: async () => {
             if (!user?.email) return [];
-            const results = await firebase.entities.SavedListing.filter({ user_email: user.email });
+            const results = await firebase.entities.SavedListing.mine();
             return results;
         },
         enabled: enableSavedListingsQuery && !!user?.email,
@@ -99,7 +99,7 @@ export default function Home() {
     const saveFavoriteMutation = useMutation({
         mutationFn: async (saleId) => {
             // Re-fetch current state at mutation time, not from closure
-            const currentSavedListings = await firebase.entities.SavedListing.filter({ user_email: user?.email });
+            const currentSavedListings = await firebase.entities.SavedListing.mine();
             const currentIsSaved = currentSavedListings.some(s => s.garage_sale_id === saleId);
             
             console.log('Save mutation called. currentIsSaved:', currentIsSaved, 'saleId:', saleId);
@@ -114,7 +114,6 @@ export default function Home() {
                 console.log('Creating saved listing for:', saleId);
                 await firebase.entities.SavedListing.create({
                     garage_sale_id: saleId,
-                    user_email: user.email,
                 });
                 setLastWasSaved(false);
             }

@@ -81,6 +81,8 @@ deploying rule changes.
 - Identity Platform enabled, **SMS multi-factor authentication** on.
 - SMS region policy: allow **Australia** only.
 - Authorized domains include `urbangaragesales.com.au` and `www.urbangaragesales.com.au`.
+- Password policy: at least 12 characters with a number, enforced by Firebase as well as the
+  website. Set it with `scripts/set-password-policy.mjs --apply` (see Admin scripts).
 
 ## Backups and monitoring
 
@@ -101,6 +103,8 @@ Run with a service account key stored **outside** the project folder:
 ```bash
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json node scripts/sync-2fa-claims.mjs          # dry run
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json node scripts/sync-2fa-claims.mjs --apply
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json node scripts/set-password-policy.mjs          # show policy
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json node scripts/set-password-policy.mjs --apply  # enforce it
 ```
 
 `scripts/cleanup-past-listings.js` and `scripts/cleanup-orphaned-saved-listings.js` read the

@@ -12,7 +12,7 @@ class DefaultFirebaseOptions {
       projectId: 'urbangaragesale',
       authDomain: 'urbangaragesale.firebaseapp.com',
       databaseURL: 'https://urbangaragesale.firebaseio.com',
-      storageBucket: 'urbangaragesale.appspot.com',
+      storageBucket: 'urbangaragesale.firebasestorage.app',
     );
   }
 }

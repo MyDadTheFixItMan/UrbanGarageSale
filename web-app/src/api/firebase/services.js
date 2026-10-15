@@ -13,6 +13,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
 import { db, storage, functions } from './app';
+import { geocode } from '@/lib/geocode';
 
 const toRecords = (snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
@@ -81,33 +82,18 @@ export const firebaseFirestore = {
   }),
 };
 
-// Coordinates for a suburb/postcode using the Google Geocoding API; null if not found.
+// Coordinates for a suburb/postcode using Google Maps geocoding; null if not found.
 export async function getSuburbCoordinates(suburbOrPostcode) {
   if (!suburbOrPostcode) return null;
-  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
-
-  if (!googleMapsApiKey) {
-    console.warn('⚠️ Missing VITE_GOOGLE_PLACES_API_KEY - geocoding lookup skipped');
-    return null;
-  }
 
   try {
-    const searchTerm = suburbOrPostcode.trim();
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(searchTerm)}&country=AU&key=${googleMapsApiKey}`
-    );
-    if (!response.ok) {
-      throw new Error(`Geocoding API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const result = data.results?.[0];
+    const result = await geocode(suburbOrPostcode.trim(), { country: 'AU' });
     if (!result) return null;
 
-    const locality = [...(result.address_components || [])].reverse().find((c) => c.types.includes('locality'));
+    const locality = [...result.components].reverse().find((c) => c.types.includes('locality'));
     return {
-      lat: result.geometry.location.lat,
-      lng: result.geometry.location.lng,
+      lat: result.lat,
+      lng: result.lng,
       name: locality?.long_name || suburbOrPostcode
     };
   } catch (error) {

@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { addDays, format } from 'date-fns';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import GooglePlacesAutocomplete from '../components/GooglePlacesAutocomplete';
+import { geocode } from '@/lib/geocode';
 
 export default function CreateListing() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -102,19 +103,6 @@ export default function CreateListing() {
         }, 5000);
         return () => clearInterval(interval);
     }, [allPromotions.length]);
-
-    useEffect(() => {
-        // Google Maps is already loaded in index.html
-        // Just verify it's available, if not wait for it
-        if (!window.google?.maps?.Geocoder) {
-            const checkForGoogle = setInterval(() => {
-                if (window.google?.maps?.Geocoder) {
-                    clearInterval(checkForGoogle);
-                }
-            }, 100);
-            setTimeout(() => clearInterval(checkForGoogle), 10000);
-        }
-    }, []);
 
     useEffect(() => {
         const init = async () => {
@@ -304,30 +292,8 @@ export default function CreateListing() {
 
     const geocodeAddress = async (address) => {
         try {
-            const googleMapsApiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
-            if (!googleMapsApiKey) {
-                throw new Error('Missing VITE_GOOGLE_PLACES_API_KEY');
-            }
-
-            // Use REST API instead of legacy Geocoder library
-            // This uses the newer Geocoding API endpoint
-            const response = await fetch(
-                `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${googleMapsApiKey}&region=au`
-            );
-            
-            if (!response.ok) {
-                throw new Error(`Geocoding API error: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (data.results && data.results.length > 0) {
-                const location = data.results[0].geometry.location;
-                return { 
-                    lat: location.lat, 
-                    lng: location.lng 
-                };
-            }
+            const result = await geocode(address);
+            if (result) return { lat: result.lat, lng: result.lng };
             throw new Error('No coordinates returned');
         } catch (error) {
             console.error('Geocoding error:', error);

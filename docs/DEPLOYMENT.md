@@ -233,8 +233,8 @@ same credentials from `.env` (`FIREBASE_SERVICE_ACCOUNT_JSON`).
 
 Build with your publishable key (and, for a non-production API, its address):
 `flutter build appbundle --dart-define=STRIPE_PUBLISHABLE_KEY=pk_live_… [--dart-define=API_BASE_URL=https://…/api]`
-(Android) or `flutter build ipa --dart-define=…` (iOS). See `docs/TAP_TO_PAY_SETUP.md` and
-`docs/STRIPE_TERMINAL_SETUP.md`.
+(Android) or `flutter build ipa --dart-define=…` (iOS). Needs Flutter 3.44 or later. Tap to Pay setup, testing and the iPhone entitlement:
+`docs/TAP_TO_PAY_SETUP.md`.
 
 Process documents in this folder (testing strategy, risk assessment, compliance checklist and
 so on) predate the October 2026 security changes; check details against this guide.

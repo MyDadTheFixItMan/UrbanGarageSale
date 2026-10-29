@@ -17,7 +17,6 @@ class _UrbanPayHomeState extends State<UrbanPayHome> {
   int _selectedIndex = 0;
   bool _stripeConnected = false;
   bool _loadingStripeStatus = true;
-  String? _stripeConnectId;
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
 
@@ -35,13 +34,12 @@ class _UrbanPayHomeState extends State<UrbanPayHome> {
         return;
       }
 
+      // Card payments are ready only once Stripe has finished checking the seller's account.
       final userDoc = await _firestore.collection('users').doc(userId).get();
-      final stripeId = userDoc.data()?['stripeConnectId'];
-      final hasStripe = stripeId != null;
+      final cardPaymentsEnabled = userDoc.data()?['cardPaymentsEnabled'] == true;
 
       setState(() {
-        _stripeConnected = hasStripe;
-        _stripeConnectId = stripeId;
+        _stripeConnected = cardPaymentsEnabled;
         _loadingStripeStatus = false;
       });
     } catch (e) {
@@ -53,7 +51,7 @@ class _UrbanPayHomeState extends State<UrbanPayHome> {
   Widget build(BuildContext context) {
     final List<Widget> screens = [
       const UrbanPayDashboard(),
-      TapToPayReader(stripeConnectId: _stripeConnectId),
+      const TapToPayReader(),
     ];
 
     return Scaffold(

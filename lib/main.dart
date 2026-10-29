@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'screens/sign_in_screen.dart';
 import 'screens/urban_pay_home.dart';
 import 'firebase_options.dart';
-import 'services/stripe_terminal_service.dart';
 
 const stripePublishableKey = String.fromEnvironment('STRIPE_PUBLISHABLE_KEY', defaultValue: '');
 
@@ -26,16 +25,8 @@ void main() async {
     throw StateError('Missing STRIPE_PUBLISHABLE_KEY (set via --dart-define).');
   }
   Stripe.publishableKey = stripePublishableKey;
-
-  // Initialize Stripe Terminal
-  try {
-    await StripeTerminalService.initializeTerminal(
-      stripePublishableKey,
-    );
-    debugPrint('✓ Stripe Terminal ready');
-  } catch (e) {
-    debugPrint('⚠️ Terminal init: $e');
-  }
+  // Stripe Terminal (Tap to Pay) starts when the seller first opens the Tap to Pay tab, after
+  // asking for location permission (services/tap_to_pay_service.dart).
 
   runApp(const MyApp());
 }

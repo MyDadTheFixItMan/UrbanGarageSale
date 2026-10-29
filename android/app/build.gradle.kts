@@ -24,7 +24,8 @@ android {
         applicationId = "com.example.urbangarageSale"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Stripe Terminal (Tap to Pay on Android) needs Android 8.0 or later.
+        minSdk = maxOf(flutter.minSdkVersion, 26)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -37,10 +38,6 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-}
-dependencies {
-    // Stripe Terminal for payment readers
-    implementation("com.stripe:stripeterminal:3.2.0")
 }
 flutter {
     source = "../.."

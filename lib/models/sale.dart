@@ -139,3 +139,43 @@ class PaymentIntentResponse {
     );
   }
 }
+
+/// What the phone needs to connect as a Tap to Pay reader for one garage sale.
+class TapToPaySetup {
+  final String locationId;
+  final String onBehalfOf;
+  final String merchantDisplayName;
+
+  TapToPaySetup({
+    required this.locationId,
+    required this.onBehalfOf,
+    required this.merchantDisplayName,
+  });
+
+  factory TapToPaySetup.fromJson(Map<String, dynamic> json) {
+    return TapToPaySetup(
+      locationId: json['locationId'] as String,
+      onBehalfOf: json['onBehalfOf'] as String,
+      merchantDisplayName: json['merchantDisplayName'] as String? ?? 'Garage sale',
+    );
+  }
+}
+
+/// One of the seller's garage sales, as shown in the garage sale picker.
+class GarageSaleOption {
+  final String id;
+  final String title;
+  final String suburb;
+
+  GarageSaleOption({required this.id, required this.title, required this.suburb});
+
+  factory GarageSaleOption.fromFirestore(String id, Map<String, dynamic> data) {
+    return GarageSaleOption(
+      id: id,
+      title: data['title'] as String? ?? 'Garage sale',
+      suburb: data['suburb'] as String? ?? '',
+    );
+  }
+
+  String get label => suburb.isEmpty ? title : '$title ($suburb)';
+}

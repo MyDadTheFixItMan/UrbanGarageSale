@@ -52,6 +52,8 @@
 	<string>We need Bluetooth to connect to payment readers and accept card payments</string>
 	<key>NSBluetoothCentralUsageDescription</key>
 	<string>We need Bluetooth to connect to payment readers</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Stripe checks where card payments are taken, so Tap to Pay needs your location while you take a payment.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>We need local network access to connect to payment readers</string>
 	<key>NSBonjourServices</key>

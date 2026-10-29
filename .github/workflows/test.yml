@@ -14,6 +14,9 @@ on:
       - 'storage.rules'
       - 'firebase.json'
       - 'package*.json'
+      - 'lib/**'
+      - 'test/**'
+      - 'pubspec.*'
       - '.github/workflows/test.yml'
   pull_request:
     branches: [main, develop]
@@ -77,6 +80,24 @@ jobs:
         run: |
           npm ci
           npm test
+
+  mobile-app:
+    # Urban Pay Flutter app: static analysis and unit/widget tests (no device needed).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter analyze
+
+      - run: flutter test
 
   security-rules:
     # Every allow/deny in firestore.rules and storage.rules, against the Firebase emulators.

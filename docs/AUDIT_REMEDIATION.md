@@ -102,7 +102,7 @@ reviewed again. Every page was loaded logged out at desktop and phone widths (Ed
 | Buttons | Favourites toast could say "Saved" after removing (state read before it updated); logic copied in Home and ListingDetails | Done: `lib/useToggleSaved.js`, with tests |
 | Content | About, Contact, Privacy and Terms read promotions in the wrong shape, so admin promotions never showed there | Done: `lib/usePromotions.js` shared by all pages |
 | Tidy | Debug logging in SavedListings; "favorite" spelling | Done |
-| Mobile app | Card reader / Tap to Pay native code (`StripeTerminalManager.kt`, `StripeTerminalPlugin.swift`) is never registered, so those screens fail with MissingPluginException. The Android connection-token call also runs on the main thread | **Open:** needs a mobile developer with a test device. Payment Sheet and cash sales are unaffected |
+| Mobile app | Card reader / Tap to Pay native code was never registered, so those screens failed | Done (29 Oct): replaced with the `mek_stripe_terminal` plugin (Stripe Terminal SDK 5.6); the phone is the reader; one Terminal location per garage sale (`initializeTapToPayReader`). **Owner:** iPhone entitlement and a real-card test, see `docs/TAP_TO_PAY_SETUP.md` |
 | Mobile app | Android `applicationId` is `com.example.urbangarageSale` and release builds are signed with debug keys | **Open:** both must change before a Play Store release |
 | Storage | Any signed-in user can upload photos (10 MB each, no count limit) without 2FA | **Open (low):** consider requiring the 2FA claim in `storage.rules`, as listing creation does |
 | Not run locally | Rules tests (need Java) and `flutter analyze` (local Flutter is older than the app needs) | Run in CI / after upgrading Flutter |

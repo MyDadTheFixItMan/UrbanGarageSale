@@ -1,24 +1,14 @@
 // Create a card PaymentIntent for an Urban Pay sale.
 // Funds are routed to the seller's connected Stripe account (destination charge),
 // so the platform never holds the seller's sale proceeds.
-import Stripe from 'stripe';
+import { getStripe } from '../_shared/stripe.js';
 import { getFirestore } from '../_shared/firebase-admin.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { rateLimit } from '../_shared/rateLimit.js';
+import { assertOwnsGarageSale } from '../_shared/sales.js';
 import {
   HttpError, readJsonBody, requireUser, requireSecondFactor, parseAudAmount, toCents, cleanText, sendError,
 } from '../_shared/http.js';
-
-let stripe = null;
-function getStripe() {
-  if (!stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error('STRIPE_SECRET_KEY not configured');
-    }
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  }
-  return stripe;
-}
 
 export default async (req, res) => {
   applyCors(res, getTrustedOrigin(req.headers.origin), 'POST, OPTIONS');
@@ -38,6 +28,9 @@ export default async (req, res) => {
     const amount = parseAudAmount(body.amount);
     const description = cleanText(body.description, 100, 'Urban Pay Sale');
     const garageSaleId = cleanText(body.garageSaleId, 128);
+    // Checked before charging: recordTapToPaySale refuses sales for someone else's garage sale,
+    // so an unchecked ID would take the customer's money and then fail to record the sale.
+    await assertOwnsGarageSale(uid, garageSaleId);
     // Card-present (Terminal / Tap to Pay) intents need an explicit payment method type.
     const cardPresent = body.channel === 'terminal' || body.channel === 'tap_to_pay';
 

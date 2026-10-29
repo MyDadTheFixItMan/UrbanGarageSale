@@ -30,6 +30,7 @@ export function BasicInfoSection({ form, onChange }) {
                     <Label htmlFor="title">Title *</Label>
                     <Input
                         id="title"
+                        maxLength={150}
                         placeholder="e.g., Moving Sale - Everything Must Go!"
                         value={form.title}
                         onChange={(e) => onChange('title', e.target.value)}
@@ -41,6 +42,7 @@ export function BasicInfoSection({ form, onChange }) {
                     <Label htmlFor="description">Description</Label>
                     <Textarea
                         id="description"
+                        maxLength={5000}
                         placeholder="Tell buyers what items you'll be selling..."
                         value={form.description}
                         onChange={(e) => onChange('description', e.target.value)}

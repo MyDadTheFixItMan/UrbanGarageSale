@@ -65,11 +65,12 @@ export function EditProfileDialog({ user, onSaved }) {
                         <Input id="profile-name" value={form.full_name} onChange={(e) => set('full_name')(e.target.value)} className="mt-1.5" />
                     </div>
                     <div>
-                        <Label>Address</Label>
+                        <Label htmlFor="profile-address">Address</Label>
                         <div className="text-sm text-slate-600 mb-2 p-2 bg-slate-50 rounded border border-slate-200">
                             Saved: {form.address || 'Not set'}
                         </div>
                         <GooglePlacesAutocomplete
+                            id="profile-address"
                             value={form.address}
                             onChange={set('address')}
                             onSelect={(place) => {

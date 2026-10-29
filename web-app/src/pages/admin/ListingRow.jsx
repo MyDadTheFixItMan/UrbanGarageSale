@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { createPageUrl } from '../../utils';
 import { AU_DATE } from '@/lib/format';
+import { coverImage } from '@/lib/listings';
 
 const statusConfig = {
     draft: { label: 'Draft', color: 'bg-slate-100 text-slate-700' },
@@ -47,9 +48,9 @@ export default function ListingRow({ listing, overrideStatus = null, onApprove, 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-4 bg-white rounded-xl border hover:border-slate-300">
             <div className="flex items-start md:items-center gap-4 min-w-0 flex-1">
                 <div className="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
-                    {listing.photos && listing.photos.length > 0 ? (
+                    {coverImage(listing) ? (
                         <img
-                            src={listing.photos[0]}
+                            src={coverImage(listing)}
                             alt={listing.title}
                             className="w-full h-full object-cover"
                         />
@@ -79,7 +80,7 @@ export default function ListingRow({ listing, overrideStatus = null, onApprove, 
                             size="sm"
                             variant="outline"
                             className="text-green-600 border-green-200 transition-none"
-                            onMouseDown={handleApprove}
+                            onClick={handleApprove}
                             aria-label="Approve listing"
                         >
                             <Check className="w-4 h-4" />
@@ -88,7 +89,7 @@ export default function ListingRow({ listing, overrideStatus = null, onApprove, 
                             size="sm"
                             variant="outline"
                             className="text-red-600 border-red-200 transition-none"
-                            onMouseDown={handleReject}
+                            onClick={handleReject}
                             aria-label="Reject listing"
                         >
                             <X className="w-4 h-4" />
@@ -100,13 +101,13 @@ export default function ListingRow({ listing, overrideStatus = null, onApprove, 
                         size="sm"
                         variant="outline"
                         className="text-red-600 border-red-200 transition-none"
-                        onMouseDown={stopAnd(() => onDelete(listing))}
+                        onClick={stopAnd(() => onDelete(listing))}
                         aria-label="Delete listing"
                     >
                         <Trash2 className="w-4 h-4" />
                     </Button>
                 )}
-                <Button size="sm" variant="ghost" className="transition-none" onMouseDown={handleView} aria-label="View listing details">
+                <Button size="sm" variant="ghost" className="transition-none" onClick={handleView} aria-label="View listing details">
                     <Eye className="w-4 h-4" />
                 </Button>
             </div>

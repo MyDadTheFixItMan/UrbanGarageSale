@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { firebase } from '@/api/firebaseClient';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { usePromotions } from '@/lib/usePromotions';
 import { createPageUrl } from '../utils';
 import { formatAud } from '@/lib/format';
 import { LISTING_FEE_AUD } from '@/lib/pricing';
@@ -58,18 +59,7 @@ export default function CreateListing() {
     const [promoIndex, setPromoIndex] = useState(0);
     const [formData, setFormData] = useState(EMPTY_FORM);
 
-    const { data: allPromotions = [] } = useQuery({
-        queryKey: ['allPromotions'],
-        queryFn: async () => {
-            try {
-                return await firebase.firestore.collection('promotions').getDocs('sequence', 'asc');
-            } catch (error) {
-                console.error('Error fetching promotions:', error);
-                return [];
-            }
-        },
-        staleTime: 1000 * 60 * 5,
-    });
+    const allPromotions = usePromotions();
 
     // The free listing period. Firestore rules make the final decision on whether a listing is free.
     const { data: appSettings = {} } = useQuery({
@@ -141,7 +131,7 @@ export default function CreateListing() {
     };
 
     const handlePhotosChange = (update) => {
-        setFormData(prev => ({ ...prev, photos: update(prev.photos) }));
+        setFormData(prev => ({ ...prev, ...update({ photos: prev.photos, thumbnails: prev.thumbnails }) }));
     };
 
     const createMutation = useMutation({

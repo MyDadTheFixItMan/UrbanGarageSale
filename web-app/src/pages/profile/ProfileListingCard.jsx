@@ -19,6 +19,7 @@ import { formatAud, AU_DATE } from '@/lib/format';
 import { LISTING_FEE_AUD } from '@/lib/pricing';
 import { createPageUrl } from '../../utils';
 import { listingActions } from './profileListings';
+import { coverImage } from '@/lib/listings';
 
 const statusConfig = {
     draft: { label: 'Draft', color: 'bg-slate-100 text-slate-700' },
@@ -35,8 +36,8 @@ export default function ProfileListingCard({ listing, onDelete, onPrint }) {
     return (
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden hover:shadow-lg transition-all duration-300">
             <div className="w-full aspect-video bg-slate-100 overflow-hidden rounded-t-lg">
-                {listing.photos && listing.photos.length > 0 ? (
-                    <img src={listing.photos[0]} alt={listing.title} className="w-full h-full object-cover" />
+                {coverImage(listing) ? (
+                    <img src={coverImage(listing)} alt={listing.title} className="w-full h-full object-cover" />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
                         <Tag className="w-12 h-12 text-slate-400" />

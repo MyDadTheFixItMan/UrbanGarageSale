@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { firebase } from '@/api/firebaseClient';
-import { useQuery } from '@tanstack/react-query';
+import { usePromotions } from '@/lib/usePromotions';
 
 export default function About() {
     const [promoIndex, setPromoIndex] = useState(0);
@@ -9,22 +8,7 @@ export default function About() {
         window.scrollTo(0, 0);
     }, []);
 
-    const { data: allPromotions = [] } = useQuery({
-        queryKey: ['allPromotions'],
-        queryFn: async () => {
-            try {
-                const snapshot = await firebase.firestore.collection('promotions').getDocs();
-                return snapshot.docs.map((doc) => {
-                    const data = doc.data();
-                    return { id: doc.id, message: data.message || '', ...data };
-                });
-            } catch (error) {
-                console.error('Error fetching promotions:', error);
-                return [];
-            }
-        },
-        staleTime: 1000 * 60 * 5, // 5 minutes
-    });
+    const allPromotions = usePromotions();
 
     // Add default promotion if none exist
     const promotions = allPromotions.length > 0 ? allPromotions : [

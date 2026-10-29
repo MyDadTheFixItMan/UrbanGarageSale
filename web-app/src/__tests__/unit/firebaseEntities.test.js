@@ -131,7 +131,7 @@ describe('GarageSale writes', () => {
 
   it('refuses to create a listing when signed out', async () => {
     auth.currentUser = null;
-    await expect(firebaseEntities.GarageSale.create({ title: 'Sale' })).rejects.toThrow('Not authenticated');
+    await expect(firebaseEntities.GarageSale.create({ title: 'Sale' })).rejects.toMatchObject({ code: 'auth/no-current-user' });
     expect(firestore.addDoc).not.toHaveBeenCalled();
   });
 

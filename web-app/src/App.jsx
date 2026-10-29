@@ -4,7 +4,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import NavigationTracker from '@/lib/NavigationTracker'
 import ErrorBoundary from '@/lib/ErrorBoundary'
 import { pagesConfig } from './pages.config'
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
@@ -17,39 +17,43 @@ const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
   : <>{children}</>;
+const Spinner = () => (
+  <div className="fixed inset-0 flex items-center justify-center" role="status" aria-label="Loading">
+    <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+  </div>
+);
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings } = useAuth();
 
   // Show loading spinner while checking auth
   if (isLoadingPublicSettings || isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-      </div>
-    );
+    return <Spinner />;
   }
 
-  // Render the main app
+  // Render the main app. Pages other than Home are loaded on first visit (pages.config.js).
   return (
-    <Routes>
-      <Route path="/" element={
-        <LayoutWrapper currentPageName={mainPageKey}>
-          <MainPage />
-        </LayoutWrapper>
-      } />
-      {Object.entries(Pages).map(([path, Page]) => (
-        <Route
-          key={path}
-          path={`/${path}`}
-          element={
-            <LayoutWrapper currentPageName={path}>
-              <Page />
-            </LayoutWrapper>
-          }
-        />
-      ))}
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+    <Suspense fallback={<Spinner />}>
+      <Routes>
+        <Route path="/" element={
+          <LayoutWrapper currentPageName={mainPageKey}>
+            <MainPage />
+          </LayoutWrapper>
+        } />
+        {Object.entries(Pages).map(([path, Page]) => (
+          <Route
+            key={path}
+            path={`/${path}`}
+            element={
+              <LayoutWrapper currentPageName={path}>
+                <Page />
+              </LayoutWrapper>
+            }
+          />
+        ))}
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </Suspense>
   );
 };
 
@@ -63,6 +67,9 @@ function StripeOAuthReturn() {
     const params = new URLSearchParams(location.search);
     if (location.pathname === '/' && params.get('state') && (params.get('code') || params.get('error'))) {
       navigate('/Profile' + location.search, { replace: true });
+    } else if (location.pathname === '/' && params.get('page') === 'ListingDetails' && params.get('id')) {
+      // QR codes on posters printed before Nov 2026 point at /?page=ListingDetails&id=…
+      navigate(`/ListingDetails?id=${encodeURIComponent(params.get('id'))}`, { replace: true });
     }
   }, [location, navigate]);
   return null;
@@ -71,7 +78,7 @@ function StripeOAuthReturn() {
 function App() {
   return (
     <ErrorBoundary>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Router>
         <AuthProvider>
           <QueryClientProvider client={queryClientInstance}>
             <NavigationTracker />

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { firebase } from '@/api/firebaseClient';
-import { useQuery } from '@tanstack/react-query';
+import { usePromotions } from '@/lib/usePromotions';
+import { BUSINESS_ABN } from '@/lib/business';
 
 export default function Terms() {
     const [promoIndex, setPromoIndex] = useState(0);
@@ -9,22 +9,7 @@ export default function Terms() {
         window.scrollTo(0, 0);
     }, []);
 
-    const { data: allPromotions = [] } = useQuery({
-        queryKey: ['allPromotions'],
-        queryFn: async () => {
-            try {
-                const snapshot = await firebase.firestore.collection('promotions').getDocs();
-                return snapshot.docs.map((doc) => {
-                    const data = doc.data();
-                    return { id: doc.id, message: data.message || '', ...data };
-                });
-            } catch (error) {
-                console.error('Error fetching promotions:', error);
-                return [];
-            }
-        },
-        staleTime: 1000 * 60 * 5, // 5 minutes
-    });
+    const allPromotions = usePromotions();
 
     // Add default promotion if none exist
     const promotions = allPromotions.length > 0 ? allPromotions : [
@@ -141,9 +126,10 @@ export default function Terms() {
                                 <h3 className="font-bold text-[#001f3f] mt-6 mb-2">7. Fees and Payments</h3>
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>Publishing a listing costs the fee shown before you pay (currently A$10.00). All prices are in Australian dollars.</li>
-                                    <li>Listing fees are processed by Stripe. Listings are reviewed before going live; if we reject your listing we will refund the fee.</li>
+                                    <li>Listing fees are processed by Stripe. Listings are reviewed before going live; if we reject your listing we refund the fee automatically to the card you paid with. Refunds usually appear within 5–10 business days.</li>
                                     <li>Urban Pay card payments are processed by Stripe and paid to the seller's own Stripe account. Stripe's fees and terms apply to those payments.</li>
                                     <li>Nothing in this section limits any refund or remedy you are entitled to under the Australian Consumer Law.</li>
+                                    {BUSINESS_ABN && <li>Urban Garage Sale ABN: {BUSINESS_ABN}.</li>}
                                 </ul>
                             </div>
 

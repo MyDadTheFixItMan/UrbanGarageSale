@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useTransition } from 'react';
-import { firebase } from '@/api/firebaseClient';
+import { firebase, getSuburbCoordinates } from '@/api/firebaseClient';
 import { Map, List, Tag, Search, Loader2, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { toast } from 'sonner';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import SaleMap from '../components/map/SaleMap';
 import { formatDateAU } from '@/lib/format';
+import { coverImage } from '@/lib/listings';
+import { useToggleSaved } from '@/lib/useToggleSaved';
 
 export default function Home() {
-    const queryClient = useQueryClient();
     const [, startTransition] = useTransition();
     const [viewMode, setViewMode] = useState('list');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -94,45 +95,7 @@ export default function Home() {
         refetchOnReconnect: false,
     });
 
-    const [lastWasSaved, setLastWasSaved] = useState(false);
-
-    const saveFavoriteMutation = useMutation({
-        mutationFn: async (saleId) => {
-            // Re-fetch current state at mutation time, not from closure
-            const currentSavedListings = await firebase.entities.SavedListing.mine();
-            const currentIsSaved = currentSavedListings.some(s => s.garage_sale_id === saleId);
-            
-            console.log('Save mutation called. currentIsSaved:', currentIsSaved, 'saleId:', saleId);
-            
-            if (currentIsSaved) {
-                const saved = currentSavedListings.find(s => s.garage_sale_id === saleId);
-                console.log('Deleting saved listing:', saved);
-                if (!saved) throw new Error('Saved listing not found');
-                await firebase.entities.SavedListing.delete(saved.id);
-                setLastWasSaved(true);
-            } else {
-                console.log('Creating saved listing for:', saleId);
-                await firebase.entities.SavedListing.create({
-                    garage_sale_id: saleId,
-                });
-                setLastWasSaved(false);
-            }
-        },
-        onSuccess: () => {
-            console.log('Save mutation succeeded, invalidating query');
-            // Defer the query update to avoid blocking the message handler
-            startTransition(() => {
-                setTimeout(() => {
-                    queryClient.invalidateQueries({ queryKey: ['savedListings', user?.email] });
-                }, 0);
-                toast.success(lastWasSaved ? 'Removed from favourites' : 'Saved to favourites');
-            });
-        },
-        onError: (error) => {
-            console.error('Save mutation failed:', error);
-            toast.error('Failed to update favorite');
-        },
-    });
+    const saveFavoriteMutation = useToggleSaved();
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -249,7 +212,7 @@ export default function Home() {
                 if (filters.postcode) {
                     // Use the suburb lookup function (which now supports async geocoding)
                     try {
-                        const suburbData = await window.firebaseSuburbLookup?.(filters.postcode);
+                        const suburbData = await getSuburbCoordinates(filters.postcode);
                         if (suburbData) {
                             searchLatitude = suburbData.lat;
                             searchLongitude = suburbData.lng;
@@ -344,8 +307,9 @@ export default function Home() {
                         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-slate-800 text-sm font-medium mb-2">Suburb or Postcode</label>
+                                    <label htmlFor="search-location" className="block text-slate-800 text-sm font-medium mb-2">Suburb or Postcode</label>
                                     <input
+                                        id="search-location"
                                         type="text"
                                         placeholder="Start typing..."
                                         className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-800"
@@ -355,9 +319,9 @@ export default function Home() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-slate-800 text-sm font-medium mb-2">Sale Type</label>
+                                    <label htmlFor="search-sale-type" className="block text-slate-800 text-sm font-medium mb-2">Sale Type</label>
                                     <Select value={filters.saleType} onValueChange={(value) => startTransition(() => setFilters({ ...filters, saleType: value }))}>
-                                        <SelectTrigger className="bg-white border-slate-300">
+                                        <SelectTrigger id="search-sale-type" className="bg-white border-slate-300">
                                             <SelectValue placeholder="All Types" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -374,9 +338,9 @@ export default function Home() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-slate-800 text-sm font-medium mb-2">Distance</label>
+                                    <label htmlFor="search-distance" className="block text-slate-800 text-sm font-medium mb-2">Distance</label>
                                     <Select value={filters.distance} onValueChange={(value) => startTransition(() => setFilters({ ...filters, distance: value }))}>
-                                        <SelectTrigger className="bg-white border-slate-300">
+                                        <SelectTrigger id="search-distance" className="bg-white border-slate-300">
                                             <SelectValue placeholder="Distance" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -484,8 +448,8 @@ export default function Home() {
                                     <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)}>
                                         <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden cursor-pointer">
                                             <div className="aspect-video bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center relative">
-                                                {sale.photos && sale.photos.length > 0 ? (
-                                                    <img src={sale.photos[0]} alt={sale.title} className="w-full h-full object-cover" />
+                                                {coverImage(sale) ? (
+                                                    <img src={coverImage(sale)} alt={sale.title} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <Tag className="w-12 h-12 text-slate-400" />
                                                 )}

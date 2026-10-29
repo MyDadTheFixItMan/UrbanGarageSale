@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Image, Upload, X, Loader2 } from 'lucide-react';
 import { toast } from "sonner";
 import { firebase } from '@/api/firebaseClient';
-import { compressImage } from '@/lib/imageOptimization';
+import { compressImage, makeThumbnail } from '@/lib/imageOptimization';
 import { FormSection } from './ListingSections';
 import { MAX_PHOTOS, ALLOWED_PHOTO_TYPES, photoProblem } from './listingForm';
 
@@ -19,7 +19,8 @@ function readDimensions(file) {
     });
 }
 
-// Checks, compresses and uploads one photo. Returns its download URL, or null if it was refused.
+// Checks, compresses and uploads one photo and its thumbnail. Returns { url, thumbnail }
+// (thumbnail is null if it couldn't be made), or null if the photo was refused.
 async function uploadPhoto(file, userId) {
     const problem = photoProblem(file, await readDimensions(file));
     if (problem) {
@@ -36,10 +37,13 @@ async function uploadPhoto(file, userId) {
     }
 
     try {
-        const suffix = Math.random().toString(36).substring(2, 8);
-        const url = await firebase.storage.uploadImage(upload, `listings/${userId}/${Date.now()}-${suffix}-${file.name}`);
+        const name = `listings/${userId}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        const url = await firebase.storage.uploadImage(upload, `${name}-${file.name}`);
+        const thumbnail = await makeThumbnail(file)
+            .then((thumb) => firebase.storage.uploadImage(thumb, `${name}-thumb.jpg`))
+            .catch(() => null);
         toast.success(`"${file.name}" uploaded successfully`);
-        return url;
+        return { url, thumbnail };
     } catch (error) {
         console.error('Upload error for', file.name, error);
         toast.error(`"${file.name}" upload failed: ${error.message}`);
@@ -47,8 +51,9 @@ async function uploadPhoto(file, userId) {
     }
 }
 
-// `onChange` takes an updater function (photos => photos), so uploads that finish while the
-// seller removes a photo don't overwrite each other.
+// `onChange` takes an updater function ({ photos, thumbnails } => { photos, thumbnails }), so
+// uploads that finish while the seller removes a photo don't overwrite each other.
+// thumbnails[i] is the small version of photos[i].
 export default function PhotosSection({ photos, onChange, userId }) {
     const fileInputRef = useRef(null);
     const [uploading, setUploading] = useState(false);
@@ -66,14 +71,20 @@ export default function PhotosSection({ photos, onChange, userId }) {
 
         setUploading(true);
         try {
-            const urls = await Promise.all(files.map((file) => uploadPhoto(file, userId)));
-            onChange((prev) => [...prev, ...urls.filter(Boolean)]);
+            const uploaded = (await Promise.all(files.map((file) => uploadPhoto(file, userId)))).filter(Boolean);
+            onChange((prev) => ({
+                photos: [...prev.photos, ...uploaded.map((u) => u.url)],
+                thumbnails: [...prev.thumbnails, ...uploaded.map((u) => u.thumbnail)],
+            }));
         } finally {
             setUploading(false);
         }
     };
 
-    const removePhoto = (index) => onChange((prev) => prev.filter((_, i) => i !== index));
+    const removePhoto = (index) => onChange((prev) => ({
+        photos: prev.photos.filter((_, i) => i !== index),
+        thumbnails: prev.thumbnails.filter((_, i) => i !== index),
+    }));
 
     return (
         <FormSection title="Photos" icon={Image}>

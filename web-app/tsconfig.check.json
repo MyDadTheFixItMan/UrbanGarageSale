@@ -1,0 +1,20 @@
+{
+  // Type-checks the service layer and pure helpers with checkJs (audit CQ-8). Widen "include"
+  // as more modules gain JSDoc types. Run with: npm run typecheck
+  "extends": "./jsconfig.json",
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src/api/**/*.js",
+    "src/lib/*.js",
+    "src/pages/createListing/listingForm.js",
+    "src/pages/login/loginForms.js",
+    "src/pages/profile/profileListings.js",
+    "src/pages/admin/adminStats.js"
+  ],
+  "exclude": ["node_modules", "dist", "src/**/__mocks__"]
+}

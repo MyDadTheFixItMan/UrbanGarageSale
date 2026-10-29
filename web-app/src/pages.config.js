@@ -1,39 +1,24 @@
-import AdminDashboard from './pages/AdminDashboard';
-import About from './pages/About';
-import Contact from './pages/Contact';
-import CreateListing from './pages/CreateListing';
+import { lazy } from 'react';
 import Home from './pages/Home';
-import ListingDetails from './pages/ListingDetails';
-import Login from './pages/Login';
-import Payment from './pages/Payment';
-import PaymentSuccess from './pages/PaymentSuccess';
-import PaymentCancelled from './pages/PaymentCancelled';
-import Privacy from './pages/Privacy';
-import Profile from './pages/Profile';
-import ResetPassword from './pages/ResetPassword';
-import SavedListings from './pages/SavedListings';
-import Terms from './pages/Terms';
-import UrbanPay from './pages/UrbanPay';
 import __Layout from './Layout.jsx';
 
-
+// Home is the landing page, so it ships in the main bundle. Every other page is loaded when
+// it's first visited, and the admin dashboard is only ever downloaded by admins.
 export const PAGES = {
-    "About": About,
-    "AdminDashboard": AdminDashboard,
-    "Contact": Contact,
-    "CreateListing": CreateListing,
+    "About": lazy(() => import('./pages/About')),
+    "AdminDashboard": lazy(() => import('./pages/AdminDashboard')),
+    "Contact": lazy(() => import('./pages/Contact')),
+    "CreateListing": lazy(() => import('./pages/CreateListing')),
     "Home": Home,
-    "ListingDetails": ListingDetails,
-    "Login": Login,
-    "Payment": Payment,
-    "PaymentSuccess": PaymentSuccess,
-    "PaymentCancelled": PaymentCancelled,
-    "Privacy": Privacy,
-    "Profile": Profile,
-    "ResetPassword": ResetPassword,
-    "SavedListings": SavedListings,
-    "Terms": Terms,
-    "UrbanPay": UrbanPay,
+    "ListingDetails": lazy(() => import('./pages/ListingDetails')),
+    "Login": lazy(() => import('./pages/Login')),
+    "Payment": lazy(() => import('./pages/Payment')),
+    "Privacy": lazy(() => import('./pages/Privacy')),
+    "Profile": lazy(() => import('./pages/Profile')),
+    "ResetPassword": lazy(() => import('./pages/ResetPassword')),
+    "SavedListings": lazy(() => import('./pages/SavedListings')),
+    "Terms": lazy(() => import('./pages/Terms')),
+    "UrbanPay": lazy(() => import('./pages/UrbanPay')),
 }
 
 export const pagesConfig = {

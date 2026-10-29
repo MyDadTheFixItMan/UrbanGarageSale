@@ -3,7 +3,15 @@ import {
   formatPosterTime,
   formatPosterDateTime,
   buildPosterHtml,
+  posterListingUrl,
 } from '@/utils/printGarageSaleSign';
+
+describe('poster QR code', () => {
+  it('opens the listing page itself', () => {
+    expect(posterListingUrl('https://www.urbangaragesales.com.au', 'abc123'))
+      .toBe('https://www.urbangaragesales.com.au/ListingDetails?id=abc123');
+  });
+});
 
 describe('poster text', () => {
   it('labels known sale types and falls back to GARAGE SALE', () => {

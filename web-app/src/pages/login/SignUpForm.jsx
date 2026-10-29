@@ -84,9 +84,9 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
             setTimeout(() => navigate(createPageUrl('Profile')), 5000);
         } catch (err) {
             console.error('Sign up error:', err);
-            if (err.message?.includes('already registered')) {
+            if (err.code === 'auth/email-already-in-use') {
                 onExistingEmail(fields.email);
-                toast.info('This email is already registered. Please sign in instead.');
+                toast.info(err.message);
             } else {
                 setError(err.message || 'Failed to create account');
                 toast.error(err.message || 'Failed to create account');

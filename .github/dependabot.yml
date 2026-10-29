@@ -1,0 +1,45 @@
+# Weekly dependency updates, grouped so each ecosystem opens at most one PR a week
+# (minor and patch together; majors separately so they can be reviewed on their own).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday, timezone: Australia/Melbourne }
+    groups:
+      api-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /web-app
+    schedule: { interval: weekly, day: monday, timezone: Australia/Melbourne }
+    groups:
+      web-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /web-app/functions
+    schedule: { interval: weekly, day: monday, timezone: Australia/Melbourne }
+    groups:
+      functions-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /tests/rules
+    schedule: { interval: monthly }
+    groups:
+      rules-tests:
+        patterns: ['*']
+
+  - package-ecosystem: pub
+    directory: /
+    schedule: { interval: weekly, day: monday, timezone: Australia/Melbourne }
+    groups:
+      flutter-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    groups:
+      actions:
+        patterns: ['*']

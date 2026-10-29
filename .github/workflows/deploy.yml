@@ -1,0 +1,105 @@
+name: Deploy
+
+# Deploys from CI instead of a laptop, and only after the full test suite passes.
+# Run it from GitHub: Actions → Deploy → Run workflow, choose staging or production.
+# The "production" environment should require approval (Settings → Environments).
+#
+# Secrets (per environment): VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_WEB_PROJECT_ID,
+# VERCEL_API_PROJECT_ID, FIREBASE_DEPLOY_SA_KEY (JSON key of a deploy-only service account).
+# Variables (per environment): FIREBASE_PROJECT (urbangaragesale or the staging project ID),
+# APP_URL, SENDGRID_FROM_EMAIL.
+# See docs/DEPLOYMENT.md, "Deploying from CI".
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to deploy to
+        type: choice
+        options: [staging, production]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    uses: ./.github/workflows/test.yml
+
+  firebase:
+    needs: tests
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_DEPLOY_SA_KEY }}
+
+      - name: Functions settings (non-secret)
+        run: |
+          printf 'APP_URL=%s\nSENDGRID_FROM_EMAIL=%s\n' "${{ vars.APP_URL }}" "${{ vars.SENDGRID_FROM_EMAIL }}" > web-app/functions/.env
+
+      - name: Install functions dependencies
+        working-directory: web-app/functions
+        run: npm ci
+
+      # Rules and indexes first, so new code never runs against old rules.
+      - name: Deploy Firestore rules, indexes and Storage rules
+        run: npx firebase-tools@15 deploy --only firestore:rules,firestore:indexes,storage --project "${{ vars.FIREBASE_PROJECT }}" --non-interactive
+
+      - name: Deploy Cloud Functions
+        working-directory: web-app
+        run: npx firebase-tools@15 deploy --only functions --project "${{ vars.FIREBASE_PROJECT }}" --non-interactive --force
+
+  api:
+    needs: firebase
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_API_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Deploy API (Vercel project urban-garage-sale)
+        run: |
+          ENV=${{ inputs.target == 'production' && 'production' || 'preview' }}
+          PROD=${{ inputs.target == 'production' && '--prod' || '' }}
+          npx vercel@latest pull --yes --environment=$ENV --token=${{ secrets.VERCEL_TOKEN }}
+          npx vercel@latest build $PROD --token=${{ secrets.VERCEL_TOKEN }}
+          npx vercel@latest deploy --prebuilt $PROD --token=${{ secrets.VERCEL_TOKEN }}
+
+  website:
+    needs: api
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    defaults:
+      run:
+        working-directory: web-app
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Deploy website (Vercel project web-app)
+        run: |
+          ENV=${{ inputs.target == 'production' && 'production' || 'preview' }}
+          PROD=${{ inputs.target == 'production' && '--prod' || '' }}
+          npx vercel@latest pull --yes --environment=$ENV --token=${{ secrets.VERCEL_TOKEN }}
+          npx vercel@latest build $PROD --token=${{ secrets.VERCEL_TOKEN }}
+          npx vercel@latest deploy --prebuilt $PROD --token=${{ secrets.VERCEL_TOKEN }}

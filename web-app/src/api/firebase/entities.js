@@ -23,7 +23,10 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { geohashQueryBounds } from 'geofire-common';
-import { auth, db, functions } from './app';
+import { ref, deleteObject } from 'firebase/storage';
+import { auth, db, functions, storage } from './app';
+import { LISTING_STATUS, PAYMENT_STATUS } from '@/lib/listings';
+import { AppError } from '@/lib/appError';
 import {
   MAX_LISTINGS_PER_CELL,
   MAX_LISTINGS_UNLOCATED,
@@ -35,9 +38,9 @@ import {
 
 const toRecords = (snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-function requireUser(message = 'Not authenticated') {
+function requireUser(message = 'Please sign in and try again.') {
   const user = auth.currentUser;
-  if (!user) throw new Error(message);
+  if (!user) throw new AppError(message, { code: 'auth/no-current-user' });
   return user;
 }
 
@@ -98,7 +101,7 @@ export const firebaseEntities = {
         ...withGeohash(data),
         user_id: user.uid,
         created_at: new Date(),
-        status: data.status || 'draft'
+        status: data.status || LISTING_STATUS.DRAFT
       });
       return { id: docRef.id, ...data };
     },
@@ -113,7 +116,7 @@ export const firebaseEntities = {
       const constraints = equalityConstraints(filters, ['user_id', 'status', 'postcode']);
       let results;
 
-      if (filters.status === 'active' && hasLocationFilter(filters)) {
+      if (filters.status === LISTING_STATUS.ACTIVE && hasLocationFilter(filters)) {
         // Radius search: only the geohash cells covering the radius are read.
         const bounds = geohashQueryBounds([filters.userLatitude, filters.userLongitude], radiusKm(filters) * 1000);
         const snapshots = await Promise.all(bounds.map(([start, end]) => getDocs(query(
@@ -122,7 +125,7 @@ export const firebaseEntities = {
         results = snapshots.flatMap(toRecords);
       } else {
         // Public searches without a location are capped; owner and admin views are not.
-        const capped = filters.status === 'active' && !filters.user_id;
+        const capped = filters.status === LISTING_STATUS.ACTIVE && !filters.user_id;
         const snapshot = await getDocs(query(garageSalesRef, ...constraints, ...(capped ? [limit(MAX_LISTINGS_UNLOCATED)] : [])));
         results = toRecords(snapshot);
       }
@@ -134,6 +137,7 @@ export const firebaseEntities = {
     getByIds: (ids) => getByIds('garageSales', ids),
 
     // Admin: one page of listings, optionally with a single status.
+    /** @param {{ status?: string, cursor?: any }} [options] */
     page: ({ status, cursor } = {}) => fetchPage('garageSales', [
       ...(status ? [where('status', '==', status)] : []),
       orderBy(documentId())
@@ -141,7 +145,20 @@ export const firebaseEntities = {
 
     update: (id, data) => updateAndReload('garageSales', id, withGeohash(data)),
 
+    // Admin: rejects a listing awaiting approval and refunds its listing fee (Cloud Function).
+    reject: async (id, reason) => {
+      const result = await httpsCallable(functions, 'rejectListing')({ saleId: id, reason });
+      return result.data;
+    },
+
+    // Removes the listing's photos from Storage too. Photo deletion is best effort: a photo
+    // that can't be deleted must not stop the listing being deleted.
     delete: async (id) => {
+      const snap = await getDoc(doc(db, 'garageSales', id));
+      if (snap.exists()) {
+        const { photos = [], thumbnails = [] } = snap.data();
+        await Promise.all([...photos, ...thumbnails].map((url) => deleteObject(ref(storage, url)).catch(() => null)));
+      }
       await deleteDoc(doc(db, 'garageSales', id));
       return { id, deleted: true };
     }
@@ -179,12 +196,19 @@ export const firebaseEntities = {
     getByIds: (ids) => getByIds('users', ids),
 
     // Admin: one page of users, optionally narrowed to a state and/or exact postcode.
+    /** @param {{ state?: string, postcode?: string, cursor?: any }} [options] */
     page: ({ state, postcode, cursor } = {}) => fetchPage('users', [
       ...equalityConstraints({ state, postcode }, ['state', 'postcode']),
       orderBy(documentId())
     ], cursor),
 
     update: (id, data) => updateAndReload('users', id, data),
+
+    // Admin: sets the admin claim and role, and records the change in the audit log.
+    setRole: async (id, role) => {
+      await httpsCallable(functions, 'setUserRole')({ userId: id, role });
+      return { id, role };
+    },
 
     delete: async (id) => {
       // Admin-only Cloud Function: removes the auth account and the user's personal data.
@@ -202,7 +226,7 @@ export const firebaseEntities = {
         user_id: user.uid,
         user_email: user.email,
         created_at: new Date(),
-        status: data.status || 'pending'
+        status: data.status || PAYMENT_STATUS.PENDING
       });
       return { id: docRef.id, ...data };
     },
@@ -213,6 +237,7 @@ export const firebaseEntities = {
     },
 
     // Admin: one page of payments, newest first, optionally only those made since a date.
+    /** @param {{ since?: Date, cursor?: any }} [options] */
     page: ({ since, cursor } = {}) => fetchPage('payments', [
       ...(since ? [where('created_at', '>=', since)] : []),
       orderBy('created_at', 'desc')
@@ -241,7 +266,7 @@ export const firebaseEntities = {
         await batch.commit();
       } catch (error) {
         if (error.code === 'permission-denied') {
-          throw new Error('Please wait a minute before sending another message.');
+          throw new AppError('Please wait a minute before sending another message.', { code: 'app/rate-limited', cause: error });
         }
         throw error;
       }
@@ -254,6 +279,7 @@ export const firebaseEntities = {
     },
 
     // Admin: one page of messages, newest first.
+    /** @param {{ cursor?: any }} [options] */
     page: ({ cursor } = {}) => fetchPage('contactMessages', [orderBy('created_at', 'desc')], cursor),
 
     update: (id, data) => updateAndReload('contactMessages', id, data),
@@ -276,12 +302,12 @@ export const firebaseEntities = {
         totalRevenue, monthlyRevenue, unreadMessages, totalUsers, listingsByState, usersByState
       ] = await Promise.all([
         countOf('garageSales'),
-        countOf('garageSales', where('status', '==', 'active'), where('end_date', '>=', localIsoDate())),
-        countOf('garageSales', where('status', '==', 'pending_approval')),
-        countOf('garageSales', where('status', '==', 'draft')),
-        countOf('garageSales', where('status', '==', 'completed')),
-        sumOf('payments', 'amount', where('status', '==', 'completed')),
-        sumOf('payments', 'amount', where('status', '==', 'completed'), where('created_at', '>=', monthStart)),
+        countOf('garageSales', where('status', '==', LISTING_STATUS.ACTIVE), where('end_date', '>=', localIsoDate())),
+        countOf('garageSales', where('status', '==', LISTING_STATUS.PENDING_APPROVAL)),
+        countOf('garageSales', where('status', '==', LISTING_STATUS.DRAFT)),
+        countOf('garageSales', where('status', '==', LISTING_STATUS.COMPLETED)),
+        sumOf('payments', 'amount', where('status', '==', PAYMENT_STATUS.COMPLETED)),
+        sumOf('payments', 'amount', where('status', '==', PAYMENT_STATUS.COMPLETED), where('created_at', '>=', monthStart)),
         countOf('contactMessages', where('status', '==', 'unread')),
         countOf('users'),
         Promise.all(AU_STATES.map((state) => countOf('garageSales', where('state', '==', state)))),
@@ -298,7 +324,8 @@ export const firebaseEntities = {
     // Top 10 postcodes by listing count, counted server-side by an admin Cloud Function.
     topPostcodes: async (state) => {
       const result = await httpsCallable(functions, 'adminTopPostcodes')({ state: state || null });
-      return result.data.postcodes || [];
+      const data = /** @type {{ postcodes?: Array<{ name: string, count: number }> }} */ (result.data);
+      return data.postcodes || [];
     }
   },
 

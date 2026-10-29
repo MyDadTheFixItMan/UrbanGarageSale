@@ -59,7 +59,8 @@ export default function ResetPassword() {
 
         try {
             await firebase.auth.resetPassword(email);
-            setSuccess('Password reset email sent! Check your inbox.');
+            // Same message whether or not the email has an account (account enumeration).
+            setSuccess('If an account exists for that email, we have sent a password reset link. Check your inbox.');
             setEmail('');
             setTimeout(() => {
                 window.location.href = createPageUrl('Login');

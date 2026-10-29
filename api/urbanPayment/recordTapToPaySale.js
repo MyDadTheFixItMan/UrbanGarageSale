@@ -1,22 +1,11 @@
 // Record a completed card (Tap to Pay / Payment Sheet) sale.
 // The amount and status come from Stripe, never from the client, and a PaymentIntent
 // can only be recorded once, by the seller it was created for.
-import Stripe from 'stripe';
+import { getStripe } from '../_shared/stripe.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { HttpError, readJsonBody, requireUser, requireSecondFactor, cleanText, sendError } from '../_shared/http.js';
 import { writeSaleWithStats, assertOwnsGarageSale } from '../_shared/sales.js';
 import { rateLimit } from '../_shared/rateLimit.js';
-
-let stripe = null;
-function getStripe() {
-  if (!stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error('STRIPE_SECRET_KEY not configured');
-    }
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  }
-  return stripe;
-}
 
 export default async function handler(req, res) {
   applyCors(res, getTrustedOrigin(req.headers.origin), 'POST, OPTIONS');

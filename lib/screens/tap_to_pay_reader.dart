@@ -8,6 +8,7 @@ import 'dart:convert';
 import '../services/stripe_terminal_service.dart';
 import '../widgets/reader_selection_dialog.dart';
 import 'terminal_payment_screen.dart';
+import '../config/api_config.dart';
 
 class TapToPayReader extends StatefulWidget {
   final String? stripeConnectId;
@@ -96,9 +97,7 @@ class _TapToPayReaderState extends State<TapToPayReader> {
       final idToken = await user.getIdToken();
 
       final response = await http.post(
-        Uri.parse(
-          'https://urban-garage-sale.vercel.app/api/urbanPayment/createPaymentIntent',
-        ),
+        Uri.parse('$apiBaseUrl/urbanPayment/createPaymentIntent'),
         headers: {
           'Authorization': 'Bearer $idToken',
           'Content-Type': 'application/json',
@@ -174,9 +173,7 @@ class _TapToPayReaderState extends State<TapToPayReader> {
 
     // The server reads the amount and status from Stripe; only succeeded payments are recorded.
     final response = await http.post(
-      Uri.parse(
-        'https://urban-garage-sale.vercel.app/api/urbanPayment/recordTapToPaySale',
-      ),
+      Uri.parse('$apiBaseUrl/urbanPayment/recordTapToPaySale'),
       headers: {
         'Authorization': 'Bearer $idToken',
         'Content-Type': 'application/json',

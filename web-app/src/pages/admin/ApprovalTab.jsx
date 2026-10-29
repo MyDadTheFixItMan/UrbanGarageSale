@@ -12,6 +12,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
+import { LISTING_STATUS } from '@/lib/listings';
 import ListingRow from './ListingRow';
 import { ADMIN_KEY, usePagedQuery, LoadMoreButton, ListLoading } from './usePagedQuery';
 
@@ -22,12 +23,12 @@ export default function ApprovalTab() {
     const [listingToReject, setListingToReject] = useState(null);
     const [rejectionReason, setRejectionReason] = useState('');
     const paged = usePagedQuery(['listings', 'pending'], (cursor) =>
-        firebase.entities.GarageSale.page({ status: 'pending_approval', cursor }));
+        firebase.entities.GarageSale.page({ status: LISTING_STATUS.PENDING_APPROVAL, cursor }));
     const pendingListings = paged.items;
 
     const approveMutation = useMutation({
         mutationFn: async (listing) => {
-            const result = await firebase.entities.GarageSale.update(listing.id, { status: 'active' });
+            const result = await firebase.entities.GarageSale.update(listing.id, { status: LISTING_STATUS.ACTIVE });
             // The approval stands even if the notification email fails.
             if (listing.user_id) {
                 try {
@@ -48,15 +49,14 @@ export default function ApprovalTab() {
     });
 
     const rejectMutation = useMutation({
-        mutationFn: ({ listingId, reason }) => firebase.entities.GarageSale.update(listingId, {
-            status: 'rejected',
-            rejection_reason: reason,
-        }),
-        onSuccess: () => {
+        mutationFn: ({ listingId, reason }) => firebase.entities.GarageSale.reject(listingId, reason),
+        onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: [ADMIN_KEY] });
             setListingToReject(null);
             setRejectionReason('');
-            toast.success('Listing rejected');
+            toast.success(result?.refunded
+                ? `Listing rejected and A${result.refunded.toFixed(2)} refunded`
+                : 'Listing rejected');
         },
         onError: (error) => {
             toast.error('Failed to reject listing: ' + errorText(error));
@@ -91,7 +91,7 @@ export default function ApprovalTab() {
                     <DialogHeader>
                         <DialogTitle>Reject Listing</DialogTitle>
                         <DialogDescription>
-                            Provide a reason for rejecting this listing
+                            Provide a reason for rejecting this listing. Any listing fee paid is refunded to the seller automatically.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
@@ -101,6 +101,7 @@ export default function ApprovalTab() {
                             </p>
                             <Textarea
                                 placeholder="Enter reason for rejection..."
+                                aria-label="Reason for rejection"
                                 value={rejectionReason}
                                 onChange={(e) => setRejectionReason(e.target.value)}
                                 className="min-h-[100px]"

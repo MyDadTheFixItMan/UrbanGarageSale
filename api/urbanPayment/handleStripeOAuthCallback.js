@@ -1,18 +1,9 @@
 // Handle Stripe OAuth callback
-import Stripe from 'stripe';
+import { getStripe } from '../_shared/stripe.js';
 import { getFirebaseAdmin } from '../_shared/firebase-admin.js';
-import { requireUser, requireSecondFactor, sendError } from '../_shared/http.js';
+import { readJsonBody, requireUser, requireSecondFactor, sendError } from '../_shared/http.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { rateLimit } from '../_shared/rateLimit.js';
-
-const getStripe = async () => {
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeSecretKey) {
-    throw new Error('STRIPE_SECRET_KEY not configured');
-  }
-  return new Stripe(stripeSecretKey);
-};
-
 
 export default async (req, res) => {
   applyCors(res, getTrustedOrigin(req.headers.origin, process.env.FRONTEND_URL || 'http://localhost:5174'), 'POST, OPTIONS');
@@ -29,31 +20,32 @@ export default async (req, res) => {
     const { uid: userId } = requireSecondFactor(await requireUser(req));
     await rateLimit(userId, 'handleStripeOAuthCallback', 10);
 
-    // Get authorization code from request
-    const body = req.body || {};
-    const { code, state } = body;
+    const { code, state } = await readJsonBody(req);
 
-    if (!code) {
+    if (typeof code !== 'string' || !code || code.length > 255) {
       return res.status(400).json({ error: 'Authorization code missing' });
     }
 
-    if (!state) {
-      return res.status(400).json({ error: 'State token missing' });
+    // State tokens are 32 random bytes in hex (initiateStripeOAuth).
+    if (typeof state !== 'string' || !/^[a-f0-9]{64}$/.test(state)) {
+      return res.status(400).json({ error: 'State token missing or invalid' });
     }
 
     // Verify state token
     const admin = getFirebaseAdmin();
     const db = admin.firestore();
-    const stateDoc = await db.collection('oauth_states').doc(state).get();
+    // State tokens are single use (read and deleted in one transaction, so two requests can't
+    // both use one) and expire after 10 minutes.
+    const stateRef = db.collection('oauth_states').doc(state);
+    const stateData = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(stateRef);
+      if (snap.exists) tx.delete(stateRef);
+      return snap.exists ? snap.data() : null;
+    });
 
-    if (!stateDoc.exists) {
+    if (!stateData) {
       return res.status(401).json({ error: 'Invalid or expired state token' });
     }
-
-    const stateData = stateDoc.data();
-    // State tokens are single use and expire after 10 minutes
-    await db.collection('oauth_states').doc(state).delete();
-
     if (stateData.userId !== userId) {
       return res.status(401).json({ error: 'State token user mismatch' });
     }
@@ -62,31 +54,16 @@ export default async (req, res) => {
     }
 
     // Exchange authorization code for access token
-    const stripe = await getStripe();
-    const stripeClientId = process.env.STRIPE_CLIENT_ID;
-    const stripeClientSecret = process.env.STRIPE_SECRET_KEY;
-
-    if (!stripeClientId) {
+    const stripe = getStripe();
+    if (!process.env.STRIPE_CLIENT_ID) {
       throw new Error('STRIPE_CLIENT_ID not configured');
     }
 
-    console.log('✓ Exchanging OAuth code for credentials...');
-    
-    // Make request to Stripe OAuth token endpoint
     const tokenResponse = await stripe.oauth.token({
       grant_type: 'authorization_code',
-      code: code,
+      code,
     });
-
-    console.log('✓ OAuth token obtained, stripe account:', tokenResponse.stripe_user_id);
-
-    // Get account details
     const account = await stripe.accounts.retrieve(tokenResponse.stripe_user_id);
-
-    console.log('✓ Account details retrieved:', {
-      chargesEnabled: account.charges_enabled,
-      payoutsEnabled: account.payouts_enabled,
-    });
 
     // Save to Firestore
     await db.collection('users').doc(userId).update({
@@ -105,8 +82,6 @@ export default async (req, res) => {
         payoutsEnabled: account.payouts_enabled,
       },
     });
-
-    console.log('✓ Account linked to user:', userId);
 
     return res.status(200).json({
       success: true,

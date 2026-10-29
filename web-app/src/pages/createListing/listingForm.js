@@ -1,4 +1,7 @@
 // Pure helpers for the create/edit listing form. No React or Firebase, so they are unit tested directly.
+import { LISTING_STATUS, PAYMENT_STATUS, isPaid, isPaidOrApproved } from '@/lib/listings';
+
+export { isPaid, isPaidOrApproved };
 
 export const MAX_PHOTOS = 5;
 export const MAX_SALE_DAYS = 3;
@@ -49,15 +52,14 @@ export const EMPTY_FORM = {
     end_time: '15:00',
     sale_type: 'garage_sale',
     photos: [],
+    thumbnails: [],
 };
 
-const PAID = ['paid', 'completed', 'free'];
 
-export const isPaid = (paymentStatus) => PAID.includes(paymentStatus);
-
-// Mirrors isPaidOrApproved() in firestore.rules.
-export function isPaidOrApproved(listing) {
-    return ['active', 'pending_approval'].includes(listing.status) || isPaid(listing.payment_status);
+// thumbnails[i] is the small version of photos[i], or null for photos uploaded before
+// thumbnails existed.
+export function alignThumbnails(photos, thumbnails = []) {
+    return photos.map((_, i) => thumbnails[i] ?? null);
 }
 
 // The form's fields filled from a saved listing.
@@ -66,6 +68,7 @@ export function formFromListing(listing) {
     for (const [field, fallback] of Object.entries(EMPTY_FORM)) {
         form[field] = listing[field] ?? fallback;
     }
+    form.thumbnails = alignThumbnails(form.photos, listing.thumbnails);
     return form;
 }
 
@@ -79,7 +82,7 @@ export function listingFormProblem(form) {
     const start = new Date(form.start_date);
     const end = new Date(form.end_date);
     if (end < start) return 'End date must be after start date';
-    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     if (days > MAX_SALE_DAYS) return `Sales can only run for a maximum of ${MAX_SALE_DAYS} consecutive days`;
     return null;
 }
@@ -104,16 +107,17 @@ export function isInFreePeriod(settings, startDate) {
 // The listing document to save. Paid listings keep their status; paid or approved listings
 // leave their locked fields out, so the update doesn't touch them.
 export function buildSaleData(form, { asDraft, isFree, alreadyPaid, locked, coords, now = Date.now() }) {
-    let status = 'pending_payment';
-    if (asDraft) status = 'draft';
-    else if (isFree) status = 'active';
+    /** @type {string} */
+    let status = LISTING_STATUS.PENDING_PAYMENT;
+    if (asDraft) status = LISTING_STATUS.DRAFT;
+    else if (isFree) status = LISTING_STATUS.ACTIVE;
 
     const data = {
         ...form,
         latitude: coords.lat,
         longitude: coords.lng,
         draft_expires_at: asDraft ? new Date(now + DRAFT_LIFETIME_MS).toISOString() : null,
-        ...(alreadyPaid ? {} : { status, payment_status: isFree ? 'completed' : 'pending' }),
+        ...(alreadyPaid ? {} : { status, payment_status: isFree ? PAYMENT_STATUS.COMPLETED : PAYMENT_STATUS.PENDING }),
     };
     if (locked) {
         LOCKED_FIELDS.forEach((field) => delete data[field]);

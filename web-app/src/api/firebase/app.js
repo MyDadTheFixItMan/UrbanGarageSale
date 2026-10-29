@@ -38,7 +38,9 @@ export async function appCheckHeaders() {
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
-export const functions = getFunctions(app);
+// Cloud Functions run in Sydney, next to the Firestore database in Melbourne.
+export const FUNCTIONS_REGION = 'australia-southeast1';
+export const functions = getFunctions(app, FUNCTIONS_REGION);
 
 // Configure app verification for Phone Authentication
 // For development: disable app verification to allow testing

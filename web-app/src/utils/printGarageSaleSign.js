@@ -94,9 +94,14 @@ export function buildPosterHtml(listing, { posterImageUrl, qrCodeDataUrl }) {
  * Includes background image, text overlays, and QR code
  * Opens in a separate print window to avoid affecting the main page
  */
+// The address the poster's QR code opens: the listing's own page.
+export function posterListingUrl(baseUrl, listingId) {
+  return `${baseUrl}/ListingDetails?id=${encodeURIComponent(listingId)}`;
+}
+
 export async function printListingPoster(listing) {
   const baseUrl = window.location.origin;
-  const listingUrl = `${baseUrl}/?page=ListingDetails&id=${encodeURIComponent(listing.id)}`;
+  const listingUrl = posterListingUrl(baseUrl, listing.id);
 
   let qrCodeDataUrl = '';
   try {

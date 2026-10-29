@@ -5,9 +5,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import '../models/sale.dart';
+import '../config/api_config.dart' as config;
 
 class UrbanPayService {
-  static const String apiBaseUrl = 'https://urban-garage-sale.vercel.app/api';
+  static const String apiBaseUrl = config.apiBaseUrl;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;

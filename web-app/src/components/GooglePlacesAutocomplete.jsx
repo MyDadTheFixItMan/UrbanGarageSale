@@ -7,6 +7,8 @@ export default function GooglePlacesAutocomplete({
   placeholder = "Enter address",
   className = "",
   disabled = false,
+  id,
+  'aria-label': ariaLabel,
 }) {
   const inputRef = useRef(null);
   const [predictions, setPredictions] = useState([]);
@@ -171,6 +173,10 @@ export default function GooglePlacesAutocomplete({
       <div style={{ position: 'relative', width: '100%' }}>
         <input
           ref={inputRef}
+          id={id}
+          aria-label={ariaLabel}
+          aria-autocomplete="list"
+          autoComplete="off"
           type="text"
           placeholder={placeholder}
           onChange={handleInputChange}

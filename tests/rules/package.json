@@ -1,0 +1,14 @@
+{
+  "name": "urbangaragesale-rules-tests",
+  "private": true,
+  "type": "module",
+  "description": "Firestore and Storage security rules tests. Run against the Firebase emulators.",
+  "scripts": {
+    "test": "firebase emulators:exec --config ../../firebase.json --only firestore,storage --project demo-urbangaragesale \"node --test --test-concurrency=1 firestore.test.js storage.test.js\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.0.0",
+    "firebase-tools": "^15.34.0"
+  }
+}

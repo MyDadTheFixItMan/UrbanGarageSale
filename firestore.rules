@@ -13,9 +13,10 @@ service cloud.firestore {
     }
 
     // Admin access requires a 2FA session, so a stolen admin password alone is not enough.
+    // The `admin` custom claim is set only server-side, by the setUserRole function or
+    // scripts/sync-admin-claims.mjs, so no document read is needed.
     function isAdmin() {
-      return hasSecondFactorSession() &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
+      return hasSecondFactorSession() && request.auth.token.get('admin', false) == true;
     }
 
     // two_fa_enabled is set by the API (api/setUserClaims.ts) once an SMS second factor is
@@ -26,6 +27,78 @@ service cloud.firestore {
 
     function unchanged(field) {
       return request.resource.data.get(field, null) == resource.data.get(field, null);
+    }
+
+    // ---------- Field validation ----------
+    // `keys` is the set of fields this write touches: data.keys() on create,
+    // diff().affectedKeys() on update, so older documents with legacy fields can still be edited.
+    // Each check passes when the field isn't part of the write.
+    function changedKeys() {
+      return resource == null ? request.resource.data.keys()
+                              : request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function isText(keys, field, max) {
+      return !keys.hasAny([field]) ||
+             (request.resource.data[field] is string && request.resource.data[field].size() <= max);
+    }
+
+    function isTextOrNull(keys, field, max) {
+      return !keys.hasAny([field]) || request.resource.data[field] == null ||
+             (request.resource.data[field] is string && request.resource.data[field].size() <= max);
+    }
+
+    function matchesOrEmpty(keys, field, pattern) {
+      return !keys.hasAny([field]) ||
+             (request.resource.data[field] is string &&
+              (request.resource.data[field] == '' || request.resource.data[field].matches(pattern)));
+    }
+
+    function isNumberOrNull(keys, field) {
+      return !keys.hasAny([field]) || request.resource.data[field] == null || request.resource.data[field] is number;
+    }
+
+    function isBool(keys, field) {
+      return !keys.hasAny([field]) || request.resource.data[field] is bool;
+    }
+
+    function isShortList(keys, field, max) {
+      return !keys.hasAny([field]) ||
+             (request.resource.data[field] is list && request.resource.data[field].size() <= max);
+    }
+
+    // Fields a user may write on their own profile (protected fields are checked separately).
+    function validUserProfile() {
+      let keys = changedKeys();
+      return keys.hasOnly(['email', 'full_name', 'address', 'phone', 'phone_verified',
+                           'postcode', 'state', 'created_date', 'role']) &&
+             isText(keys, 'email', 254) && isText(keys, 'full_name', 100) &&
+             isText(keys, 'address', 300) && isText(keys, 'phone', 20) &&
+             matchesOrEmpty(keys, 'postcode', '^[0-9]{4}$') && isText(keys, 'state', 3) &&
+             isText(keys, 'created_date', 40) && isBool(keys, 'phone_verified');
+    }
+
+    // Fields a seller may write on their own listing. Status, payment and ownership rules are
+    // in the match block below; this checks shape and size.
+    function validListing() {
+      let keys = changedKeys();
+      return keys.hasOnly(['title', 'description', 'address', 'suburb', 'postcode', 'state',
+                           'latitude', 'longitude', 'geohash', 'start_date', 'end_date',
+                           'start_time', 'end_time', 'sale_type', 'photos', 'thumbnails',
+                           'status', 'payment_status', 'draft_expires_at', 'user_id', 'created_at']) &&
+             isText(keys, 'title', 150) && isText(keys, 'description', 5000) &&
+             isText(keys, 'address', 300) && isText(keys, 'suburb', 100) &&
+             matchesOrEmpty(keys, 'postcode', '^[0-9]{4}$') && isText(keys, 'state', 3) &&
+             isNumberOrNull(keys, 'latitude') && isNumberOrNull(keys, 'longitude') &&
+             isText(keys, 'geohash', 12) &&
+             matchesOrEmpty(keys, 'start_date', '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+             matchesOrEmpty(keys, 'end_date', '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+             matchesOrEmpty(keys, 'start_time', '^[0-9]{2}:[0-9]{2}$') &&
+             matchesOrEmpty(keys, 'end_time', '^[0-9]{2}:[0-9]{2}$') &&
+             isText(keys, 'sale_type', 30) &&
+             isShortList(keys, 'photos', 10) && isShortList(keys, 'thumbnails', 10) &&
+             isTextOrNull(keys, 'draft_expires_at', 40) &&
+             (!keys.hasAny(['created_at']) || request.resource.data.created_at is timestamp);
     }
 
     // ---------- Users ----------
@@ -42,11 +115,15 @@ service cloud.firestore {
       // New profiles may only claim the default 'user' role.
       allow create: if signedIn() && request.auth.uid == userId &&
                        request.resource.data.get('role', 'user') == 'user' &&
-                       !request.resource.data.keys().hasAny(protectedUserFields().removeAll(['role']));
+                       !request.resource.data.keys().hasAny(protectedUserFields().removeAll(['role'])) &&
+                       validUserProfile();
 
-      allow update: if isAdmin() ||
+      // Roles change only through the setUserRole function, which sets the admin claim and
+      // writes the audit log.
+      allow update: if (isAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) ||
                        (signedIn() && request.auth.uid == userId &&
-                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedUserFields()));
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedUserFields()) &&
+                        validUserProfile());
 
       allow delete: if isAdmin();
     }
@@ -93,11 +170,13 @@ service cloud.firestore {
       allow create: if has2FAEnabled() &&
                        request.resource.data.user_id == request.auth.uid &&
                        !('created_by' in request.resource.data) &&
+                       validListing() &&
                        (isUnpaidOwnerState(request.resource.data) || isFreeListing(request.resource.data));
 
       allow update: if isAdmin() ||
                        (signedIn() && request.auth.uid == resource.data.user_id &&
                         unchanged('user_id') && unchanged('created_by') && unchanged('is_free_listing') &&
+                        validListing() &&
                         (!isPaidOrApproved(resource.data) || lockedFieldsUnchanged()) &&
                         (
                           // Ordinary edits that leave the status alone
@@ -203,6 +282,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // oauth_states and anything not listed above: no client access (Admin SDK only).
+    // oauth_states, auditLog, rateLimits and anything not listed above: no client access
+    // (Admin SDK only).
   }
 }

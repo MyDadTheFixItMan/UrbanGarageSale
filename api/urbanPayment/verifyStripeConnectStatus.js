@@ -1,18 +1,9 @@
 // Verify the actual Stripe Connect account status
-import Stripe from 'stripe';
+import { getStripe } from '../_shared/stripe.js';
 import { getFirebaseAdmin } from '../_shared/firebase-admin.js';
 import { requireUser, sendError } from '../_shared/http.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { rateLimit } from '../_shared/rateLimit.js';
-
-const getStripe = async () => {
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeSecretKey) {
-    throw new Error('STRIPE_SECRET_KEY not configured');
-  }
-  return new Stripe(stripeSecretKey);
-};
-
 
 export default async (req, res) => {
   applyCors(res, getTrustedOrigin(req.headers.origin, process.env.FRONTEND_URL || 'http://localhost:5174'), 'POST, OPTIONS');
@@ -43,7 +34,7 @@ export default async (req, res) => {
     }
 
     // Check actual Stripe account status
-    const stripe = await getStripe();
+    const stripe = getStripe();
     const account = await stripe.accounts.retrieve(userData.stripeConnectId);
 
     console.log(`✓ Stripe account status for ${userData.stripeConnectId}:`, {

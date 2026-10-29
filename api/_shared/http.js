@@ -102,13 +102,21 @@ export function toCents(amount) {
   return Math.round(amount * 100);
 }
 
+// Firestore document IDs taken from a request: letters, digits, _ and - only, so a value such as
+// "a/b" can never address a document in another collection.
+const DOC_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
+export function isDocId(value) {
+  return typeof value === 'string' && DOC_ID.test(value);
+}
+
 export function cleanText(value, maxLength, fallback = '') {
   if (typeof value !== 'string') return fallback;
   const trimmed = value.trim().slice(0, maxLength);
   return trimmed || fallback;
 }
 
-const ERROR_REPORT_URL = 'https://us-central1-urbangaragesale.cloudfunctions.net/reportClientError';
+const ERROR_REPORT_URL = 'https://australia-southeast1-urbangaragesale.cloudfunctions.net/reportClientError';
 
 // Forwards an unexpected server error to Error Reporting (via the reportClientError function).
 // Waits at most 2 seconds so reporting can never hold up or break the response.

@@ -4,7 +4,7 @@ import { firebaseAuth } from './firebase/auth';
 import { firebaseEntities } from './firebase/entities';
 import { firebaseStorage, firebaseFunctions, firebaseFirestore, getSuburbCoordinates } from './firebase/services';
 
-export { firebaseAuth, firebaseEntities, firebaseStorage, firebaseFunctions, firebaseFirestore };
+export { firebaseAuth, firebaseEntities, firebaseStorage, firebaseFunctions, firebaseFirestore, getSuburbCoordinates };
 
 export const firebase = {
   auth: firebaseAuth,
@@ -20,10 +20,5 @@ export const firebase = {
     return auth.currentUser;
   }
 };
-
-// Exposed for the Home page's suburb search.
-if (typeof window !== 'undefined') {
-  window.firebaseSuburbLookup = getSuburbCoordinates;
-}
 
 export default firebase;

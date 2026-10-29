@@ -24,27 +24,29 @@ describe('normalizePhone', () => {
 });
 
 describe('auth error messages', () => {
-  it('maps SMS errors to plain-English messages and keeps unknown details', () => {
+  it('maps SMS errors to plain-English messages and hides raw Firebase text', () => {
     expect(smsErrorMessage({ code: 'auth/too-many-requests' })).toMatch(/wait a few minutes/);
     expect(smsErrorMessage({ code: 'auth/second-factor-already-in-use' })).toMatch(/already enrolled/);
-    expect(smsErrorMessage({ code: 'auth/other', message: 'boom' })).toBe('Could not send the SMS code: boom');
+    expect(smsErrorMessage({ code: 'auth/other', message: 'boom' })).toBe('Could not send the SMS code. Please try again.');
   });
 
   it('explains sign-up failures, including the password policy', () => {
-    expect(signUpErrorMessage({ code: 'auth/email-already-in-use' })).toMatch(/already registered/);
+    // Must not confirm that the email has an account
+    expect(signUpErrorMessage({ code: 'auth/email-already-in-use' })).not.toMatch(/already registered/);
+    expect(signUpErrorMessage({ code: 'auth/email-already-in-use' })).toMatch(/sign in or reset your password/);
     expect(signUpErrorMessage({ code: 'auth/password-does-not-meet-requirements' })).toMatch(/12 characters/);
-    expect(signUpErrorMessage({ code: 'x', message: 'nope' })).toBe('Sign up failed: nope');
+    expect(signUpErrorMessage({ code: 'x', message: 'nope' })).toBe('Sign up failed. Please try again.');
   });
 
   it('names the provider when a popup sign-in fails for an unexpected reason', () => {
     expect(popupSignInErrorMessage({ code: 'auth/popup-closed-by-user' }, 'Google')).toBe('Sign in was cancelled');
     expect(popupSignInErrorMessage({ code: 'auth/popup-blocked' }, 'Apple')).toMatch(/allow popups/);
-    expect(popupSignInErrorMessage({ code: 'x', message: 'bad' }, 'Facebook')).toBe('Facebook sign in failed: bad');
+    expect(popupSignInErrorMessage({ code: 'x', message: 'bad' }, 'Facebook')).toBe('Facebook sign in failed. Please try again.');
   });
 
   it('distinguishes wrong and expired SMS codes', () => {
     expect(verificationCodeErrorMessage({ code: 'auth/invalid-verification-code' }, 'X')).toMatch(/incorrect/);
     expect(verificationCodeErrorMessage({ code: 'auth/code-expired' }, 'X')).toMatch(/expired/);
-    expect(verificationCodeErrorMessage({ code: 'x', message: 'm' }, 'Could not turn on 2FA')).toBe('Could not turn on 2FA: m');
+    expect(verificationCodeErrorMessage({ code: 'x', message: 'm' }, 'Could not turn on 2FA')).toBe('Could not turn on 2FA. Please try again.');
   });
 });

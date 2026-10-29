@@ -1,23 +1,12 @@
 // Create (or resume) a Stripe Connect Express account for an Australian seller and
 // return an onboarding link.
-import Stripe from 'stripe';
+import { getStripe } from '../_shared/stripe.js';
 import { getFirebaseAdmin } from '../_shared/firebase-admin.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { HttpError, readJsonBody, requireUser, requireSecondFactor, cleanText, sendError } from '../_shared/http.js';
 import { rateLimit } from '../_shared/rateLimit.js';
 
 const AU_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
-
-let stripe = null;
-function getStripe() {
-  if (!stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error('STRIPE_SECRET_KEY not configured');
-    }
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  }
-  return stripe;
-}
 
 export default async (req, res) => {
   const origin = getTrustedOrigin(req.headers.origin);

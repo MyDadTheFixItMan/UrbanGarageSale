@@ -14,6 +14,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
 import { db, storage, functions } from './app';
 import { geocode } from '@/lib/geocode';
+import { toAppError } from '@/lib/appError';
 
 const toRecords = (snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
@@ -25,7 +26,7 @@ export const firebaseStorage = {
       await uploadBytes(storageRef, file);
       return await getDownloadURL(storageRef);
     } catch (error) {
-      throw new Error(`Image upload failed: ${error.message}`);
+      throw toAppError(error, 'Image upload failed. Please try again.');
     }
   }
 };
@@ -37,8 +38,8 @@ export const firebaseFunctions = {
       const response = await httpsCallable(functions, functionName)(data);
       return response.data;
     } catch (error) {
-      console.error(`Function call failed:`, error);
-      throw new Error(`Function call failed: ${error.message}`);
+      console.error(`Function ${functionName} failed:`, error);
+      throw toAppError(error, 'That request failed. Please try again.');
     }
   }
 };
@@ -61,6 +62,10 @@ export const firebaseFirestore = {
       };
     },
     // Get all documents from collection, optionally ordered
+    /**
+     * @param {string | null} [orderByField]
+     * @param {'asc' | 'desc'} [orderDirection]
+     */
     getDocs: async (orderByField = null, orderDirection = 'asc') => {
       const collectionRef = collection(db, collectionName);
       const q = orderByField ? query(collectionRef, orderBy(orderByField, orderDirection)) : collectionRef;

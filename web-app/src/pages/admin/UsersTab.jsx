@@ -65,7 +65,7 @@ export default function UsersTab({ currentUserEmail }) {
     });
 
     const changeRoleMutation = useMutation({
-        mutationFn: ({ userId, newRole }) => firebase.entities.User.update(userId, { role: newRole }),
+        mutationFn: ({ userId, newRole }) => firebase.entities.User.setRole(userId, newRole),
         onSuccess: () => {
             refreshUsers();
             setUserToPromote(null);

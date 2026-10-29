@@ -131,7 +131,7 @@ describe('GarageSale writes', () => {
 
   it('refuses to create a listing when signed out', async () => {
     auth.currentUser = null;
-    await expect(firebaseEntities.GarageSale.create({ title: 'Sale' })).rejects.toThrow('Not authenticated');
+    await expect(firebaseEntities.GarageSale.create({ title: 'Sale' })).rejects.toMatchObject({ code: 'auth/no-current-user' });
     expect(firestore.addDoc).not.toHaveBeenCalled();
   });
 
@@ -142,10 +142,16 @@ describe('GarageSale writes', () => {
   });
 });
 
-describe('SavedListing.filter', () => {
-  it('always restricts results to the signed-in user', async () => {
-    await firebaseEntities.SavedListing.filter({ user_id: 'someone-else' });
-    expect(wheres(store.queries[0])).toEqual(['user_id==user-1', 'user_id==someone-else']);
+describe('SavedListing', () => {
+  it('reads the signed-in user\'s saved listings by account ID only, so an email change keeps them', async () => {
+    await firebaseEntities.SavedListing.mine();
+    expect(wheres(store.queries[0])).toEqual(['user_id==user-1']);
+  });
+
+  it('saves only the listing ID and owner, not the email address', async () => {
+    await firebaseEntities.SavedListing.create({ garage_sale_id: 'sale-3', user_email: 'ignored@example.com' });
+    const written = firestore.addDoc.mock.calls[0][1];
+    expect(written).toEqual({ garage_sale_id: 'sale-3', user_id: 'user-1', created_at: expect.any(Date) });
   });
 });
 

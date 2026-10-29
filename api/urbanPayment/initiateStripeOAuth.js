@@ -58,10 +58,6 @@ export default async (req, res) => {
     stripeOAuthUrl.searchParams.append('t', Date.now().toString());
     stripeOAuthUrl.searchParams.append('redirect_uri', redirectUri);
 
-    console.log('✓ OAuth URL with fresh session parameters:', stripeOAuthUrl.toString().substring(0, 100) + '...');
-
-    console.log('✓ OAuth URL generated for user:', userId);
-
     return res.status(200).json({
       success: true,
       oauthUrl: stripeOAuthUrl.toString(),

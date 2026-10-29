@@ -1,19 +1,8 @@
 // Create a Stripe Terminal connection token for the Urban Pay mobile app.
-import Stripe from 'stripe';
+import { getStripe } from '../_shared/stripe.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { requireUser, requireSecondFactor, sendError } from '../_shared/http.js';
 import { rateLimit } from '../_shared/rateLimit.js';
-
-let stripe = null;
-function getStripe() {
-  if (!stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error('STRIPE_SECRET_KEY not configured');
-    }
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  }
-  return stripe;
-}
 
 export default async (req, res) => {
   applyCors(res, getTrustedOrigin(req.headers.origin), 'POST, OPTIONS');

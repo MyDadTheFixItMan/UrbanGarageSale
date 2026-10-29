@@ -1,0 +1,32 @@
+# Gitleaks baseline (audit SEC-8): findings in old commits for keys that have since been revoked
+# or are public Firebase web keys. Listed by fingerprint so these old commits no longer fail a
+# full-history scan, while any NEW secret (different commit/file/line) still fails CI.
+# Regenerate: gitleaks git --report-format json --report-path r.json . (then add only reviewed,
+# revoked findings here). Never add a fingerprint for a key that is still live.
+ae17f54afafed6dd64343456b8d27bd0fddd470d:lib/firebase_options.dart:gcp-api-key:9
+928e95ed8ccee33fdd3824ecdc9c0095d404ef83:STRIPE_KEY_EXPOSURE_GUIDE.md:generic-api-key:107
+928e95ed8ccee33fdd3824ecdc9c0095d404ef83:STRIPE_KEY_ROTATION_REQUIRED.md:generic-api-key:66
+928e95ed8ccee33fdd3824ecdc9c0095d404ef83:SECURITY_AUDIT_FINAL_REPORT_2026-06-15.md:generic-api-key:205
+928e95ed8ccee33fdd3824ecdc9c0095d404ef83:scripts/rotate-firebase-service-account-key.mjs:generic-api-key:67
+c82981268e4342990116b88f548ea0e996bfe772:.env:stripe-access-token:6
+c82981268e4342990116b88f548ea0e996bfe772:.env:private-key:14
+c82981268e4342990116b88f548ea0e996bfe772:.env:sendgrid-api-token:26
+c82981268e4342990116b88f548ea0e996bfe772:api/.env:stripe-access-token:7
+c82981268e4342990116b88f548ea0e996bfe772:web-app/src/api/firebaseClient.js:gcp-api-key:1420
+3a16aaecc706f426138a1134f0094c0aeff3bc2a:api/urbanPayment/recordSale.js:gcp-api-key:9
+a418db0d09027c3844b64003b21f7a2372690cbd:VERCEL_FIREBASE_SETUP.md:curl-auth-header:56
+2a4eeb81650437cb736b676cbc61a2fde31c4063:URBAN_PAY_STATUS.md:generic-api-key:41
+b47f67ca6187a26de2af8fe639ab7ced59bbc774:lib/main.dart:generic-api-key:15
+b47f67ca6187a26de2af8fe639ab7ced59bbc774:lib/firebase_options.dart:gcp-api-key:9
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:API/.env:gcp-api-key:1
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:.env:sendgrid-api-token:17
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:.env:stripe-access-token:5
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:DEBUG_USER_DELETION.md:curl-auth-header:195
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:LIVE_TESTING_ACTIVE.md:gcp-api-key:30
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:STEP4_RECAPTCHA_VERIFICATION.md:generic-api-key:45
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:PHONE_AUTH_SETUP.md:gcp-api-key:37
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:PHONE_AUTH_SETUP.md:generic-api-key:36
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:RECAPTCHA_ENTERPRISE_SETUP.md:generic-api-key:68
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:seed-db.cjs:gcp-api-key:5
+92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:seed-db.mjs:gcp-api-key:5
+7640b9dbaac923c800e06b5d5adc1332f35962b0:web-app/seed-db.cjs:gcp-api-key:5

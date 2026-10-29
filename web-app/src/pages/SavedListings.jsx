@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format, parseISO, isToday, isTomorrow } from 'date-fns';
+import { coverImage } from '@/lib/listings';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -66,14 +67,7 @@ export default function SavedListings() {
 
     const { data: savedListings = [], isLoading: savedLoading } = useQuery({
         queryKey: ['savedListings', user?.email],
-        queryFn: async () => {
-            const results = await firebase.entities.SavedListing.filter({ user_email: user?.email });
-            console.log('SavedListings.jsx: Fetched saved listings:', results);
-            results.forEach(sl => {
-                console.log('SavedListings.jsx: Saved listing details -', sl);
-            });
-            return results;
-        },
+        queryFn: () => firebase.entities.SavedListing.mine(),
         enabled: !!user?.email,
     });
 
@@ -85,23 +79,10 @@ export default function SavedListings() {
         enabled: !!user?.email && savedIds.length > 0,
     });
 
-    const savedSales = savedListings
-        .map(saved => {
-            console.log('SavedListings.jsx: Looking for sale with id:', saved.garage_sale_id);
-            const found = allSales.find(sale => sale.id === saved.garage_sale_id);
-            console.log('SavedListings.jsx: Found sale:', found);
-            return found;
-        })
-        .filter(Boolean)
-        // Deduplicate by sale ID to avoid duplicate keys
-        .reduce((unique, sale) => {
-            if (!unique.find(s => s.id === sale.id)) {
-                unique.push(sale);
-            }
-            return unique;
-        }, []);
-    
-    console.log('SavedListings.jsx: Final savedSales:', savedSales);
+    // Deduplicated by sale ID so a listing saved twice shows once
+    const savedSales = [...new Set(savedListings.map(saved => saved.garage_sale_id))]
+        .map(id => allSales.find(sale => sale.id === id))
+        .filter(Boolean);
 
     const removeMutation = useMutation({
         mutationFn: async (savedId) => {
@@ -251,9 +232,9 @@ export default function SavedListings() {
                                             to={createPageUrl(`ListingDetails?id=${sale.id}`)}
                                             className="w-full sm:w-48 h-48 sm:h-auto flex-shrink-0 bg-slate-100"
                                         >
-                                            {sale.photos && sale.photos.length > 0 ? (
+                                            {coverImage(sale) ? (
                                                 <img
-                                                    src={sale.photos[0]}
+                                                    src={coverImage(sale)}
                                                     alt={sale.title}
                                                     className="w-full h-full object-cover"
                                                 />

@@ -2,7 +2,7 @@
 // Google Cloud Error Reporting (grouped, with email notifications for new errors).
 // No personal data is sent: no user details, and URLs are reported without query strings.
 
-const ENDPOINT = 'https://us-central1-urbangaragesale.cloudfunctions.net/reportClientError';
+const ENDPOINT = 'https://australia-southeast1-urbangaragesale.cloudfunctions.net/reportClientError';
 const MAX_REPORTS_PER_PAGE = 10;
 let sent = 0;
 

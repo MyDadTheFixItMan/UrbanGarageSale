@@ -1,6 +1,6 @@
 // Writes an Urban Pay sale and updates seller / per-garage-sale stats in one transaction.
 import { getFirebaseAdmin } from './firebase-admin.js';
-import { HttpError } from './http.js';
+import { HttpError, isDocId } from './http.js';
 
 // If saleDocId is given the write is idempotent: recording the same sale twice returns the
 // existing record and leaves the stats untouched.
@@ -43,6 +43,9 @@ export async function writeSaleWithStats({ saleDocId, sale }) {
 // Confirms the garage sale exists and belongs to the seller (when one is supplied).
 export async function assertOwnsGarageSale(sellerId, garageSaleId) {
   if (!garageSaleId) return;
+  if (!isDocId(garageSaleId)) {
+    throw new HttpError(400, 'Invalid garage sale ID');
+  }
   const db = getFirebaseAdmin().firestore();
   const snap = await db.collection('garageSales').doc(garageSaleId).get();
   if (!snap.exists || snap.data().user_id !== sellerId) {

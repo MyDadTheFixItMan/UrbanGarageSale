@@ -30,6 +30,10 @@ import {
   popupSignInErrorMessage,
   verificationCodeErrorMessage
 } from './authMessages';
+import { AppError, toAppError } from '@/lib/appError';
+
+const notSignedIn = () => new AppError('Please sign in and try again.', { code: 'auth/no-current-user' });
+const sessionExpired = () => new AppError('Your sign-in session expired. Please sign in again.', { code: 'auth/mfa-session-expired' });
 
 // In-progress multi-factor sign-in / enrolment (kept in memory only, never persisted).
 let pendingMfaResolver = null;
@@ -40,18 +44,19 @@ let pendingEnrollmentVerificationId = null;
 function mfaRequiredError(error) {
   pendingMfaResolver = getMultiFactorResolver(auth, error);
   pendingMfaVerificationId = null;
-  const hint = pendingMfaResolver.hints.find((h) => h.factorId === PhoneMultiFactorGenerator.FACTOR_ID);
-  const err = new Error('Enter the code we text to your phone to finish signing in.');
-  err.mfaRequired = true;
-  err.phoneHint = hint?.phoneNumber || '';
-  return err;
+  const hint = /** @type {import('firebase/auth').PhoneMultiFactorInfo | undefined} */ (
+    pendingMfaResolver.hints.find((h) => h.factorId === PhoneMultiFactorGenerator.FACTOR_ID));
+  return new AppError('Enter the code we text to your phone to finish signing in.', {
+    code: error.code,
+    details: { mfaRequired: true, phoneHint: hint?.phoneNumber || '' },
+  });
 }
 
 // Asks the API to turn 2FA on or off, then refreshes the ID token so the new claim applies.
 async function setTwoFactor(action) {
   const user = auth.currentUser;
   if (!user) {
-    throw new Error('No authenticated user');
+    throw notSignedIn();
   }
 
   const token = await user.getIdToken();
@@ -66,7 +71,7 @@ async function setTwoFactor(action) {
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || `Failed to ${action} 2FA (${response.status})`);
+    throw new AppError(data.error || `Failed to ${action} 2FA. Please try again.`, { code: `api/http-${response.status}` });
   }
 
   await user.getIdToken(true);
@@ -79,7 +84,7 @@ async function signInWithProvider(provider, providerName) {
     return result.user;
   } catch (error) {
     if (error.code === 'auth/multi-factor-auth-required') throw mfaRequiredError(error);
-    throw new Error(popupSignInErrorMessage(error, providerName));
+    throw new AppError(popupSignInErrorMessage(error, providerName), { code: error.code, cause: error });
   }
 }
 
@@ -91,14 +96,17 @@ function clearRecaptchaElement(element) {
   element.style.display = 'none'; // Keep hidden for invisible reCAPTCHA
 }
 
+// The current invisible reCAPTCHA verifier for SMS codes (one per page).
+let recaptchaVerifier = null;
+
 function clearRecaptchaVerifier() {
-  if (window.recaptchaVerifier) {
+  if (recaptchaVerifier) {
     try {
-      window.recaptchaVerifier.clear();
+      recaptchaVerifier.clear();
     } catch (e) {
       console.log('ℹ Info clearing previous reCAPTCHA:', e.message);
     }
-    window.recaptchaVerifier = null;
+    recaptchaVerifier = null;
   }
 }
 
@@ -111,7 +119,7 @@ export const firebaseAuth = {
       return userCredential.user;
     } catch (error) {
       if (error.code === 'auth/multi-factor-auth-required') throw mfaRequiredError(error);
-      throw new Error(`Login failed: ${error.message}`);
+      throw toAppError(error, 'Sign in failed. Please try again.');
     }
   },
 
@@ -123,8 +131,7 @@ export const firebaseAuth = {
       await sendEmailVerification(userCredential.user).catch((e) => console.warn('Verification email not sent:', e.message));
       return userCredential.user;
     } catch (error) {
-      console.error('Firebase sign up error:', error.code, error.message);
-      throw new Error(signUpErrorMessage(error));
+      throw new AppError(signUpErrorMessage(error), { code: error.code, cause: error });
     }
   },
 
@@ -133,7 +140,7 @@ export const firebaseAuth = {
     try {
       await signOut(auth);
     } catch (error) {
-      throw new Error(`Logout failed: ${error.message}`);
+      throw toAppError(error, 'Sign out failed. Please try again.');
     }
   },
 
@@ -171,7 +178,7 @@ export const firebaseAuth = {
   me: async () => {
     const user = auth.currentUser;
     if (!user) {
-      throw new Error('No authenticated user');
+      throw notSignedIn();
     }
 
     try {
@@ -209,7 +216,7 @@ export const firebaseAuth = {
   updateProfile: async (data) => {
     const user = auth.currentUser;
     if (!user) {
-      throw new Error('No authenticated user');
+      throw notSignedIn();
     }
 
     if (!data || Object.keys(data).length === 0) {
@@ -231,7 +238,10 @@ export const firebaseAuth = {
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
-      throw new Error(`Password reset failed: ${error.message}`);
+      // Don't reveal whether the email has an account (Firebase's email enumeration
+      // protection does the same server-side once it is on).
+      if (error.code === 'auth/user-not-found') return;
+      throw toAppError(error, 'Could not send the reset email. Please try again.');
     }
   },
 
@@ -244,9 +254,11 @@ export const firebaseAuth = {
       return email;
     } catch (error) {
       if (error.code === 'auth/invalid-action-code' || error.code === 'auth/expired-action-code') {
-        throw new Error('Your password reset link has expired. Please request a new one.');
+        throw new AppError('Your password reset link has expired. Please request a new one.', { code: error.code, cause: error });
       }
-      throw new Error(`Password reset failed: ${error.message}`);
+      throw error.code === 'auth/password-does-not-meet-requirements' || error.code === 'auth/weak-password'
+        ? new AppError(signUpErrorMessage(error), { code: error.code, cause: error })
+        : toAppError(error, 'Password reset failed. Please try again.');
     }
   },
 
@@ -254,7 +266,7 @@ export const firebaseAuth = {
   changePassword: async (currentPassword, newPassword) => {
     const user = auth.currentUser;
     if (!user || !user.email) {
-      throw new Error('No authenticated user');
+      throw notSignedIn();
     }
 
     try {
@@ -263,10 +275,13 @@ export const firebaseAuth = {
       await reauthenticateWithCredential(user, credential);
       await updatePassword(user, newPassword);
     } catch (error) {
-      if (error.code === 'auth/wrong-password') {
-        throw new Error('Current password is incorrect');
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        throw new AppError('Current password is incorrect', { code: error.code, cause: error });
       }
-      throw new Error(`Password change failed: ${error.message}`);
+      if (error.code === 'auth/password-does-not-meet-requirements' || error.code === 'auth/weak-password') {
+        throw new AppError(signUpErrorMessage(error), { code: error.code, cause: error });
+      }
+      throw toAppError(error, 'Password change failed. Please try again.');
     }
   },
 
@@ -298,11 +313,11 @@ export const firebaseAuth = {
             }
           });
 
-          window.recaptchaVerifier = verifier;
+          recaptchaVerifier = verifier;
           resolve(verifier);
         } catch (error) {
           console.error('❌ Failed to create reCAPTCHA verifier', isDevelopment ? '(dev mode):' : ':', error.message);
-          window.recaptchaVerifier = null;
+          recaptchaVerifier = null;
           reject(error);
         }
       }, 100);
@@ -333,11 +348,11 @@ export const firebaseAuth = {
   // Call after login() / signInWith*() threw an error with `mfaRequired: true`.
   sendMfaSignInCode: async (recaptchaElementId) => {
     if (!pendingMfaResolver) {
-      throw new Error('Your sign-in session expired. Please sign in again.');
+      throw sessionExpired();
     }
     const hint = pendingMfaResolver.hints.find((h) => h.factorId === PhoneMultiFactorGenerator.FACTOR_ID);
     if (!hint) {
-      throw new Error('No phone is enrolled for two-factor sign-in on this account.');
+      throw new AppError('No phone is enrolled for two-factor sign-in on this account.', { code: 'auth/no-phone-factor' });
     }
     const verifier = await firebaseAuth.setupRecaptcha(recaptchaElementId);
     try {
@@ -346,14 +361,14 @@ export const firebaseAuth = {
         verifier
       );
     } catch (error) {
-      throw new Error(smsErrorMessage(error));
+      throw new AppError(smsErrorMessage(error), { code: error.code, cause: error });
     }
   },
 
   // Sign-in step 3: check the SMS code. Firebase only issues the session after this succeeds.
   completeMfaSignIn: async (code) => {
     if (!pendingMfaResolver || !pendingMfaVerificationId) {
-      throw new Error('Your sign-in session expired. Please sign in again.');
+      throw sessionExpired();
     }
     try {
       const credential = PhoneAuthProvider.credential(pendingMfaVerificationId, String(code).trim());
@@ -362,27 +377,28 @@ export const firebaseAuth = {
       pendingMfaVerificationId = null;
       return result.user;
     } catch (error) {
-      throw new Error(verificationCodeErrorMessage(error, 'Verification failed'));
+      throw new AppError(verificationCodeErrorMessage(error, 'Verification failed'), { code: error.code, cause: error });
     }
   },
 
   // Firebase requires a verified email before a second factor can be enrolled.
   sendVerificationEmail: async () => {
     const user = auth.currentUser;
-    if (!user) throw new Error('No authenticated user');
+    if (!user) throw notSignedIn();
     await sendEmailVerification(user);
   },
 
   // Enrolment step 1: text a code to the phone number being enrolled.
   startMfaEnrollment: async (phoneNumber, recaptchaElementId) => {
     const user = auth.currentUser;
-    if (!user) throw new Error('No authenticated user');
+    if (!user) throw notSignedIn();
 
     await user.reload();
     if (!user.emailVerified) {
-      const error = new Error('Please verify your email address first. Check your inbox for the verification link.');
-      error.emailNotVerified = true;
-      throw error;
+      throw new AppError('Please verify your email address first. Check your inbox for the verification link.', {
+        code: 'auth/unverified-email',
+        details: { emailNotVerified: true },
+      });
     }
 
     const normalized = normalizePhone(phoneNumber);
@@ -395,9 +411,9 @@ export const firebaseAuth = {
       );
     } catch (error) {
       if (error.code === 'auth/requires-recent-login') {
-        throw new Error('For your security, please sign out and sign in again before turning on 2FA.');
+        throw new AppError('For your security, please sign out and sign in again before turning on 2FA.', { code: error.code, cause: error });
       }
-      throw new Error(smsErrorMessage(error));
+      throw new AppError(smsErrorMessage(error), { code: error.code, cause: error });
     }
   },
 
@@ -405,9 +421,9 @@ export const firebaseAuth = {
   // Returns { signInAgain: true } if the user must sign in again to get a 2FA session.
   finishMfaEnrollment: async (code) => {
     const user = auth.currentUser;
-    if (!user) throw new Error('No authenticated user');
+    if (!user) throw notSignedIn();
     if (!pendingEnrollmentVerificationId) {
-      throw new Error('Please request a new code.');
+      throw new AppError('Please request a new code.', { code: 'auth/no-pending-code' });
     }
 
     try {
@@ -415,7 +431,7 @@ export const firebaseAuth = {
       await multiFactor(user).enroll(PhoneMultiFactorGenerator.assertion(credential), 'Mobile');
       pendingEnrollmentVerificationId = null;
     } catch (error) {
-      throw new Error(verificationCodeErrorMessage(error, 'Could not turn on 2FA'));
+      throw new AppError(verificationCodeErrorMessage(error, 'Could not turn on 2FA'), { code: error.code, cause: error });
     }
 
     await setTwoFactor('enable');
@@ -425,14 +441,14 @@ export const firebaseAuth = {
   // Removes every enrolled second factor. Firebase may ask for a recent sign-in first.
   disable2FA: async () => {
     const user = auth.currentUser;
-    if (!user) throw new Error('No authenticated user');
+    if (!user) throw notSignedIn();
     try {
       for (const factor of multiFactor(user).enrolledFactors) {
         await multiFactor(user).unenroll(factor);
       }
     } catch (error) {
       if (error.code === 'auth/requires-recent-login') {
-        throw new Error('For your security, please sign out and sign in again before turning off 2FA.');
+        throw new AppError('For your security, please sign out and sign in again before turning off 2FA.', { code: error.code, cause: error });
       }
       throw error;
     }
@@ -444,6 +460,5 @@ export const firebaseAuth = {
     const element = document.getElementById('recaptcha-container');
     if (element) clearRecaptchaElement(element);
     clearRecaptchaVerifier();
-    window.confirmationResult = null;
   },
 };

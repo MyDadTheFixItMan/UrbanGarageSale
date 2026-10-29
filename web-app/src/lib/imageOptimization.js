@@ -48,11 +48,16 @@ export async function compressImage(file, maxWidth = 2560, maxHeight = 1920, qua
         );
       };
       img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = event.target.result;
+      img.src = /** @type {string} */ (event.target.result);
     };
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsDataURL(file);
   });
+}
+
+// Small JPEG for list and map views (cards show photos at about 300px wide).
+export function makeThumbnail(file) {
+  return compressImage(file, 480, 480, 0.75);
 }
 
 /**

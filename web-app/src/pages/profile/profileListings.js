@@ -1,11 +1,9 @@
 // Pure helpers for the profile page's listings. No React or Firebase, so they are unit tested directly.
 import { isBefore, parseISO, startOfDay } from 'date-fns';
 import { passwordProblem } from '@/lib/password';
+import { LISTING_STATUS, isLiveStatus, isPaid, isUnpaidDraft } from '@/lib/listings';
 
-export const isUnpaidDraft = (listing) => listing.status === 'draft' || listing.status === 'pending_payment';
-
-const isLiveStatus = (listing) => listing.status === 'active' || listing.status === 'pending_approval';
-const PAID = ['paid', 'completed', 'free'];
+export { isUnpaidDraft };
 
 function hasEnded(listing, today) {
     return Boolean(listing.end_date) && isBefore(parseISO(listing.end_date), startOfDay(today));
@@ -15,18 +13,18 @@ function hasEnded(listing, today) {
 // Active: approved or awaiting approval, paid (or free), with an end date that has not passed.
 export function groupProfileListings(listings, today = new Date()) {
     return {
-        active: listings.filter((l) => isLiveStatus(l) && l.end_date && !hasEnded(l, today) && PAID.includes(l.payment_status)),
+        active: listings.filter((l) => isLiveStatus(l) && l.end_date && !hasEnded(l, today) && isPaid(l.payment_status)),
         drafts: listings.filter(isUnpaidDraft),
-        past: listings.filter((l) => l.status === 'completed' || (isLiveStatus(l) && hasEnded(l, today))),
+        past: listings.filter((l) => l.status === LISTING_STATUS.COMPLETED || (isLiveStatus(l) && hasEnded(l, today))),
     };
 }
 
 // Which actions the listing card offers for a listing.
 export function listingActions(listing) {
-    const viewable = ['active', 'pending_approval', 'completed', 'rejected'].includes(listing.status);
+    const viewable = [LISTING_STATUS.ACTIVE, LISTING_STATUS.PENDING_APPROVAL, LISTING_STATUS.COMPLETED, LISTING_STATUS.REJECTED].includes(listing.status);
     return {
         view: viewable,
-        edit: isUnpaidDraft(listing) || listing.status === 'active',
+        edit: isUnpaidDraft(listing) || listing.status === LISTING_STATUS.ACTIVE,
         pay: isUnpaidDraft(listing),
         print: isLiveStatus(listing),
     };

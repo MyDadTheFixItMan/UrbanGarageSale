@@ -15,6 +15,7 @@ poster-template/
 web-app/
 lib/
 test/
+tests/
 android/
 ios/
 linux/

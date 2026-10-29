@@ -4,6 +4,7 @@ import { createPageUrl } from './utils';
 import { firebase } from '@/api/firebaseClient';
 import { Plus, Heart, User, Home, Shield, LogOut, Smartphone } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { BUSINESS_NAME, BUSINESS_ABN } from '@/lib/business';
 
 export default function Layout({ children, currentPageName }) {
     const [user, setUser] = useState(null);
@@ -159,6 +160,9 @@ export default function Layout({ children, currentPageName }) {
                             <Link to={createPageUrl('Terms')} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Terms</Link>
                         </nav>
                     </div>
+                    <p className="mt-2 text-center text-xs text-slate-400">
+                        © {new Date().getFullYear()} {BUSINESS_NAME}{BUSINESS_ABN && ` · ABN ${BUSINESS_ABN}`}
+                    </p>
                 </div>
             </footer>
 

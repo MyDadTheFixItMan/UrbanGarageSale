@@ -2,19 +2,26 @@
 // Geocoding web service (maps/api/geocode/json), this works with an API key locked to the
 // website's address, so the key can't be copied and used from anywhere else.
 
+// The Maps JavaScript API global (loaded by a script tag, so it has no imported types).
+const maps = () => /** @type {any} */ (window).google?.maps;
+
 async function loadGeocoder() {
-    for (let attempt = 0; !window.google?.maps?.importLibrary && attempt < 50; attempt++) {
+    for (let attempt = 0; !maps()?.importLibrary && attempt < 50; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    if (!window.google?.maps?.importLibrary) {
+    if (!maps()?.importLibrary) {
         throw new Error('Google Maps did not load');
     }
-    const { Geocoder } = await window.google.maps.importLibrary('geocoding');
+    const { Geocoder } = await maps().importLibrary('geocoding');
     return new Geocoder();
 }
 
 // Returns the first match as { lat, lng, components }, or null when nothing matches.
 // Throws if Google Maps can't be reached.
+/**
+ * @param {string} address
+ * @param {{ country?: string }} [options]
+ */
 export async function geocode(address, { country } = {}) {
     const geocoder = await loadGeocoder();
     const request = { address, region: 'au', ...(country ? { componentRestrictions: { country } } : {}) };

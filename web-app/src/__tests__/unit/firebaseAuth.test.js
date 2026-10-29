@@ -111,7 +111,7 @@ describe('sign-up and social sign-in', () => {
 
   it('turns sign-up errors into readable messages', async () => {
     sdk.createUserWithEmailAndPassword.mockRejectedValue(authError('auth/email-already-in-use'));
-    await expect(firebaseAuth.signUp('a@b.c', 'pw')).rejects.toThrow('already registered');
+    await expect(firebaseAuth.signUp('a@b.c', 'pw')).rejects.toMatchObject({ code: 'auth/email-already-in-use', message: expect.stringMatching(/sign in or reset your password/) });
   });
 
   it('reports a cancelled Google popup plainly', async () => {

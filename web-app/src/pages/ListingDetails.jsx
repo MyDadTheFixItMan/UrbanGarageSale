@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { firebase } from '@/api/firebaseClient';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { usePromotions } from '@/lib/usePromotions';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import {
@@ -14,6 +15,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import SaleMap from '../components/map/SaleMap';
 import { printListingPoster, paperSizes } from '../utils/printGarageSaleSign';
 import { AU_WEEKDAY_DATE } from '@/lib/format';
+import { useToggleSaved } from '@/lib/useToggleSaved';
 import {
     Dialog,
     DialogContent,
@@ -36,7 +38,6 @@ const saleTypeLabels = {
 export default function ListingDetails() {
     const urlParams = new URLSearchParams(window.location.search);
     const saleId = urlParams.get('id');
-    const queryClient = useQueryClient();
 
     const [user, setUser] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -61,18 +62,7 @@ export default function ListingDetails() {
         checkAuth();
     }, []);
 
-    const { data: allPromotions = [] } = useQuery({
-        queryKey: ['allPromotions'],
-        queryFn: async () => {
-            try {
-                return await firebase.firestore.collection('promotions').getDocs('sequence', 'asc');
-            } catch (error) {
-                console.error('Error fetching promotions:', error);
-                return [];
-            }
-        },
-        staleTime: 1000 * 60 * 5,
-    });
+    const allPromotions = usePromotions();
 
     // Rotate promotional messages every 5 seconds
     useEffect(() => {
@@ -94,48 +84,12 @@ export default function ListingDetails() {
 
     const { data: savedListings = [] } = useQuery({
         queryKey: ['savedListings', user?.email],
-        queryFn: () => firebase.entities.SavedListing.filter({ user_email: user?.email }),
+        queryFn: () => firebase.entities.SavedListing.mine(),
         enabled: !!user?.email,
     });
 
     const isSaved = savedListings.some(s => s.garage_sale_id === saleId);
-    const [lastWasSaved, setLastWasSaved] = useState(false);
-
-    const saveMutation = useMutation({
-        mutationFn: async () => {
-            // Check current state at mutation time, not from closure
-            const currentSavedListings = await firebase.entities.SavedListing.filter({ user_email: user?.email });
-            const currentIsSaved = currentSavedListings.some(s => s.garage_sale_id === saleId);
-            
-            console.log('Save mutation called. currentIsSaved:', currentIsSaved, 'saleId:', saleId);
-            
-            if (currentIsSaved) {
-                const saved = currentSavedListings.find(s => s.garage_sale_id === saleId);
-                console.log('Deleting saved listing:', saved);
-                if (!saved) throw new Error('Saved listing not found');
-                await firebase.entities.SavedListing.delete(saved.id);
-                setLastWasSaved(true);
-            } else {
-                console.log('Creating saved listing for:', saleId);
-                await firebase.entities.SavedListing.create({
-                    garage_sale_id: saleId,
-                    user_email: user.email,
-                });
-                setLastWasSaved(false);
-            }
-        },
-        onSuccess: () => {
-            console.log('Save mutation succeeded, invalidating query');
-            // Invalidate both the current page's query and the SavedListings page query
-            queryClient.invalidateQueries({ queryKey: ['savedListings', user?.email] });
-            queryClient.invalidateQueries({ queryKey: ['savedListings'] });
-            toast.success(lastWasSaved ? 'Removed from favourites' : 'Saved to favourites');
-        },
-        onError: (error) => {
-            console.error('Save mutation failed:', error);
-            toast.error('Failed to save: ' + error.message);
-        },
-    });
+    const saveMutation = useToggleSaved();
 
     const handleGetDirections = () => {
         if (sale?.latitude && sale?.longitude) {
@@ -258,7 +212,7 @@ export default function ListingDetails() {
                     
                     {isAuthenticated && (
                         <Button
-                            onClick={() => saveMutation.mutate()}
+                            onClick={() => saveMutation.mutate(saleId)}
                             disabled={saveMutation.isPending}
                             variant={isSaved ? "default" : "outline"}
                             className={`gap-2 ${isSaved ? 'bg-[#1e3a5f] hover:bg-[#152a45]' : ''}`}

@@ -9,9 +9,16 @@ on:
     paths:
       - 'web-app/**'
       - 'api/**'
+      - 'tests/**'
+      - 'firestore.rules'
+      - 'storage.rules'
+      - 'firebase.json'
+      - 'package*.json'
       - '.github/workflows/test.yml'
   pull_request:
     branches: [main, develop]
+  # Lets the deploy workflow run the full suite before deploying.
+  workflow_call:
 
 jobs:
   web-app:
@@ -35,6 +42,9 @@ jobs:
 
       - run: npm run lint
 
+      - run: npm run typecheck
+
+      # Includes the axe-core accessibility checks in src/__tests__/accessibility
       - run: npm test -- --maxWorkers=2
         env:
           CI: true
@@ -53,8 +63,39 @@ jobs:
 
       - run: npm ci
 
-      - name: Syntax-check API and Cloud Functions
+      - name: Syntax-check API, Cloud Functions and scripts
         run: |
-          for f in api/*.js api/*/*.js web-app/functions/index.js scripts/*.js scripts/*.mjs; do
+          for f in api/*.js api/*/*.js web-app/functions/index.js web-app/functions/lib/*.js scripts/*.js scripts/*.mjs; do
             node --check "$f"
           done
+
+      - name: API unit tests
+        run: npm test
+
+      - name: Cloud Functions unit tests
+        working-directory: web-app/functions
+        run: |
+          npm ci
+          npm test
+
+  security-rules:
+    # Every allow/deny in firestore.rules and storage.rules, against the Firebase emulators.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/rules
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+
+      - run: npm test

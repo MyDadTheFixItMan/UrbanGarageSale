@@ -3,7 +3,7 @@ allprojects {
         google()
         mavenCentral()
     }
-    // flutter_stripe 10 declares Stripe's card push-provisioning library (adding cards to Google
+    // flutter_stripe (stripe_android, compileOnly as of 14.x) declares Stripe's card push-provisioning library (adding cards to Google
     // Wallet), which depends on Google's private play-services-tapandpay artifact. The app doesn't
     // use push provisioning, and the artifact isn't published, so release builds can't resolve it.
     configurations.configureEach {

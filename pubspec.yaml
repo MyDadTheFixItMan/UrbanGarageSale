@@ -41,7 +41,7 @@ dependencies:
   firebase_auth: ^5.0.0
   
   # Stripe Payment Integration
-  flutter_stripe: ^10.0.0
+  flutter_stripe: ^14.2.0
   
   # HTTP Requests
   http: ^1.1.0

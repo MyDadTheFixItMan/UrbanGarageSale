@@ -2,212 +2,86 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import '../services/stripe_terminal_service.dart';
-import '../widgets/reader_selection_dialog.dart';
-import 'terminal_payment_screen.dart';
-import '../config/api_config.dart';
+import 'package:intl/intl.dart';
+import '../models/sale.dart';
+import '../services/tap_to_pay_service.dart';
+import '../services/urban_pay_service.dart';
 
+/// Takes card payments with the phone itself: the customer taps their card or phone on the
+/// back of the seller's phone. No separate card reader is needed.
 class TapToPayReader extends StatefulWidget {
-  final String? stripeConnectId;
-
-  const TapToPayReader({super.key, this.stripeConnectId});
+  const TapToPayReader({super.key});
 
   @override
   State<TapToPayReader> createState() => _TapToPayReaderState();
 }
 
 class _TapToPayReaderState extends State<TapToPayReader> {
+  static const _navy = Color(0xFF1e3a5f);
+
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _auth = FirebaseAuth.instance;
-  final _firestore = FirebaseFirestore.instance;
+  final _tapToPay = TapToPayService.instance;
+  final _urbanPay = UrbanPayService();
+  final _currency = NumberFormat.currency(locale: 'en_AU', symbol: '\$', decimalDigits: 2);
 
-  bool _isProcessing = false;
-  bool _stripeValid = true;
-  String? _connectedReaderId;
-  String? _connectedReaderLabel;
+  List<GarageSaleOption>? _garageSales;
+  String? _garageSaleId;
+  String? _loadError;
+  bool _processing = false;
 
   @override
   void initState() {
     super.initState();
-    _verifyStripeStatus();
+    _loadGarageSales();
   }
 
-  Future<void> _verifyStripeStatus() async {
+  Future<void> _loadGarageSales() async {
     try {
-      final userId = _auth.currentUser?.uid;
-      if (userId == null) {
-        setState(() => _stripeValid = false);
-        return;
-      }
-
-      final userDoc = await _firestore.collection('users').doc(userId).get();
-      final hasStripe = userDoc.data()?['stripeConnectId'] != null;
-
-      setState(() => _stripeValid = hasStripe);
-    } catch (e) {
-      setState(() => _stripeValid = false);
-    }
-  }
-
-  Future<void> _selectAndConnectReader() async {
-    showDialog(
-      context: context,
-      builder: (context) => ReaderSelectionDialog(
-        onReaderSelected: (reader) {
-          setState(() {
-            _connectedReaderId = reader['id'] as String;
-            _connectedReaderLabel = reader['label'] as String?;
-          });
-          _showMessage('Connected to ${reader['label']}');
-        },
-      ),
-    );
-  }
-
-  Future<void> _processPayment() async {
-    final amount = double.tryParse(_amountController.text);
-    final description = _descriptionController.text.trim();
-
-    if (amount == null || amount <= 0) {
-      _showMessage('Please enter a valid amount');
-      return;
-    }
-
-    if (description.isEmpty) {
-      _showMessage('Please enter a description');
-      return;
-    }
-
-    if (_connectedReaderId == null) {
-      _showMessage('Please select and connect a reader first');
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-
-    try {
-      // Step 1: Create payment intent on backend
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('Not authenticated');
-
-      final idToken = await user.getIdToken();
-
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/urbanPayment/createPaymentIntent'),
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'amount': amount,
-          'description': description,
-          'channel': 'terminal',
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        final error = (jsonDecode(response.body) as Map?)?['error'];
-        throw Exception(error ?? 'Failed to create payment intent');
-      }
-
-      final paymentData = jsonDecode(response.body);
-      final paymentIntentId = paymentData['paymentIntentId'] as String;
-
-      // Step 2: Show payment screen with reader
-      if (mounted) {
-        // Navigate to terminal payment screen
-        final result = await Navigator.push<Map<String, dynamic>>(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TerminalPaymentScreen(
-              amount: amount,
-              description: description,
-              paymentIntentId: paymentIntentId,
-              onPaymentComplete: (result) {
-                Navigator.pop(context, result);
-              },
-              onPaymentError: (error) {
-                _showMessage('Payment error: $error');
-              },
-            ),
-          ),
-        );
-
-        if (result != null) {
-          // Payment was successful - record it
-          await _recordPaymentInDatabase(
-            amount,
-            description,
-            paymentIntentId,
-            result,
-          );
-
-          // Clear form
-          _amountController.clear();
-          _descriptionController.clear();
-
-          _showMessage('Payment recorded successfully!');
-        }
-      }
-    } catch (e) {
-      _showMessage('Error: $e');
-    } finally {
-      setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _recordPaymentInDatabase(
-    double amount,
-    String description,
-    String paymentIntentId,
-    Map<String, dynamic> paymentResult,
-  ) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('Not authenticated');
-
-    final idToken = await user.getIdToken();
-
-    // The server reads the amount and status from Stripe; only succeeded payments are recorded.
-    final response = await http.post(
-      Uri.parse('$apiBaseUrl/urbanPayment/recordTapToPaySale'),
-      headers: {
-        'Authorization': 'Bearer $idToken',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'description': description,
-        'paymentIntentId': paymentIntentId,
-        'paymentMethod': 'tap_to_pay',
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      final error = (jsonDecode(response.body) as Map?)?['error'];
-      throw Exception(error ?? 'Payment taken but could not be recorded');
-    }
-  }
-
-  Future<void> _disconnectReader() async {
-    try {
-      await StripeTerminalService.disconnectReader();
+      final sellerId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      final sales = await _urbanPay.getActiveGarageSales(sellerId);
+      if (!mounted) return;
       setState(() {
-        _connectedReaderId = null;
-        _connectedReaderLabel = null;
+        _garageSales = sales;
+        _garageSaleId = sales.length == 1 ? sales.first.id : null;
+        _loadError = null;
       });
-      _showMessage('Reader disconnected');
     } catch (e) {
-      _showMessage('Error disconnecting: $e');
+      if (mounted) setState(() => _loadError = 'Could not load your garage sales. Pull down to try again.');
+    }
+  }
+
+  Future<void> _charge() async {
+    final amount = double.tryParse(_amountController.text.trim());
+    final description = _descriptionController.text.trim();
+    final garageSaleId = _garageSaleId;
+
+    if (garageSaleId == null) return _showMessage('Choose the garage sale you are selling at');
+    if (amount == null || amount < 0.5) return _showMessage('Enter an amount of at least \$0.50');
+    if (description.isEmpty) return _showMessage('Enter what is being bought');
+
+    setState(() => _processing = true);
+    try {
+      await _tapToPay.charge(
+        garageSaleId: garageSaleId,
+        amount: amount,
+        description: description,
+      );
+      _amountController.clear();
+      _descriptionController.clear();
+      _showMessage('Paid ${_currency.format(amount)}. Sale recorded.');
+    } on TapToPayException catch (e) {
+      _showMessage(e.message);
+    } catch (e) {
+      _showMessage('Payment failed: $e');
+    } finally {
+      if (mounted) setState(() => _processing = false);
     }
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -219,280 +93,137 @@ class _TapToPayReaderState extends State<TapToPayReader> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_stripeValid) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF5F1E8),
-        appBar: AppBar(
-          title: const Text('Tap to Pay'),
-          backgroundColor: const Color(0xFF1e3a5f),
-          elevation: 0,
-        ),
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF9500).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.credit_card,
-                    size: 40,
-                    color: Color(0xFFFF9500),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Card Payments Not Enabled',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1e3a5f),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'To accept card payments with Tap to Pay, you need to enable card payments in your profile first.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F1E8),
       appBar: AppBar(
-        title: const Text('Tap to Pay Terminal'),
-        backgroundColor: const Color(0xFF1e3a5f),
+        title: const Text('Tap to Pay'),
+        backgroundColor: _navy,
+        foregroundColor: Colors.white,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: RefreshIndicator(
+        onRefresh: _loadGarageSales,
+        child: ListView(
+          padding: const EdgeInsets.all(24),
           children: [
-            // Reader Connection Status
-            Card(
-              margin: const EdgeInsets.only(bottom: 24),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Reader Status',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1e3a5f),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_connectedReaderId != null)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Connected: $_connectedReaderLabel',
-                                  style: const TextStyle(color: Colors.green),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton(
-                              onPressed: _disconnectReader,
-                              child: const Text('Disconnect Reader'),
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.bluetooth_disabled,
-                                color: Colors.red,
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'No reader connected',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _selectAndConnectReader,
-                              icon: const Icon(Icons.bluetooth_connected),
-                              label: const Text('Select & Connect Reader'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1e3a5f),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
+            if (terminalSimulated)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Test mode: payments use Stripe\'s simulated reader. No real card is charged.',
                 ),
               ),
-            ),
-
-            // Payment Form
-            Card(
-              margin: const EdgeInsets.only(bottom: 24),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Payment Amount',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1e3a5f),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _amountController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        prefixText: '\$ ',
-                        hintText: '0.00',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Description',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1e3a5f),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _descriptionController,
-                      decoration: InputDecoration(
-                        hintText: 'What is being purchased?',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                      maxLines: 2,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Process Button
-            ElevatedButton(
-              onPressed: _isProcessing || _connectedReaderId == null
-                  ? null
-                  : _processPayment,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1e3a5f),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                disabledBackgroundColor: Colors.grey,
-              ),
-              child: _isProcessing
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text(
-                      'Collect Payment',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            ),
-
+            _garageSaleCard(),
+            const SizedBox(height: 16),
+            _paymentCard(),
             const SizedBox(height: 24),
+            if (_processing)
+              OutlinedButton(
+                onPressed: _tapToPay.cancel,
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                child: const Text('Cancel payment'),
+              )
+            else
+              ElevatedButton.icon(
+                onPressed: _garageSaleId == null ? null : _charge,
+                icon: const Icon(Icons.contactless),
+                label: const Text('Charge', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _navy,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            if (_processing) ...[
+              const SizedBox(height: 16),
+              const Center(child: CircularProgressIndicator()),
+              const SizedBox(height: 12),
+              const Text(
+                'Ask the customer to hold their card or phone against the back of your phone.',
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 24),
+            const Text(
+              'The first payment on a phone can take a little longer while Tap to Pay sets up. '
+              'Keep NFC turned on, and keep the app open until the payment finishes.',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-            // Info Box
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'How Tap to Pay Works:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1e3a5f),
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '1. Select and connect a payment reader\n'
-                    '2. Enter the payment amount\n'
-                    '3. Add a description\n'
-                    '4. Tap "Collect Payment"\n'
-                    '5. Customer taps their card/phone',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                ],
-              ),
+  Widget _garageSaleCard() {
+    final sales = _garageSales;
+    Widget content;
+    if (_loadError != null) {
+      content = Text(_loadError!, style: const TextStyle(color: Colors.red));
+    } else if (sales == null) {
+      content = const Center(child: CircularProgressIndicator());
+    } else if (sales.isEmpty) {
+      content = const Text(
+        'You need a live (approved) garage sale listing to take card payments. '
+        'Create one on the Urban Garage Sale website.',
+      );
+    } else {
+      content = DropdownButtonFormField<String>(
+        initialValue: _garageSaleId,
+        isExpanded: true,
+        hint: const Text('Choose a garage sale'),
+        items: [
+          for (final sale in sales)
+            DropdownMenuItem(value: sale.id, child: Text(sale.label, overflow: TextOverflow.ellipsis)),
+        ],
+        onChanged: _processing ? null : (id) => setState(() => _garageSaleId = id),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Garage sale', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _navy)),
+            const SizedBox(height: 12),
+            content,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _paymentCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Amount', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _navy)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _amountController,
+              enabled: !_processing,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(prefixText: '\$ ', hintText: '0.00', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 16),
+            const Text('What is being bought?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _navy)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _descriptionController,
+              enabled: !_processing,
+              maxLength: 100,
+              decoration: const InputDecoration(hintText: 'e.g. Bookshelf', border: OutlineInputBorder()),
             ),
           ],
         ),

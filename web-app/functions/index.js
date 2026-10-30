@@ -451,6 +451,7 @@ exports.deleteUser = callable([], async (request) => {
     await deleteQueryInBatches(db.collection('sales').where('sellerId', '==', userId));
     await deleteQueryInBatches(db.collection('saleStats').where('sellerId', '==', userId));
     await deleteQueryInBatches(db.collection('contactMessages').where('user_id', '==', userId));
+    await deleteQueryInBatches(db.collection('terminalLocations').where('sellerId', '==', userId));
     if (email) {
         await deleteQueryInBatches(db.collection('contactMessages').where('email', '==', email));
     }

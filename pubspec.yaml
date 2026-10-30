@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.10.7
+  sdk: ^3.12.0
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -36,12 +36,12 @@ dependencies:
   cupertino_icons: ^1.0.8
   
   # Firebase and Cloud
-  firebase_core: ^3.0.0
-  cloud_firestore: ^5.6.0
-  firebase_auth: ^5.0.0
+  firebase_core: ^5.1.0
+  cloud_firestore: ^7.1.0
+  firebase_auth: ^7.0.1
   
   # Stripe Payment Integration
-  flutter_stripe: ^10.0.0
+  flutter_stripe: ^14.2.0
   
   # HTTP Requests
   http: ^1.1.0
@@ -51,6 +51,8 @@ dependencies:
   
   # State Management (optional but recommended)
   provider: ^6.0.0
+  mek_stripe_terminal: ^5.7.3
+  permission_handler: ^13.0.2
 
 dev_dependencies:
   flutter_test:

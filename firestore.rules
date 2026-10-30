@@ -282,7 +282,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // oauth_states, auditLog, rateLimits and anything not listed above: no client access
+    // oauth_states, auditLog, rateLimits, terminalLocations and anything not listed above: no client access
     // (Admin SDK only).
   }
 }

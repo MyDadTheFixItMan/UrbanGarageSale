@@ -42,10 +42,12 @@ function getStripe() {
     return stripe;
 }
 
-// Returns false (and sends nothing) when SendGrid isn't configured.
+// Returns false (and sends nothing) when SendGrid isn't configured. Secret Manager can't hold an
+// empty value, so projects without email (e.g. staging) set the secret to "not-configured".
 async function sendEmail(message) {
-    if (!process.env.SENDGRID_API_KEY) return false;
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    const key = process.env.SENDGRID_API_KEY;
+    if (!key || key === 'not-configured') return false;
+    sgMail.setApiKey(key);
     await sgMail.send(message);
     return true;
 }

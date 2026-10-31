@@ -1,12 +1,29 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  // `npm run dev:staging`: the site talks to the staging Firebase project, and the dev server
+  // forwards /api to the staging API (a protected Vercel preview), adding the bypass secret here
+  // so it never reaches the browser. Neither variable has the VITE_ prefix, so neither is bundled.
+  const env = loadEnv(mode, __dirname, '')
+  const stagingProxy = mode === 'staging' && env.STAGING_API_URL
+    ? {
+        '/api': {
+          target: env.STAGING_API_URL,
+          changeOrigin: true,
+          headers: env.VERCEL_PROTECTION_BYPASS
+            ? { 'x-vercel-protection-bypass': env.VERCEL_PROTECTION_BYPASS }
+            : {},
+        },
+      }
+    : undefined
+
+  return {
   plugins: [
     react(),
   ],
@@ -40,5 +57,7 @@ export default defineConfig(({ mode }) => ({
       'Pragma': 'no-cache',
       'Expires': '0',
     },
+    proxy: stagingProxy,
   },
-}));
+  };
+});

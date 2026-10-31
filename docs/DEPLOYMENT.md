@@ -140,17 +140,19 @@ One-time setup in GitHub (Settings → Environments), for `staging` and `product
 
 ## Staging
 
-A separate Firebase project (e.g. `urbangaragesale-staging`) with Stripe **test** keys, so tests
-never touch live payments or real users' data:
+A separate Firebase project, **`urbangaragesale-staging`** (set up October 2026), with Stripe
+**test** keys, so tests never touch live payments or real users' data. The Vercel **Preview**
+deployments of `urban-garage-sale` are the staging API.
 
-1. Create the project in the Firebase console (Blaze plan), enable Firestore in
-   `australia-southeast2`, Authentication with SMS MFA, and Storage.
-2. Set its functions secrets with Stripe test keys, and create a `staging` environment in
-   GitHub with `FIREBASE_PROJECT` set to the new project ID.
-3. Point Vercel Preview environment variables (`VITE_FIREBASE_*`, `FIREBASE_SERVICE_ACCOUNT_JSON`,
-   `STRIPE_SECRET_KEY`) at the staging project and Stripe test mode.
-4. Deploy with the Deploy workflow, target `staging`, and run the checks in `docs/TEST_PLAN.md`
-   before deploying to production.
+| Part | Staging setup |
+|---|---|
+| Firebase | Blaze; Firestore `australia-southeast2`; Auth like production (email/password, SMS MFA, 12+ character password policy, enumeration protection); Storage. Same rules and indexes: `npx firebase-tools deploy --only firestore,storage --project urbangaragesale-staging`. |
+| Cloud Functions | `npx firebase-tools deploy --only functions --project urbangaragesale-staging` (from `web-app`). `web-app/functions/.env.urbangaragesale-staging` overrides `.env`. Secrets: `STRIPE_SECRET_KEY` = Stripe **test** secret key; `SENDGRID_API_KEY` and `STRIPE_WEBHOOK_SECRET` = `not-configured` until needed. |
+| API (Vercel Preview env) | `FIREBASE_PROJECT_ID=urbangaragesale-staging`; `FIREBASE_SERVICE_ACCOUNT_JSON` = key of `urban-pay-api@urbangaragesale-staging` (`datastore.user`, `firebaseauth.admin`); `STRIPE_SECRET_KEY` = test key; `FRONTEND_URL`, `APP_URL`, `ALLOWED_ORIGINS` = `http://localhost:5173`. |
+| Vercel Authentication | Stays on for previews. Test builds of the mobile app send a *Protection Bypass for Automation* secret (Project → Settings → Deployment Protection) via `--dart-define=VERCEL_PROTECTION_BYPASS=…`. |
+| Mobile app | `--dart-define=FIREBASE_ENV=staging` plus a `pk_test_` key and the preview `API_BASE_URL`; the app refuses to start with staging Firebase and live Stripe or the live API. See `docs/TAP_TO_PAY_SETUP.md`. |
+
+Run the checks in `docs/TEST_PLAN.md` against staging before deploying to production.
 
 ## Rollback
 

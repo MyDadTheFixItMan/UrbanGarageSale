@@ -42,12 +42,21 @@ html, body {
   left: 8.5mm;
 }
 
-/* Only the sheet on the right of a join gets folded, so only its marks say so. */
+/* Both words read upward on the strip that ends up hidden: "Fold" is folded under, and the fold
+   then covers "Join". So the line runs along the base of "Fold" and the top of "Join". */
 .join-mark-left::before {
   content: 'Fold';
+  right: calc(100% + 1.3mm);
+}
+
+.join-mark-right::before {
+  content: 'Join';
+  left: 0.8mm;
+}
+
+.join-mark::before {
   position: absolute;
   top: 50%;
-  right: calc(100% + 1.3mm);
   writing-mode: vertical-rl;
   transform: translateY(-50%) rotate(180deg);
   font-size: 7pt;

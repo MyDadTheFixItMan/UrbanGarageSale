@@ -117,11 +117,11 @@ describe('buildPosterHtml', () => {
     expect(marks('A4')).toBe(0);
   });
 
-  it('labels only the sheet that gets folded', () => {
+  it('labels the mark to fold on the right-hand sheet and the mark to join to on the left', () => {
     const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
 
     expect(html).toMatch(/\.join-mark-left::before \{[^}]*content: 'Fold'/);
-    expect(html).not.toMatch(/\.join-mark-right::before/);
+    expect(html).toMatch(/\.join-mark-right::before \{[^}]*content: 'Join'/);
   });
 
   it('stops the browser splitting a sheet across pages when printing', () => {

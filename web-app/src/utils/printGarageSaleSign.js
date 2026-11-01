@@ -10,7 +10,7 @@ const paperSizes = {
     height: 594,
     name: 'A2 - Prints on 4 A4 sheets (fold and tape)',
     sheetsAcross: 2,
-    note: 'Print at 100% (Actual size). Fold the left edge of each right-hand sheet back along its small marks, lay the fold on the marks of the sheet to its left, then tape.',
+    note: 'Print at 100% (Actual size). Fold the left edge of each right-hand sheet back along its Fold marks, lay the fold on the Join marks of the sheet to its left, then tape.',
   },
 };
 

@@ -117,6 +117,13 @@ describe('buildPosterHtml', () => {
     expect(marks('A4')).toBe(0);
   });
 
+  it('labels only the sheet that gets folded', () => {
+    const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
+
+    expect(html).toMatch(/\.join-mark-left::before \{[^}]*content: 'fold'/);
+    expect(html).not.toMatch(/\.join-mark-right::before/);
+  });
+
   it('stops the browser splitting a sheet across pages when printing', () => {
     const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
 

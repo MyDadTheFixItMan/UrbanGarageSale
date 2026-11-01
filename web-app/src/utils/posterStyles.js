@@ -35,19 +35,31 @@ html, body {
 .join-mark {
   position: absolute;
   height: 8mm;
-  border-left: 0.5mm solid #475569;
+  border-left: 1mm solid #475569;
 }
 
 .join-mark-left {
-  left: 7mm;
+  left: 6.5mm;
+}
+
+/* Only the sheet on the right of a join gets folded, so only its marks say so. */
+.join-mark-left::before {
+  content: 'fold';
+  position: absolute;
+  bottom: 100%;
+  left: -0.5mm;
+  transform: translateX(-50%);
+  font-size: 7pt;
+  line-height: 1.2;
+  color: #475569;
 }
 
 .join-mark-right {
-  right: 7mm;
+  right: 6.5mm;
 }
 
 .join-mark-top {
-  top: 8mm;
+  top: 11mm;
 }
 
 .join-mark-bottom {

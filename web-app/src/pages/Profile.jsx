@@ -77,7 +77,10 @@ export default function Profile() {
                 window.location.href = '/login';
                 return;
             }
-            setUser(await firebase.auth.me());
+            const me = await firebase.auth.me();
+            setUser(me);
+            // 2FA is required for listings and Urban Pay, so accounts without it go straight into setup.
+            if (!me?.two_fa_enabled) setTwoFADialogOpen(true);
         };
         init();
     }, []);

@@ -385,7 +385,22 @@ export const firebaseAuth = {
   sendVerificationEmail: async () => {
     const user = auth.currentUser;
     if (!user) throw notSignedIn();
-    await sendEmailVerification(user);
+    try {
+      await sendEmailVerification(user);
+    } catch (error) {
+      if (error.code === 'auth/too-many-requests') {
+        throw new AppError('We have sent several emails already. Please wait a few minutes and check your junk folder.', { code: error.code, cause: error });
+      }
+      throw toAppError(error, 'Could not send the verification email. Please try again.');
+    }
+  },
+
+  // True if the email is verified, asking Firebase rather than trusting the cached user.
+  isEmailVerified: async () => {
+    const user = auth.currentUser;
+    if (!user) throw notSignedIn();
+    await user.reload();
+    return user.emailVerified;
   },
 
   // Enrolment step 1: text a code to the phone number being enrolled.

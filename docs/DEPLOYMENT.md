@@ -146,7 +146,7 @@ deployments of `urban-garage-sale` are the staging API.
 
 | Part | Staging setup |
 |---|---|
-| Firebase | Blaze; Firestore `australia-southeast2`; Auth like production (email/password, SMS MFA, 12+ character password policy, enumeration protection); Storage. Same rules and indexes: `npx firebase-tools deploy --only firestore,storage --project urbangaragesale-staging`. |
+| Firebase | Blaze; Firestore `australia-southeast2`; Auth like production (email/password, SMS MFA, SMS region allowlist set to AU, 12+ character password policy, enumeration protection); Storage. Same rules and indexes: `npx firebase-tools deploy --only firestore,storage --project urbangaragesale-staging`. |
 | Cloud Functions | `npx firebase-tools deploy --only functions --project urbangaragesale-staging` (from `web-app`). `web-app/functions/.env.urbangaragesale-staging` overrides `.env`. Secrets: `STRIPE_SECRET_KEY` = Stripe **test** secret key; `SENDGRID_API_KEY` and `STRIPE_WEBHOOK_SECRET` = `not-configured` until needed. |
 | API (Vercel Preview env) | `FIREBASE_PROJECT_ID=urbangaragesale-staging`; `FIREBASE_SERVICE_ACCOUNT_JSON` = key of `urban-pay-api@urbangaragesale-staging` (`datastore.user`, `firebaseauth.admin`); `STRIPE_SECRET_KEY` = test key; `FRONTEND_URL`, `APP_URL`, `ALLOWED_ORIGINS` = `http://localhost:5173`. |
 | Vercel Authentication | Stays on for previews. Test builds of the mobile app send a *Protection Bypass for Automation* secret (Project → Settings → Deployment Protection) via `--dart-define=VERCEL_PROTECTION_BYPASS=…`. |

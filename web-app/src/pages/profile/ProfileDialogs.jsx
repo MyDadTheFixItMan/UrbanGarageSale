@@ -23,6 +23,8 @@ const profileForm = (user) => ({
     email: user?.email || '',
     full_name: user?.full_name || '',
     address: user?.address || '',
+    postcode: user?.postcode || '',
+    state: user?.state || '',
     phone: user?.phone || '',
 });
 
@@ -74,7 +76,9 @@ export function EditProfileDialog({ user, onSaved }) {
                             value={form.address}
                             onChange={set('address')}
                             onSelect={(place) => {
-                                if (place.address) set('address')(place.address);
+                                if (place.address) {
+                                    setForm((prev) => ({ ...prev, address: place.address, postcode: place.postcode || '', state: place.state || '' }));
+                                }
                             }}
                             placeholder="123 Main Street, Sydney NSW 2000"
                             className="mt-1.5"

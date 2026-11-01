@@ -53,8 +53,22 @@ function MapUpdater({ center, zoom }) {
     return null;
 }
 
+// Frames every pin. Compares positions rather than the `sales` array, because pages pass a new
+// array on each render and re-framing then would undo the viewer's panning and zooming.
+function FitToSales({ sales }) {
+    const map = useMap();
+    const positions = JSON.stringify(
+        sales.filter((sale) => sale.latitude && sale.longitude).map((sale) => [sale.latitude, sale.longitude]),
+    );
+    useEffect(() => {
+        const points = JSON.parse(positions);
+        if (points.length > 0) map.fitBounds(points, { padding: [40, 40], maxZoom: 14 });
+    }, [positions, map]);
+    return null;
+}
+
 export default function SaleMap({ sales, center, zoom = 12 }) {
-    const defaultCenter = center || [-33.8688, 151.2093]; // Sydney default
+    const defaultCenter = center || [-33.8688, 151.2093]; // Sydney until FitToSales frames the pins
 
     return (
         <div className="w-full h-full rounded-2xl overflow-hidden shadow-lg">
@@ -68,8 +82,8 @@ export default function SaleMap({ sales, center, zoom = 12 }) {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                <MapUpdater center={center} zoom={zoom} />
-                
+                {center ? <MapUpdater center={center} zoom={zoom} /> : <FitToSales sales={sales} />}
+
                 {sales.map((sale) => (
                     sale.latitude && sale.longitude && (
                         <Marker

@@ -1,3 +1,4 @@
+import { waitFor } from '@testing-library/react';
 import {
   saleTypeLabel,
   formatPosterTime,
@@ -20,8 +21,7 @@ describe('printAfterDialogCloses', () => {
 
     await jest.advanceTimersByTimeAsync(300);
     jest.useRealTimers();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(open).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
     open.mockRestore();
   });
 });

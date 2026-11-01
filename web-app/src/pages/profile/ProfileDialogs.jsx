@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Loader2, Pencil, Printer } from 'lucide-react';
 import { toast } from "sonner";
@@ -23,6 +23,8 @@ const profileForm = (user) => ({
     email: user?.email || '',
     full_name: user?.full_name || '',
     address: user?.address || '',
+    postcode: user?.postcode || '',
+    state: user?.state || '',
     phone: user?.phone || '',
 });
 
@@ -74,7 +76,9 @@ export function EditProfileDialog({ user, onSaved }) {
                             value={form.address}
                             onChange={set('address')}
                             onSelect={(place) => {
-                                if (place.address) set('address')(place.address);
+                                if (place.address) {
+                                    setForm((prev) => ({ ...prev, address: place.address, postcode: place.postcode || '', state: place.state || '' }));
+                                }
                             }}
                             placeholder="123 Main Street, Sydney NSW 2000"
                             className="mt-1.5"
@@ -203,6 +207,10 @@ export function ChangePasswordDialog({ email }) {
 
 export function PrintSignDialog({ listing, onClose, onPrint }) {
     const [size, setSize] = useState('A4');
+    // Printing clears `listing`, but the dialog stays up while it animates closed, and the print
+    // window can pause that. Keep the listing so the button still works if it's clicked again.
+    const lastListing = useRef(listing);
+    if (listing) lastListing.current = listing;
     return (
         <Dialog open={!!listing} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-[400px]">
@@ -231,7 +239,7 @@ export function PrintSignDialog({ listing, onClose, onPrint }) {
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button className="bg-[#1e3a5f] hover:bg-[#152a45]" onClick={() => onPrint(listing)}>
+                    <Button className="bg-[#1e3a5f] hover:bg-[#152a45]" onClick={() => onPrint(lastListing.current, size)}>
                         <Printer className="w-4 h-4 mr-2" />
                         Print Sign
                     </Button>

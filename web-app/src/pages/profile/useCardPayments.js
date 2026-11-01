@@ -1,7 +1,22 @@
 import { useEffect, useState } from 'react';
 import { toast } from "sonner";
 import { firebase } from '@/api/firebaseClient';
+import { AU_STATES } from '@/api/firebase/entities';
 import { API_BASE_URL, apiFetch } from '@/lib/api-base';
+
+const STRIPE_POPUP_NAMES = ['stripeOnboarding', 'stripeOAuth'];
+
+// The seller's address for their Stripe account. Anything missing or invalid is left out, and
+// Stripe asks for it during sign-up. Profiles have no suburb, so Stripe always asks for that.
+export function stripeAddress(user) {
+    const state = String(user?.state || '').toUpperCase();
+    const postcode = String(user?.postcode || '');
+    return {
+        address: user?.address,
+        state: AU_STATES.includes(state) ? state : undefined,
+        postcode: /^\d{4}$/.test(postcode) ? postcode : undefined,
+    };
+}
 
 // POSTs to our API as the signed-in user and returns the JSON body.
 async function postApi(path, body) {
@@ -53,6 +68,12 @@ function openPopupAndWait(url, name) {
     });
 }
 
+// Stripe returns to this page inside the popup. Closing it hands back to openPopupAndWait in the
+// main window, which refreshes the status. Does nothing in a normal tab.
+function closeIfStripePopup() {
+    if (window.opener || STRIPE_POPUP_NAMES.includes(window.name)) window.close();
+}
+
 function cleanOAuthParams() {
     window.history.replaceState({}, document.title, window.location.pathname + '?tab=payments');
 }
@@ -93,6 +114,11 @@ export function useCardPayments(user, setUser) {
         return () => { cancelled = true; };
     }, [stripeConnectId, storedEnabled]);
 
+    // Stripe onboarding finished: its return URL has ?success=true.
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).get('success') === 'true') closeIfStripePopup();
+    }, []);
+
     // Stripe OAuth redirects back here with ?code=&state= (or ?error=).
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -112,6 +138,7 @@ export function useCardPayments(user, setUser) {
                 setUser(await firebase.auth.me());
                 setEnabled(data.cardPaymentsEnabled === true);
                 toast.success('Stripe account linked successfully!', { id: toastId });
+                closeIfStripePopup();
             })
             .catch((err) => {
                 toast.error('Failed to link account: ' + err.message, { id: toastId });
@@ -149,10 +176,7 @@ export function useCardPayments(user, setUser) {
                 email: currentUser?.email,
                 firstName: firstName || 'Seller',
                 lastName: rest.join(' ') || currentUser?.email?.split('@')[0],
-                address: user?.address,
-                city: 'Sydney',
-                state: 'NSW',
-                postcode: '2000',
+                ...stripeAddress(user),
                 refreshUrl: window.location.href,
                 returnUrl: window.location.href,
             }),

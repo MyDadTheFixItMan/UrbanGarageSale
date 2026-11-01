@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format, parseISO, differenceInDays } from 'date-fns';
 import SaleMap from '../components/map/SaleMap';
-import { printListingPoster, paperSizes } from '../utils/printGarageSaleSign';
+import { printAfterDialogCloses, paperSizes } from '../utils/printGarageSaleSign';
 import { AU_WEEKDAY_DATE } from '@/lib/format';
 import { useToggleSaved } from '@/lib/useToggleSaved';
 import {
@@ -120,8 +120,8 @@ export default function ListingDetails() {
 
     const handlePrintSignConfirm = () => {
         if (sale) {
-            printListingPoster(sale);
             setPrintDialogOpen(false);
+            printAfterDialogCloses(sale, selectedPrintSize);
             setSelectedPrintSize('A4');
             toast.success('Opening print poster window...');
         }

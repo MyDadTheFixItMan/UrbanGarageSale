@@ -6,23 +6,10 @@ import { compressImage, makeThumbnail } from '@/lib/imageOptimization';
 import { FormSection } from './ListingSections';
 import { MAX_PHOTOS, ALLOWED_PHOTO_TYPES, photoProblem } from './listingForm';
 
-// Reads an image's pixel size, or null if the browser can't decode it.
-function readDimensions(file) {
-    return new Promise((resolve) => {
-        const img = new window.Image();
-        img.onload = () => {
-            URL.revokeObjectURL(img.src);
-            resolve({ width: img.width, height: img.height });
-        };
-        img.onerror = () => resolve(null);
-        img.src = URL.createObjectURL(file);
-    });
-}
-
 // Checks, compresses and uploads one photo and its thumbnail. Returns { url, thumbnail }
 // (thumbnail is null if it couldn't be made), or null if the photo was refused.
 async function uploadPhoto(file, userId) {
-    const problem = photoProblem(file, await readDimensions(file));
+    const problem = photoProblem(file);
     if (problem) {
         toast.error(problem);
         return null;
@@ -127,7 +114,7 @@ export default function PhotosSection({ photos, onChange, userId }) {
                 </div>
 
                 <p className="text-sm text-slate-500">
-                    Upload up to {MAX_PHOTOS} images (JPEG, PNG, WEBP). Max 5MB and 2560×1920px each. First image will be the cover.
+                    Upload up to {MAX_PHOTOS} images (JPEG, PNG, WEBP). Max 20MB each; large photos are resized automatically. First image will be the cover.
                 </p>
             </div>
         </FormSection>

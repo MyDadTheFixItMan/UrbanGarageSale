@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { printListingPoster } from '../utils/printGarageSaleSign';
+import { printAfterDialogCloses } from '../utils/printGarageSaleSign';
 import { groupProfileListings } from './profile/profileListings';
 import { useCardPayments } from './profile/useCardPayments';
 import ProfileListingCard from './profile/ProfileListingCard';
@@ -129,9 +129,9 @@ export default function Profile() {
         toast.success('Two-factor authentication is on');
     };
 
-    const handlePrint = (listing) => {
-        printListingPoster(listing);
+    const handlePrint = (listing, size) => {
         setPrintingListing(null);
+        printAfterDialogCloses(listing, size);
         toast.success('Opening print poster window...');
     };
 

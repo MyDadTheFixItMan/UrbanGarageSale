@@ -48,22 +48,23 @@ Australia and charges are in AUD, as Stripe requires.
 
 Debug builds use Stripe's **simulated reader** automatically (override with
 `--dart-define=TERMINAL_SIMULATED=false`). The simulated reader only works with Stripe
-**test-mode** keys, so point the app at an API that uses a test secret key:
+**test-mode** keys, so test against **staging** (see *Staging* in `DEPLOYMENT.md`): the
+`urbangaragesale-staging` Firebase project and a Vercel Preview deployment of the API.
 
 ```bash
 flutter run \
+  --dart-define=FIREBASE_ENV=staging \
   --dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_… \
-  --dart-define=API_BASE_URL=https://<preview-or-staging-api>/api
+  --dart-define=API_BASE_URL=https://<preview-deployment>.vercel.app/api \
+  --dart-define=VERCEL_PROTECTION_BYPASS=<bypass secret>
 ```
 
-The Vercel *Preview* environment of `urban-garage-sale` has its own `STRIPE_SECRET_KEY` and
-`FIREBASE_SERVICE_ACCOUNT_JSON`, but both were set in early 2026, before the June key rotation;
-replace them with a Stripe **test** secret key and a current service-account key before testing.
-Preview deployments also have Vercel Authentication on, which the phone can't pass: use the
-staging setup in `DEPLOYMENT.md`, or a protection bypass for the test.
+The bypass secret is under Vercel → `urban-garage-sale` → Settings → Deployment Protection →
+Protection Bypass for Automation. Never pass it, or `FIREBASE_ENV=staging`, to a release build.
 
-In test mode the garage sale must still be live (`active`) and the seller's test connected
-account must have card payments enabled.
+Test accounts live only in staging: sign up in the test build with any email you control. The
+garage sale must be live (`active`) and the seller's **test** connected account must have card
+payments enabled.
 
 ## Going live checklist
 

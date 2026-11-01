@@ -30,3 +30,7 @@ b47f67ca6187a26de2af8fe639ab7ced59bbc774:lib/firebase_options.dart:gcp-api-key:9
 92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:seed-db.cjs:gcp-api-key:5
 92b2d3c17e0c4150c84de04c02c2eedbe1a1b6bb:seed-db.mjs:gcp-api-key:5
 7640b9dbaac923c800e06b5d5adc1332f35962b0:web-app/seed-db.cjs:gcp-api-key:5
+# Public Firebase web keys (production and urbangaragesale-staging), October 2026 staging setup.
+12bd6570c17ddef95b7af4f9bfbe391b91200aff:lib/firebase_options.dart:gcp-api-key:20
+12bd6570c17ddef95b7af4f9bfbe391b91200aff:lib/firebase_options.dart:gcp-api-key:30
+c6607ddf3e390413676891ba1acf587de7713e1e:web-app/.env.staging:gcp-api-key:6

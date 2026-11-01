@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'screens/sign_in_screen.dart';
 import 'screens/urban_pay_home.dart';
 import 'firebase_options.dart';
+import 'config/api_config.dart';
 
 const stripePublishableKey = String.fromEnvironment('STRIPE_PUBLISHABLE_KEY', defaultValue: '');
 
@@ -16,6 +17,12 @@ void main() async {
   // Australian date and number formats throughout the app
   Intl.defaultLocale = 'en_AU';
   await initializeDateFormatting('en_AU');
+
+  // A staging build must use Stripe test mode and a non-live API, so test data never mixes with live.
+  if (firebaseEnv == 'staging' &&
+      (!stripePublishableKey.startsWith('pk_test_') || apiBaseUrl == productionApiBaseUrl)) {
+    throw StateError('FIREBASE_ENV=staging needs a pk_test_ key and a non-production API_BASE_URL.');
+  }
 
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { firebase } from '@/api/firebaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,14 +21,26 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
     const [phone, setPhone] = useState(defaultPhone);
     const [code, setCode] = useState('');
     const [error, setError] = useState('');
+    const [notice, setNotice] = useState('');
     const [loading, setLoading] = useState(false);
 
     const reset = () => {
         setStep('phone');
         setCode('');
         setError('');
+        setNotice('');
         setLoading(false);
     };
+
+    // Firebase can't enrol a phone until the email is verified, so start there if it isn't.
+    useEffect(() => {
+        if (!open) return undefined;
+        let cancelled = false;
+        firebase.auth.isEmailVerified()
+            .then((verified) => { if (!cancelled && !verified) setStep('verify-email'); })
+            .catch(() => {}); // sendCode checks again, so a failed check here changes nothing
+        return () => { cancelled = true; };
+    }, [open]);
 
     const handleOpenChange = (next) => {
         if (!next) reset();
@@ -37,6 +49,7 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
 
     const sendCode = async () => {
         setError('');
+        setNotice('');
         setLoading(true);
         try {
             await firebase.auth.startMfaEnrollment(phone, RECAPTCHA_ID);
@@ -54,10 +67,28 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
 
     const resendVerificationEmail = async () => {
         setError('');
+        setNotice('');
         setLoading(true);
         try {
             await firebase.auth.sendVerificationEmail();
-            setError('Verification email sent. Click the link in it, then come back and try again.');
+            setNotice('Verification email sent. Click the link in it, then come back here. Check your junk folder if it does not arrive.');
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const checkEmailVerified = async () => {
+        setError('');
+        setNotice('');
+        setLoading(true);
+        try {
+            if (await firebase.auth.isEmailVerified()) {
+                setStep('phone');
+            } else {
+                setError('Your email is not verified yet. Click the link in the email we sent you, then try again.');
+            }
         } catch (err) {
             setError(err.message);
         } finally {
@@ -98,6 +129,9 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
 
                 {error && (
                     <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">{error}</div>
+                )}
+                {notice && (
+                    <div className="text-sm text-green-800 bg-green-50 border border-green-200 rounded p-3">{notice}</div>
                 )}
 
                 {step === 'phone' && (
@@ -145,12 +179,12 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
                 {step === 'verify-email' && (
                     <div className="space-y-4">
                         <p className="text-sm text-slate-700">
-                            Please verify your email address first. Click the link in the email we sent you, then try again.
+                            First, verify your email address: click the link in the email we sent you. Check your junk folder if you can't see it.
                         </p>
                         <Button onClick={resendVerificationEmail} disabled={loading} variant="outline" className="w-full">
                             Resend verification email
                         </Button>
-                        <Button onClick={sendCode} disabled={loading} className="w-full bg-[#1e3a5f] hover:bg-[#152a45]">
+                        <Button onClick={checkEmailVerified} disabled={loading} className="w-full bg-[#1e3a5f] hover:bg-[#152a45]">
                             I've verified my email
                         </Button>
                     </div>

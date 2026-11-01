@@ -21,6 +21,14 @@ class UrbanPayService {
     return token;
   }
 
+  Map<String, String> _headers(String token) => {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        // Lets test builds reach a Vercel preview deployment behind Deployment Protection.
+        if (config.vercelProtectionBypass.isNotEmpty)
+          'x-vercel-protection-bypass': config.vercelProtectionBypass,
+      };
+
   String _errorFrom(http.Response response) {
     try {
       final data = jsonDecode(response.body);
@@ -40,10 +48,7 @@ class UrbanPayService {
     final token = await _getAuthToken();
     final response = await http.post(
       Uri.parse('$apiBaseUrl/urbanPayment/createPaymentIntent'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+      headers: _headers(token),
       body: jsonEncode({
         'amount': amount,
         'description': description,
@@ -67,10 +72,7 @@ class UrbanPayService {
     final token = await _getAuthToken();
     final response = await http.post(
       Uri.parse('$apiBaseUrl/urbanPayment/recordSale'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+      headers: _headers(token),
       body: jsonEncode({
         'amount': amount,
         'description': description,
@@ -95,10 +97,7 @@ class UrbanPayService {
     final token = await _getAuthToken();
     final response = await http.post(
       Uri.parse('$apiBaseUrl/urbanPayment/recordTapToPaySale'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+      headers: _headers(token),
       body: jsonEncode({
         'paymentIntentId': paymentIntentId,
         'description': description,
@@ -116,10 +115,7 @@ class UrbanPayService {
     final token = await _getAuthToken();
     final response = await http.post(
       Uri.parse('$apiBaseUrl$path'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+      headers: _headers(token),
       body: jsonEncode(body),
     );
     if (response.statusCode == 200) {

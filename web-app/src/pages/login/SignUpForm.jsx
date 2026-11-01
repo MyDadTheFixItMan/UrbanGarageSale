@@ -34,7 +34,7 @@ function SignUpComplete() {
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Account created</h2>
                 <p className="text-slate-600 mb-2">We've emailed you a verification link.</p>
-                <p className="text-slate-600 mb-6">Once your email is verified, turn on two-factor authentication in your Profile to create listings and use Urban Pay.</p>
+                <p className="text-slate-600 mb-6">Next we'll set up two-factor authentication, which you need to create listings and use Urban Pay.</p>
                 <p className="text-sm text-slate-500">Taking you to your Profile...</p>
             </div>
         </div>

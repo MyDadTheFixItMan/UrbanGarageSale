@@ -16,6 +16,7 @@ export function smsErrorMessage(error) {
   switch (error.code) {
     case 'auth/too-many-requests': return 'Too many SMS requests. Please wait a few minutes and try again.';
     case 'auth/invalid-phone-number': return 'That mobile number is not valid.';
+    case 'auth/operation-not-allowed': return 'We can only send SMS codes to Australian mobile numbers.';
     case 'auth/captcha-check-failed': return 'Security check failed. Please refresh the page and try again.';
     case 'auth/network-request-failed': return 'Network error. Please check your connection and try again.';
     case 'auth/unverified-email': return 'Please verify your email address first.';

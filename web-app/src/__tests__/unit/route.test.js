@@ -71,6 +71,62 @@ describe('directionsUrl', () => {
   it('leaves out the origin when there is no home address', () => {
     expect(params(directionsUrl(undefined, ['-33.1,151.1'])).has('origin')).toBe(false);
   });
+
+  describe('on Apple phones and tablets', () => {
+    const mobile = (userAgent) => ({ userAgent, maxTouchPoints: 5 });
+    const iPhone = (version) => mobile(`Mozilla/5.0 (iPhone; CPU iPhone OS ${version} like Mac OS X) AppleWebKit/605.1.15`);
+    const iPad = (version) => mobile(`Mozilla/5.0 (iPad; CPU OS ${version} like Mac OS X) AppleWebKit/605.1.15`);
+    const desktopSafari = (version) => `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${version} Safari/605.1.15`;
+    const stops = ['-33.1,151.1', '-33.2,151.2', '-33.3,151.3'];
+
+    it.each(['18_4', '18_6', '26_0'])('routes every stop through Apple Maps on iOS %s', (version) => {
+      const url = directionsUrl('1 Main St, Sydney NSW', stops, iPhone(version));
+      const query = params(url);
+
+      expect(new URL(url).origin + new URL(url).pathname).toBe('https://maps.apple.com/directions');
+      expect(query.get('mode')).toBe('driving');
+      expect(query.get('source')).toBe('1 Main St, Sydney NSW');
+      expect(query.getAll('waypoint')).toEqual(['-33.1,151.1', '-33.2,151.2']);
+      expect(query.get('destination')).toBe('-33.3,151.3');
+    });
+
+    it('starts from the device when there is no home address', () => {
+      expect(params(directionsUrl(undefined, stops, iPhone('18_4'))).has('source')).toBe(false);
+    });
+
+    it.each(['17_7', '18_3', '18_3_2'])('stays on Google Maps on iOS %s', (version) => {
+      expect(directionsUrl('1 Main St', stops, iPhone(version))).toContain('https://www.google.com/maps/dir/');
+    });
+
+    it.each([
+      ['an iPad asking for the mobile site', iPad('18_4')],
+      ['an iPad asking for the desktop site', mobile(desktopSafari('18.4'))],
+      ['a Mac using Safari', { userAgent: desktopSafari('18.4'), maxTouchPoints: 0 }],
+      ['a Mac using an older Safari', { userAgent: desktopSafari('17.6'), maxTouchPoints: 0 }],
+      ['a Mac using Chrome', {
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        maxTouchPoints: 0,
+      }],
+    ])('routes through Apple Maps on %s', (_name, device) => {
+      expect(directionsUrl('1 Main St', stops, device)).toContain('https://maps.apple.com/directions?');
+    });
+
+    it.each([
+      ['an older iPad asking for the mobile site', iPad('18_3')],
+      ['an older iPad asking for the desktop site', mobile(desktopSafari('18.3'))],
+    ])('stays on Google Maps on %s', (_name, device) => {
+      expect(directionsUrl('1 Main St', stops, device)).toContain('https://www.google.com/maps/dir/');
+    });
+  });
+
+  it('stays on Google Maps on other devices', () => {
+    const android = {
+      userAgent: 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36',
+      maxTouchPoints: 5,
+    };
+
+    expect(directionsUrl('1 Main St', ['-33.1,151.1'], android)).toContain('https://www.google.com/maps/dir/');
+  });
 });
 
 describe('saleLocation', () => {

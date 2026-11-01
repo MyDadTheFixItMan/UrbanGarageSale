@@ -57,6 +57,9 @@ export default function ApprovalTab() {
             toast.success(result?.refunded
                 ? `Listing rejected and A${result.refunded.toFixed(2)} refunded`
                 : 'Listing rejected');
+            if (!result?.emailed) {
+                toast.warning("The seller couldn't be emailed. They can still see the reason on their profile.");
+            }
         },
         onError: (error) => {
             toast.error('Failed to reject listing: ' + errorText(error));
@@ -91,7 +94,7 @@ export default function ApprovalTab() {
                     <DialogHeader>
                         <DialogTitle>Reject Listing</DialogTitle>
                         <DialogDescription>
-                            Provide a reason for rejecting this listing. Any listing fee paid is refunded to the seller automatically.
+                            Provide a reason for rejecting this listing. The seller sees this reason by email and on their profile. Any listing fee paid is refunded to them automatically.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">

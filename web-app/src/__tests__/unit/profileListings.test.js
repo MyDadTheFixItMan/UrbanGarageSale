@@ -28,13 +28,12 @@ describe('groupProfileListings', () => {
     expect(ids(groups.drafts)).toEqual(['draft', 'pending-payment']);
   });
 
-  it('shows completed listings and live listings whose end date passed as past', () => {
-    expect(ids(groups.past)).toEqual(['expired', 'completed']);
+  it('shows completed and rejected listings, and live listings whose end date passed, as past', () => {
+    expect(ids(groups.past)).toEqual(['expired', 'completed', 'rejected']);
   });
 
-  it('does not show rejected listings in any tab', () => {
-    const all = [...groups.active, ...groups.drafts, ...groups.past];
-    expect(all.find((l) => l.id === 'rejected')).toBeUndefined();
+  it('keeps rejected listings out of the active and draft tabs', () => {
+    expect(ids([...groups.active, ...groups.drafts])).not.toContain('rejected');
   });
 });
 

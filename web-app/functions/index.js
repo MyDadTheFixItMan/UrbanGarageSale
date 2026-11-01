@@ -11,7 +11,7 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
-    isDocId, isRole, escapeHtml, listingPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
+    isDocId, isRole, escapeHtml, rejectionEmailHtml, listingPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
     isExpiredDraft, refundablePayments,
 } = require('./lib/helpers');
 
@@ -269,6 +269,11 @@ exports.stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHO
 // Admin actions
 // ---------------------------------------------------------------------------
 
+// Listings don't store the seller's email (they are public); look it up from their account.
+async function sellerEmail(sellerId) {
+    return (await auth.getUser(sellerId).catch(() => null))?.email;
+}
+
 // Send listing-approved email (admin only)
 exports.sendApprovalEmail = callable(['SENDGRID_API_KEY'], async (request) => {
     const adminUid = requireAdmin(request);
@@ -279,9 +284,8 @@ exports.sendApprovalEmail = callable(['SENDGRID_API_KEY'], async (request) => {
     if (!listing.exists || !listing.data().user_id) {
         throw new HttpsError('not-found', 'Listing not found');
     }
-    // Listings don't store the seller's email (they are public); look it up from their account.
     const { user_id: sellerId, title } = listing.data();
-    const userEmail = (await auth.getUser(sellerId).catch(() => null))?.email;
+    const userEmail = await sellerEmail(sellerId);
     if (!userEmail) {
         throw new HttpsError('not-found', 'Seller has no email address');
     }
@@ -306,9 +310,32 @@ exports.sendApprovalEmail = callable(['SENDGRID_API_KEY'], async (request) => {
     return { success: true, message: 'Approval notification sent' };
 });
 
-// Reject a listing and refund its listing fee (admin only). The Terms promise a refund when a
-// listing is rejected. Refunds use an idempotency key per payment, so retrying is safe.
-exports.rejectListing = callable(['STRIPE_SECRET_KEY'], async (request) => {
+// Tells the seller why their listing was rejected. Returns whether the email went out. Never
+// throws: the rejection and any refund have already happened, and the reason is on their profile.
+async function emailRejection(saleId, listing, reason, refunded) {
+    try {
+        const to = listing.user_id ? await sellerEmail(listing.user_id) : null;
+        if (!to) {
+            logger.warn(`Rejection email not sent: no seller email for listing ${saleId}`);
+            return false;
+        }
+        const sent = await sendEmail({
+            to,
+            from: FROM_EMAIL,
+            subject: "Your garage sale listing wasn't approved",
+            html: rejectionEmailHtml({ title: listing.title, reason, refunded, footer: BUSINESS_FOOTER }),
+        });
+        if (!sent) logger.warn(`Email not sent (SendGrid not configured). Rejection of listing ${saleId}`);
+        return sent;
+    } catch (error) {
+        logger.error(`Rejection email failed for listing ${saleId}: ${error.message}`);
+        return false;
+    }
+}
+
+// Reject a listing, refund its listing fee and tell the seller why (admin only). The Terms promise
+// a refund when a listing is rejected. Refunds use an idempotency key per payment, so retrying is safe.
+exports.rejectListing = callable(['STRIPE_SECRET_KEY', 'SENDGRID_API_KEY'], async (request) => {
     const adminUid = requireAdmin(request);
     await rateLimit(adminUid, 'rejectListing', 30);
 
@@ -349,7 +376,10 @@ exports.rejectListing = callable(['STRIPE_SECRET_KEY'], async (request) => {
         ...(refunds.length ? { payment_status: 'refunded' } : {}),
     });
     await audit('rejectListing', adminUid, { saleId, reason, refunds });
-    return { success: true, refunded: refunds.reduce((total, r) => total + (r.amount || 0), 0) };
+
+    const refunded = refunds.reduce((total, r) => total + (r.amount || 0), 0);
+    const emailed = await emailRejection(saleId, listing.data(), reason, refunded);
+    return { success: true, refunded, emailed };
 });
 
 // Make a user an admin or a regular user (admin only). The role is a custom claim, which

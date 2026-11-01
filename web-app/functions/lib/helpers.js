@@ -24,6 +24,23 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+// The email telling a seller their listing was rejected. Title and reason are escaped.
+function rejectionEmailHtml({ title, reason, refunded, footer }) {
+    const refundLine = refunded > 0
+        ? `<p>Your listing fee of A$${refunded.toFixed(2)} has been refunded to the card you paid with. Refunds usually appear within 5–10 business days.</p>`
+        : '';
+    return `
+            <h2>Your listing wasn't approved</h2>
+            <p>Your garage sale listing "<strong>${escapeHtml(title || 'your listing')}</strong>" wasn't approved, so it won't appear on Urban Garage Sale.</p>
+            <p><strong>Reason:</strong></p>
+            <p style="white-space: pre-line;">${escapeHtml(reason)}</p>
+            ${refundLine}
+            <p>You're welcome to create a new listing with these changes. If you have any questions, contact support@urbangaragesales.com.au.</p>
+            <hr>
+            <p><small>You received this email because you listed a garage sale on Urban Garage Sale.<br>${footer}</small></p>
+        `;
+}
+
 // The Storage object path inside a Firebase download URL
 // (https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<encoded path>?alt=media&token=…),
 // or null for anything else. Only paths under listings/ are returned, so a crafted URL can't
@@ -88,4 +105,5 @@ module.exports = {
     DRAFT_LIFETIME_MS,
     isExpiredDraft,
     refundablePayments,
+    rejectionEmailHtml,
 };

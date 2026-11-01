@@ -63,6 +63,13 @@ export default function ProfileListingCard({ listing, onDelete, onPrint }) {
                     📍 {listing.address && listing.suburb ? `${listing.address}, ${listing.suburb}` : listing.address || 'No address'}
                 </p>
 
+                {listing.status === 'rejected' && listing.rejection_reason && (
+                    <div className="text-sm text-red-700 bg-red-50 rounded-lg p-3 mb-4">
+                        <p className="font-medium mb-1">Why it wasn't approved</p>
+                        <p className="whitespace-pre-line break-words">{listing.rejection_reason}</p>
+                    </div>
+                )}
+
                 <div className="flex gap-3">
                     {actions.view && (
                         <Link to={createPageUrl(`ListingDetails?id=${listing.id}`)} className="flex-1">

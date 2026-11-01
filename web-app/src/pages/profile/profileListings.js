@@ -15,7 +15,8 @@ export function groupProfileListings(listings, today = new Date()) {
     return {
         active: listings.filter((l) => isLiveStatus(l) && l.end_date && !hasEnded(l, today) && isPaid(l.payment_status)),
         drafts: listings.filter(isUnpaidDraft),
-        past: listings.filter((l) => l.status === LISTING_STATUS.COMPLETED || (isLiveStatus(l) && hasEnded(l, today))),
+        past: listings.filter((l) => l.status === LISTING_STATUS.COMPLETED || l.status === LISTING_STATUS.REJECTED ||
+            (isLiveStatus(l) && hasEnded(l, today))),
     };
 }
 

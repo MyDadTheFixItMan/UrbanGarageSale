@@ -259,7 +259,7 @@ export default function CreateListing() {
                 {/* Pricing Info */}
                 <Alert className="mb-6 border-[#FF9500]/30 bg-[#FF9500]/10">
                     <AlertDescription className="text-[#1e3a5f] text-center">
-                        Listings are <strong>{formatAud(LISTING_FEE_AUD, { withCode: true })}</strong> to publish. Drafts are free and will be saved for 2 days.
+                        Listings are <strong>{formatAud(LISTING_FEE_AUD, { withCode: true })}</strong> to publish. Drafts are free. Anything not paid for is saved for 2 days, then deleted.
                     </AlertDescription>
                 </Alert>
 

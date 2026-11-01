@@ -57,6 +57,15 @@ test('isExpiredDraft uses draft_expires_at, falling back to created_at', () => {
     assert.equal(isExpiredDraft({ status: 'draft' }, now), false);
 });
 
+test('isExpiredDraft covers abandoned payments but never paid listings', () => {
+    const now = Date.parse('2026-10-15T00:00:00Z');
+    const day = 24 * 60 * 60 * 1000;
+    assert.equal(isExpiredDraft({ status: 'pending_payment', draft_expires_at: '2026-10-14T00:00:00Z' }, now), true);
+    assert.equal(isExpiredDraft({ status: 'pending_payment', draft_expires_at: '2026-10-16T00:00:00Z' }, now), false);
+    assert.equal(isExpiredDraft({ status: 'pending_payment', draft_expires_at: null, created_at: { toMillis: () => now - 3 * day } }, now), true);
+    assert.equal(isExpiredDraft({ status: 'pending_approval', draft_expires_at: '2026-10-14T00:00:00Z' }, now), false);
+});
+
 test('refundablePayments picks completed Stripe payments with a PaymentIntent', () => {
     const payments = [
         { id: '1', payment_method: 'stripe', status: 'completed', transaction_id: 'pi_123' },

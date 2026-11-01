@@ -111,11 +111,14 @@ export function buildSaleData(form, { asDraft, isFree, alreadyPaid, locked, coor
     if (asDraft) status = LISTING_STATUS.DRAFT;
     else if (isFree) status = LISTING_STATUS.ACTIVE;
 
+    // Anything left unpaid expires, including a publish abandoned at checkout.
+    const expires = asDraft || (!isFree && !alreadyPaid);
+
     const data = {
         ...form,
         latitude: coords.lat,
         longitude: coords.lng,
-        draft_expires_at: asDraft ? new Date(now + DRAFT_LIFETIME_MS).toISOString() : null,
+        draft_expires_at: expires ? new Date(now + DRAFT_LIFETIME_MS).toISOString() : null,
         ...(alreadyPaid ? {} : { status, payment_status: isFree ? PAYMENT_STATUS.COMPLETED : PAYMENT_STATUS.PENDING }),
     };
     if (locked) {

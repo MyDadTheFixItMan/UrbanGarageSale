@@ -11,7 +11,8 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
-    isDocId, isRole, escapeHtml, listingPhotoPaths, melbourneDate, isExpiredDraft, refundablePayments,
+    isDocId, isRole, escapeHtml, listingPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
+    isExpiredDraft, refundablePayments,
 } = require('./lib/helpers');
 
 const REGION = 'australia-southeast1';
@@ -174,6 +175,9 @@ exports.createStripeCheckout = callable(['STRIPE_SECRET_KEY'], async (request) =
     if (listingData.payment_status === 'paid' || listingData.payment_status === 'completed') {
         throw new HttpsError('failed-precondition', 'This listing has already been paid for');
     }
+
+    // Restart the unpaid clock, so cleanupExpiredDrafts can't delete the listing mid-payment.
+    await listing.ref.update({ draft_expires_at: new Date(Date.now() + DRAFT_LIFETIME_MS).toISOString() });
 
     try {
         const user = await auth.getUser(uid);
@@ -597,10 +601,10 @@ exports.healthCheck = onSchedule({ schedule: 'every 10 minutes', timeZone: TIME_
 
 // Once a sale's end date has passed it is marked completed, so it drops out of public search
 // and admin counts. Runs just after midnight Melbourne time (end_date is a YYYY-MM-DD string).
-// Drafts are left to cleanupExpiredDrafts.
+// Unpaid listings are left to cleanupExpiredDrafts.
 exports.expireListings = onSchedule({ schedule: 'every day 00:15', timeZone: TIME_ZONE }, async () => {
     const query = db.collection('garageSales')
-        .where('status', 'in', ['active', 'pending_approval', 'pending_payment'])
+        .where('status', 'in', ['active', 'pending_approval'])
         .where('end_date', '<', melbourneDate());
 
     // Updated listings leave the query, so each pass reads the next batch.
@@ -616,18 +620,18 @@ exports.expireListings = onSchedule({ schedule: 'every day 00:15', timeZone: TIM
     logger.info(`Marked ${expired} ended listing(s) completed`);
 });
 
-// Drafts are kept for two days, as the listing form tells sellers (APP 11.2: don't keep
-// personal information longer than needed). Deletes expired drafts and their photos.
+// Unpaid listings are kept for two days, as the listing form tells sellers (APP 11.2: don't keep
+// personal information longer than needed). Deletes expired ones and their photos.
 exports.cleanupExpiredDrafts = onSchedule({ schedule: 'every day 01:00', timeZone: TIME_ZONE }, async () => {
     const now = Date.now();
-    const snap = await db.collection('garageSales').where('status', '==', 'draft').get();
+    const snap = await db.collection('garageSales').where('status', 'in', UNPAID_STATUSES).get();
     const expired = snap.docs.filter((doc) => isExpiredDraft(doc.data(), now));
 
     for (const doc of expired) {
         await deleteStorageFiles(listingPhotoPaths(doc.data()));
         await doc.ref.delete();
     }
-    logger.info(`Deleted ${expired.length} expired draft(s)`);
+    logger.info(`Deleted ${expired.length} expired unpaid listing(s)`);
 });
 
 // Top 10 postcodes by number of listings (optionally within one state) for the admin

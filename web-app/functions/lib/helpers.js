@@ -52,10 +52,16 @@ function melbourneDate(date = new Date()) {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne' }).format(date);
 }
 
-// A draft is due for deletion once its expiry has passed. Drafts saved before draft_expires_at
-// existed are kept for the same lifetime from when they were created.
-function isExpiredDraft(listing, now = Date.now(), lifetimeMs = 2 * 24 * 60 * 60 * 1000) {
-    if (listing?.status !== 'draft') return false;
+// Listings that were never paid for: saved drafts, and publishes abandoned at Stripe Checkout.
+const UNPAID_STATUSES = ['draft', 'pending_payment'];
+// Longer than a Stripe Checkout session stays open (24 hours), so a listing can't be deleted
+// while its seller is paying.
+const DRAFT_LIFETIME_MS = 2 * 24 * 60 * 60 * 1000;
+
+// An unpaid listing is due for deletion once its expiry has passed. Listings saved before
+// draft_expires_at was set on them are kept for the same lifetime from when they were created.
+function isExpiredDraft(listing, now = Date.now(), lifetimeMs = DRAFT_LIFETIME_MS) {
+    if (!UNPAID_STATUSES.includes(listing?.status)) return false;
     if (listing.draft_expires_at) {
         const expires = Date.parse(listing.draft_expires_at);
         return Number.isFinite(expires) && expires < now;
@@ -78,6 +84,8 @@ module.exports = {
     storagePathFromUrl,
     listingPhotoPaths,
     melbourneDate,
+    UNPAID_STATUSES,
+    DRAFT_LIFETIME_MS,
     isExpiredDraft,
     refundablePayments,
 };

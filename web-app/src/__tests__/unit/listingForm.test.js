@@ -74,19 +74,20 @@ describe('buildSaleData', () => {
     expect(data.draft_expires_at).toBe('2026-11-03T00:00:00.000Z');
   });
 
-  it('waits for payment when publishing a paid listing', () => {
-    const data = buildSaleData(form(), { asDraft: false, isFree: false, alreadyPaid: false, locked: false, coords });
-    expect(data).toMatchObject({ status: 'pending_payment', payment_status: 'pending', draft_expires_at: null });
+  it('waits for payment when publishing a paid listing, with the same two-day expiry', () => {
+    const data = buildSaleData(form(), { asDraft: false, isFree: false, alreadyPaid: false, locked: false, coords, now: NOW });
+    expect(data).toMatchObject({ status: 'pending_payment', payment_status: 'pending', draft_expires_at: '2026-11-03T00:00:00.000Z' });
   });
 
-  it('publishes a free-period listing straight away', () => {
+  it('publishes a free-period listing straight away, with no expiry', () => {
     const data = buildSaleData(form(), { asDraft: false, isFree: true, alreadyPaid: false, locked: false, coords });
-    expect(data).toMatchObject({ status: 'active', payment_status: 'completed' });
+    expect(data).toMatchObject({ status: 'active', payment_status: 'completed', draft_expires_at: null });
   });
 
-  it('leaves the status of an already-paid listing alone', () => {
+  it('leaves the status of an already-paid listing alone, with no expiry', () => {
     const data = buildSaleData(form(), { asDraft: false, isFree: false, alreadyPaid: true, locked: false, coords });
     expect(data).not.toHaveProperty('status');
+    expect(data.draft_expires_at).toBeNull();
     expect(data).not.toHaveProperty('payment_status');
   });
 

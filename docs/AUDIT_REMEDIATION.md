@@ -60,7 +60,7 @@ account owner's action in a console or a decision; the steps are in `docs/DEPLOY
 |---|---|---|
 | Dependabot | No automated updates | Done: `.github/dependabot.yml`, weekly grouped updates for npm (3 packages), pub and Actions. |
 | Stripe SDK | Functions on v13, API on v14 | Done: both on Stripe SDK 14. A move to the current major (new API version) should be planned and tested in staging. |
-| CMP-2 | Photos and drafts kept indefinitely | Done: `cleanupExpiredDrafts` deletes drafts after 2 days with their photos; `deleteUser` deletes the user's photos and contact messages; deleting a listing deletes its photos. |
+| CMP-2 | Photos and drafts kept indefinitely | Done: `cleanupExpiredDrafts` deletes drafts and abandoned payments after 2 days with their photos; `deleteUser` deletes the user's photos and contact messages; deleting a listing deletes its photos. |
 | CMP-3 | Unlabelled inputs, no a11y tests | Done: all form controls labelled (the address field ignored its `id`, now fixed); axe-core tests in CI. |
 | CMP-4 | `lang="en"` | Done: `lang="en-AU"`. |
 | CMP-5 | No refund flow; no ABN | Done: rejecting a listing calls `rejectListing`, which refunds the Stripe fee (idempotent) and records it; Terms updated. ABN shows in footer and Terms when `VITE_BUSINESS_ABN` is set. **Owner:** set the ABN if registered. |

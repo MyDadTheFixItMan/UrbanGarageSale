@@ -29,35 +29,18 @@ export default function Home() {
         saleType: 'all',
     });
 
-    // Load saved filters and search results from localStorage on mount
+    // Restore the last search's filters and search again, so a sale that has since been deleted,
+    // rejected or changed never shows. Results used to be saved here too; clear any left behind.
     useEffect(() => {
+        localStorage.removeItem('homeSearchResults');
         const savedFilters = localStorage.getItem('homeSearchFilters');
-        const savedResults = localStorage.getItem('homeSearchResults');
-        
-        if (savedFilters) {
-            try {
-                setFilters(JSON.parse(savedFilters));
-            } catch (error) {
-                console.error('Error parsing saved filters:', error);
-            }
-        }
-        
-        if (savedResults) {
-            try {
-                const results = JSON.parse(savedResults);
-                // Filter out past-dated listings from cached results
-                const now = new Date();
-                now.setHours(0, 0, 0, 0);
-                const activeListing = results.filter(sale => {
-                    if (!sale.end_date) return true;
-                    let endDate = new Date(sale.end_date);
-                    endDate.setHours(23, 59, 59, 999);
-                    return endDate >= now;
-                });
-                setSearchResults(activeListing);
-            } catch (error) {
-                console.error('Error parsing saved results:', error);
-            }
+        if (!savedFilters) return;
+        try {
+            const restored = JSON.parse(savedFilters);
+            setFilters(restored);
+            if (restored.postcode) runSearch(restored, { quiet: true });
+        } catch (error) {
+            console.error('Error parsing saved filters:', error);
         }
     }, []);
 
@@ -142,16 +125,10 @@ export default function Home() {
         return () => clearInterval(interval);
     }, []);
 
-    // Save filters and search results to localStorage whenever they change
+    // Save filters to localStorage whenever they change
     useEffect(() => {
         localStorage.setItem('homeSearchFilters', JSON.stringify(filters));
     }, [filters]);
-
-    useEffect(() => {
-        if (searchResults.length > 0) {
-            localStorage.setItem('homeSearchResults', JSON.stringify(searchResults));
-        }
-    }, [searchResults]);
 
     const requestGeolocation = () => {
         return new Promise((resolve) => {
@@ -178,7 +155,9 @@ export default function Home() {
         });
     };
 
-    const handleSearch = async () => {
+    // Takes the filters as an argument because the search on page load runs before state updates.
+    // `quiet` skips the result messages for that search.
+    const runSearch = async (filters, { quiet = false } = {}) => {
         let location = userLocation;
         
         if (!filters.postcode && !location) {
@@ -239,12 +218,14 @@ export default function Home() {
                 
                 // Defer state update to prevent blocking the UI
                 startTransition(() => {
-                    if (results.length === 0) {
-                        toast.info('No listings found in your search area');
-                    } else {
-                        toast.success(`Found ${results.length} listing${results.length !== 1 ? 's' : ''}`);
+                    if (!quiet) {
+                        if (results.length === 0) {
+                            toast.info('No listings found in your search area');
+                        } else {
+                            toast.success(`Found ${results.length} listing${results.length !== 1 ? 's' : ''}`);
+                        }
                     }
-                    
+
                     setSearchResults(results);
                 });
             } catch (error) {
@@ -255,6 +236,8 @@ export default function Home() {
             }
         }, 0);
     };
+
+    const handleSearch = () => runSearch(filters);
 
     return (
         <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">

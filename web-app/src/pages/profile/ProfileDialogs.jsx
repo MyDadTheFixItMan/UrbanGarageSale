@@ -242,6 +242,7 @@ export function PrintSignDialog({ listing, onClose, onPrint }) {
                             </label>
                         ))}
                     </div>
+                    {paperSizes[size].note && <p className="text-sm text-slate-600">{paperSizes[size].note}</p>}
                 </div>
                 <div className="flex gap-3 justify-end">
                     <Button variant="outline" onClick={onClose}>

@@ -102,6 +102,21 @@ describe('buildPosterHtml', () => {
     expect(html('A2')).toContain('class="poster-container poster-tiled"');
   });
 
+  it('shifts side-by-side sheets so the join stays inside what a printer can reach', () => {
+    const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
+    const shifts = [...html.matchAll(/translateX\((-?\d+)mm\)/g)].map((match) => Number(match[1]));
+
+    expect(shifts).toEqual([-7, 7, -7, 7]);
+  });
+
+  it('marks the join on the sheets either side of it', () => {
+    const marks = (size) => buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size })
+      .match(/<div class="join-mark /g)?.length ?? 0;
+
+    expect(marks('A2')).toBe(8);
+    expect(marks('A4')).toBe(0);
+  });
+
   it('stops the browser splitting a sheet across pages when printing', () => {
     const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
 

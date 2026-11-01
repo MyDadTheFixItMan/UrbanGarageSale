@@ -31,6 +31,29 @@ html, body {
   break-after: auto;
 }
 
+/* The join between side-by-side sheets: JOIN_INSET_MM in printGarageSaleSign.js from the edge. */
+.join-mark {
+  position: absolute;
+  height: 8mm;
+  border-left: 0.5mm solid #475569;
+}
+
+.join-mark-left {
+  left: 7mm;
+}
+
+.join-mark-right {
+  right: 7mm;
+}
+
+.join-mark-top {
+  top: 8mm;
+}
+
+.join-mark-bottom {
+  bottom: 8mm;
+}
+
 .poster-container {
   position: absolute;
   top: 0;

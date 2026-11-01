@@ -5,7 +5,13 @@ import { POSTER_CSS } from './posterStyles';
 // `sheetsAcross`: the poster is split into this many A4 sheets across and down.
 const paperSizes = {
   A4: { width: 210, height: 297, name: 'A4 (210mm x 297mm)', sheetsAcross: 1 },
-  A2: { width: 420, height: 594, name: 'A2 - Prints on 4 A4 sheets (tape together)', sheetsAcross: 2 },
+  A2: {
+    width: 420,
+    height: 594,
+    name: 'A2 - Prints on 4 A4 sheets (fold and tape)',
+    sheetsAcross: 2,
+    note: 'Print at 100% (Actual size). Fold the left edge of each right-hand sheet back along its small marks, lay the fold on the marks of the sheet to its left, then tape.',
+  },
 };
 
 // The poster is laid out at this pixel size, then scaled to fit the paper.
@@ -20,6 +26,11 @@ const MAX_POSTER_DAYS = 3; // MAX_SALE_DAYS in pages/createListing/listingForm.j
 // How much the top half of a multi-sheet poster shrinks, by number of sale days, so the dates
 // stay above the join between the sheets.
 const TILED_TOP_FIT = { 1: 1, 2: 0.86, 3: 0.75 };
+// Printers can't reach the edge of the paper, so sheets simply butted together lose letters at
+// the join. Side-by-side sheets move the join this far in from the paper's edge, onto the printed
+// area, and the right-hand sheet's spare edge is folded under. The marks in posterStyles.js show
+// where, at the same distance.
+const JOIN_INSET_MM = 7;
 
 const SALE_TYPE_LABELS = {
   garage_sale: 'GARAGE SALE',
@@ -78,9 +89,13 @@ function posterSheets(posterHtml, sheetsAcross) {
     for (let column = 0; column < sheetsAcross; column += 1) {
       const x = (column * POSTER_WIDTH) / sheetsAcross;
       const y = (row * POSTER_HEIGHT) / sheetsAcross;
+      const joinShift = (2 * column - (sheetsAcross - 1)) * JOIN_INSET_MM;
+      const joinMarks = [column > 0 && 'left', column < sheetsAcross - 1 && 'right'].filter(Boolean).map((side) => `
+        <div class="join-mark join-mark-${side} join-mark-top"></div>
+        <div class="join-mark join-mark-${side} join-mark-bottom"></div>`).join('');
       sheets.push(`
       <div class="sheet">
-        <div class="poster-container${sheetsAcross > 1 ? ' poster-tiled' : ''}" style="transform: scale(${scale}) translate(-${x}px, -${y}px)">${posterHtml}</div>
+        <div class="poster-container${sheetsAcross > 1 ? ' poster-tiled' : ''}" style="transform: translateX(${joinShift}mm) scale(${scale}) translate(-${x}px, -${y}px)">${posterHtml}</div>${joinMarks}
       </div>`);
     }
   }

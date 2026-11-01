@@ -94,4 +94,20 @@ describe('Route to All', () => {
     expect(query.has('origin')).toBe(false);
     expect(toast.info).toHaveBeenCalledWith(expect.stringMatching(/add your home address/i));
   });
+
+  it('opens Apple Maps on an iPhone', async () => {
+    const userAgent = jest.spyOn(window.navigator, 'userAgent', 'get')
+      .mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15');
+    firebase.auth.me.mockResolvedValue({ email: 'a@b.test', address: '10 Example St', state: 'VIC', postcode: '3226' });
+    geocode.mockResolvedValue({ lat: -38.27, lng: 144.52, components: [] });
+
+    renderPage();
+    const query = await clickRouteToAll();
+    userAgent.mockRestore();
+
+    expect(window.open.mock.calls[0][0]).toMatch(/^https:\/\/maps\.apple\.com\/directions\?/);
+    expect(query.get('source')).toBe('10 Example St, VIC 3226, Australia');
+    expect(query.getAll('waypoint')).toEqual(['-38.262,144.53', '-38.148,144.361', '-38.12,144.33']);
+    expect(query.get('destination')).toBe('-38.108,144.335');
+  });
 });

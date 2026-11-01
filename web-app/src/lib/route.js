@@ -1,4 +1,5 @@
-// Builds Google Maps driving routes. Pure helpers, so they can be unit tested directly.
+// Builds driving routes for Google Maps, or Apple Maps on Apple devices. Pure helpers, so they
+// can be unit tested directly.
 import { calculateDistance } from '@/api/firebase/listingSearch';
 
 // The account's home address in a form Google Maps can pin down. Profiles usually hold only the
@@ -22,7 +23,7 @@ export function saleLocation(sale) {
 }
 
 // Orders sales for driving: the sale closest to `start` first, then whichever is closest to that
-// one, and so on. Google Maps links keep stops in the order given, so the order is decided here.
+// one, and so on. Map links keep stops in the order given, so the order is decided here.
 /**
  * @param {{ lat: number, lng: number }} start
  * @param {any[]} sales each with a latitude and longitude
@@ -41,13 +42,41 @@ export function orderStopsFrom(start, sales) {
     return ordered;
 }
 
-// A Google Maps directions link through `stops` in order. Without an origin, Google Maps starts
-// from wherever the device is.
+// Apple Maps links with several stops need iOS or iPadOS 18.4 or later. Older phones and tablets
+// stay on Google Maps, so a route never loses stops. iPads ask for desktop sites by default, so
+// Safari there looks like a Mac, except for its touch screen, and only its Safari version shows
+// the OS. Real Macs all report the same old macOS version, so every Mac gets Apple Maps.
+function supportsAppleDirections({ userAgent, maxTouchPoints }) {
+    const looksLikeMac = /Macintosh/.test(userAgent);
+    if (looksLikeMac && maxTouchPoints <= 1) return true;
+
+    const version = /(?:iPhone OS|iPad; CPU OS) (\d+)_(\d+)/.exec(userAgent)
+        || (looksLikeMac && /Version\/(\d+)\.(\d+)/.exec(userAgent));
+    if (!version) return false;
+    const [major, minor] = [Number(version[1]), Number(version[2])];
+    return major > 18 || (major === 18 && minor >= 4);
+}
+
+function appleDirectionsUrl(origin, stops) {
+    const destination = stops[stops.length - 1];
+
+    let url = `https://maps.apple.com/directions?mode=driving`;
+    if (origin) url += `&source=${encodeURIComponent(origin)}`;
+    url += `&destination=${encodeURIComponent(destination)}`;
+    for (const stop of stops.slice(0, -1)) url += `&waypoint=${encodeURIComponent(stop)}`;
+    return url;
+}
+
+// A directions link through `stops` in order: Apple Maps on a Mac or a current iPhone or iPad,
+// otherwise Google Maps. Without an origin, the map starts from wherever the device is.
 /**
  * @param {string | undefined} origin
  * @param {string[]} stops
+ * @param {{ userAgent: string, maxTouchPoints: number }} [device]
  */
-export function directionsUrl(origin, stops) {
+export function directionsUrl(origin, stops, device = navigator) {
+    if (supportsAppleDirections(device)) return appleDirectionsUrl(origin, stops);
+
     const destination = stops[stops.length - 1];
     const waypoints = stops.slice(0, -1).join('|');
 

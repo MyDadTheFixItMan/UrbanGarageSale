@@ -17,6 +17,9 @@ const AVERAGE_CHAR_WIDTH = 0.62; // In ems, for bold Arial in mixed case
 const CAPITALS_CHAR_WIDTH = 0.76; // In ems, for the sale type in heavy capitals
 const DIALOG_CLOSE_MS = 300;
 const MAX_POSTER_DAYS = 3; // MAX_SALE_DAYS in pages/createListing/listingForm.js
+// How much the top half of a multi-sheet poster shrinks, by number of sale days, so the dates
+// stay above the join between the sheets.
+const TILED_TOP_FIT = { 1: 1, 2: 0.86, 3: 0.75 };
 
 const SALE_TYPE_LABELS = {
   garage_sale: 'GARAGE SALE',
@@ -77,7 +80,7 @@ function posterSheets(posterHtml, sheetsAcross) {
       const y = (row * POSTER_HEIGHT) / sheetsAcross;
       sheets.push(`
       <div class="sheet">
-        <div class="poster-container" style="transform: scale(${scale}) translate(-${x}px, -${y}px)">${posterHtml}</div>
+        <div class="poster-container${sheetsAcross > 1 ? ' poster-tiled' : ''}" style="transform: scale(${scale}) translate(-${x}px, -${y}px)">${posterHtml}</div>
       </div>`);
     }
   }
@@ -91,16 +94,20 @@ export function buildPosterHtml(listing, { logoUrl, qrCodeDataUrl, size = 'A4' }
   const address = safe.address || '';
   const { days, time } = formatPosterDates(safe);
   const posterHtml = `
-        <img src="${logoUrl}" alt="Urban Garage Sale" class="poster-logo">
-        <div class="poster-type" style="font-size: ${posterFontSize(saleType, 340, 1, CAPITALS_CHAR_WIDTH)}px">${saleType}</div>
-        <div class="poster-rule"></div>
-        ${days.map((day) => `<div class="poster-day">${day}</div>`).join('')}
-        ${time ? `<div class="poster-time">${time}</div>` : ''}
-        <div class="poster-address" style="font-size: ${posterFontSize(address, 210, 2)}px">${address}</div>
-        ${safe.suburb ? `<div class="poster-suburb">${safe.suburb}</div>` : ''}
-        <div class="poster-qr">
-          <img src="${qrCodeDataUrl}" alt="QR code" class="poster-qr-image" />
-          <div class="poster-qr-label">Scan for photos, map &amp; directions</div>
+        <div class="poster-section poster-top" style="--fit: ${TILED_TOP_FIT[days.length]}">
+          <img src="${logoUrl}" alt="Urban Garage Sale" class="poster-logo">
+          <div class="poster-type" style="font-size: ${posterFontSize(saleType, 340, 1, CAPITALS_CHAR_WIDTH)}px">${saleType}</div>
+          <div class="poster-rule"></div>
+          ${days.map((day) => `<div class="poster-day">${day}</div>`).join('')}
+          ${time ? `<div class="poster-time">${time}</div>` : ''}
+        </div>
+        <div class="poster-section poster-bottom">
+          <div class="poster-address" style="font-size: ${posterFontSize(address, 210, 2)}px">${address}</div>
+          ${safe.suburb ? `<div class="poster-suburb">${safe.suburb}</div>` : ''}
+          <div class="poster-qr">
+            <img src="${qrCodeDataUrl}" alt="QR code" class="poster-qr-image" />
+            <div class="poster-qr-label">Scan for photos, map &amp; directions</div>
+          </div>
         </div>`;
 
   return `

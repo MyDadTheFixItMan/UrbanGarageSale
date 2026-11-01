@@ -14,12 +14,15 @@ html, body {
   font-family: Arial, sans-serif;
 }
 
-/* One sheet of A4 paper, showing its section of the poster. */
+/* One sheet of A4 paper, showing its section of the poster. Containment makes the sheet a single
+   unit: the browser lays the poster out before scaling it, and without this it splits the poster
+   across pages at its full size, so sections of a multi-sheet poster land on the wrong sheets. */
 .sheet {
   position: relative;
   width: 210mm;
   height: 297mm;
   overflow: hidden;
+  contain: strict;
   background: white;
   break-after: page;
 }
@@ -41,6 +44,52 @@ html, body {
   transform-origin: top left;
   text-align: center;
   color: #111111;
+}
+
+/* On one sheet the two sections are just part of the page. */
+.poster-section {
+  display: contents;
+}
+
+/* Across several sheets, each section fills half the poster, so no row sits on the join between
+   the top and bottom sheets. */
+.poster-tiled {
+  padding: 0 150px;
+}
+
+.poster-tiled .poster-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.poster-tiled .poster-top {
+  height: calc(1754px / var(--fit));
+  padding-top: 140px;
+  zoom: var(--fit);
+}
+
+.poster-tiled .poster-bottom {
+  height: 1754px;
+  padding: 120px 0 140px;
+}
+
+.poster-tiled .poster-address {
+  margin-top: 0;
+}
+
+/* The QR code on the left sheet and its label on the right, clear of the join between them. */
+.poster-tiled .poster-qr {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 240px;
+  justify-items: center;
+  width: 100%;
+}
+
+.poster-tiled .poster-qr-label {
+  justify-self: start;
 }
 
 .poster-logo {

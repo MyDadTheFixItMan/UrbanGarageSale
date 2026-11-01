@@ -95,6 +95,19 @@ describe('buildPosterHtml', () => {
     expect(html).toContain('src="data:image/png;base64,QR"');
   });
 
+  it('keeps the rows off the join only on a multi-sheet poster', () => {
+    const html = (size) => buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size });
+
+    expect(html('A4')).not.toContain('class="poster-container poster-tiled"');
+    expect(html('A2')).toContain('class="poster-container poster-tiled"');
+  });
+
+  it('stops the browser splitting a sheet across pages when printing', () => {
+    const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
+
+    expect(html).toMatch(/\.sheet \{[^}]*contain: strict/);
+  });
+
   it('prints A4 on one sheet and A2 across four', () => {
     const sheets = (size) => buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size })
       .match(/class="sheet"/g).length;

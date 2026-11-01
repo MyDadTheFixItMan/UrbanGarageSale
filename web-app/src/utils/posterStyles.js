@@ -35,7 +35,7 @@ html, body {
 .join-mark {
   position: absolute;
   height: 8mm;
-  border-left: 1mm solid #475569;
+  border-left: 1mm solid #94a3b8;
 }
 
 .join-mark-left {
@@ -46,12 +46,12 @@ html, body {
 .join-mark-left::before {
   content: 'fold';
   position: absolute;
-  bottom: 100%;
-  left: -0.5mm;
-  transform: translateX(-50%);
+  top: 50%;
+  left: -0.15mm;
+  transform: translate(-50%, -50%) rotate(-90deg);
   font-size: 7pt;
-  line-height: 1.2;
-  color: #475569;
+  line-height: 1;
+  color: #0f172a;
 }
 
 .join-mark-right {

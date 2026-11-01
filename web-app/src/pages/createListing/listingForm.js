@@ -109,7 +109,7 @@ export function buildSaleData(form, { asDraft, isFree, alreadyPaid, locked, coor
     /** @type {string} */
     let status = LISTING_STATUS.PENDING_PAYMENT;
     if (asDraft) status = LISTING_STATUS.DRAFT;
-    else if (isFree) status = LISTING_STATUS.ACTIVE;
+    else if (isFree) status = LISTING_STATUS.PENDING_APPROVAL;
 
     // Anything left unpaid expires, including a publish abandoned at checkout.
     const expires = asDraft || (!isFree && !alreadyPaid);

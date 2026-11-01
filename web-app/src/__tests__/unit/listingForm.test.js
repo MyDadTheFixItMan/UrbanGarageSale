@@ -79,9 +79,9 @@ describe('buildSaleData', () => {
     expect(data).toMatchObject({ status: 'pending_payment', payment_status: 'pending', draft_expires_at: '2026-11-03T00:00:00.000Z' });
   });
 
-  it('publishes a free-period listing straight away, with no expiry', () => {
+  it('sends a free-period listing for admin approval, with no expiry', () => {
     const data = buildSaleData(form(), { asDraft: false, isFree: true, alreadyPaid: false, locked: false, coords });
-    expect(data).toMatchObject({ status: 'active', payment_status: 'completed', draft_expires_at: null });
+    expect(data).toMatchObject({ status: 'pending_approval', payment_status: 'completed', draft_expires_at: null });
   });
 
   it('leaves the status of an already-paid listing alone, with no expiry', () => {

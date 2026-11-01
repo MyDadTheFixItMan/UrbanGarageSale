@@ -177,12 +177,30 @@ test('sellers cannot mark their own listing paid or approved', async () => {
 test('free listings are allowed only inside the free period', async () => {
   await seed('appSettings/default', { is_active: true, free_listing_start: '2026-11-01', free_listing_end: '2026-11-30' });
   const db = as.seller('alice');
-  const free = (start) => listing({ status: 'active', payment_status: 'completed', start_date: start, end_date: start });
+  const free = (start) => listing({ status: 'pending_approval', payment_status: 'completed', start_date: start, end_date: start });
   await assertSucceeds(setDoc(doc(db, 'garageSales/inside'), free('2026-11-14')));
   await assertFails(setDoc(doc(db, 'garageSales/outside'), free('2026-12-05')));
 
   await seed('appSettings/default', { is_active: false, free_listing_start: '2026-11-01', free_listing_end: '2026-11-30' });
   await assertFails(setDoc(doc(db, 'garageSales/off'), free('2026-11-14')));
+});
+
+test('free listings wait for admin approval and stay private until then', async () => {
+  await seed('appSettings/default', { is_active: true, free_listing_start: '2026-11-01', free_listing_end: '2026-11-30' });
+  await seed('garageSales/draft', listing({ start_date: '2026-11-14', end_date: '2026-11-14' }));
+  const db = as.seller('alice');
+  const free = (status) => ({ status, payment_status: 'completed', start_date: '2026-11-14', end_date: '2026-11-14' });
+
+  await assertFails(setDoc(doc(db, 'garageSales/direct'), listing(free('active'))));
+  await assertFails(updateDoc(doc(db, 'garageSales/draft'), free('active')));
+
+  await assertSucceeds(setDoc(doc(db, 'garageSales/waiting'), listing(free('pending_approval'))));
+  await assertSucceeds(updateDoc(doc(db, 'garageSales/draft'), free('pending_approval')));
+  await assertFails(getDoc(doc(as.anon(), 'garageSales/waiting')));
+  await assertFails(updateDoc(doc(db, 'garageSales/waiting'), { status: 'active' }));
+
+  await assertSucceeds(updateDoc(doc(as.admin(), 'garageSales/waiting'), { status: 'active' }));
+  await assertSucceeds(getDoc(doc(as.anon(), 'garageSales/waiting')));
 });
 
 test('other users cannot edit or delete a listing', async () => {
@@ -195,7 +213,7 @@ test('other users cannot edit or delete a listing', async () => {
 // ---------- Payments ----------
 
 test('clients may only record a $0 free-period payment for their own free listing', async () => {
-  await seed('garageSales/free', listing({ status: 'active', payment_status: 'completed' }));
+  await seed('garageSales/free', listing({ status: 'pending_approval', payment_status: 'completed' }));
   await seed('garageSales/unpaid', listing({ status: 'pending_payment' }));
   const db = as.user('alice');
   const payment = (overrides) => ({

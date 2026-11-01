@@ -130,9 +130,10 @@ service cloud.firestore {
 
     // ---------- Garage sale listings ----------
     // A listing qualifies as free when the admin's free period is on and the sale starts inside it.
+    // Free listings wait for admin approval like paid ones, so sellers can never publish directly.
     function isFreeListing(data) {
       let settings = get(/databases/$(database)/documents/appSettings/default).data;
-      return data.get('status', '') == 'active' &&
+      return data.get('status', '') == 'pending_approval' &&
              data.get('payment_status', '') == 'completed' &&
              settings.get('is_active', false) == true &&
              data.get('start_date', '') is string &&
@@ -185,7 +186,7 @@ service cloud.firestore {
                           (request.resource.data.get('status', '') == 'completed' && unchanged('payment_status')) ||
                           // Moving between unpaid states (e.g. draft -> pending_payment)
                           (isUnpaidOwnerState(resource.data) && isUnpaidOwnerState(request.resource.data)) ||
-                          // Free-period publish of a listing that was never paid for
+                          // Free-period submission of a listing that was never paid for
                           (resource.data.get('payment_status', 'pending') == 'pending' && isFreeListing(request.resource.data))
                         ));
 

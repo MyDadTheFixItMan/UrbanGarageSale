@@ -174,7 +174,7 @@ export default function CreateListing() {
                         payment_method: 'free_period',
                         created_at: new Date(),
                     });
-                    toast.success('🎉 Free listing period! Your listing is now live!');
+                    toast.success("🎉 Free listing period! Your listing is pending approval. You'll receive an email once it's live.");
                     setTimeout(goToProfile, 1500);
                 } catch (error) {
                     console.error('Error creating payment record:', error);
@@ -272,7 +272,7 @@ export default function CreateListing() {
                     {freePeriod && (
                         <Alert className="bg-green-50 border-green-200">
                             <AlertDescription className="text-green-700 font-medium">
-                                ✨ Free Listing Period Active! Your listing will be published for FREE.
+                                ✨ Free Listing Period Active! Your listing is FREE and will go live once it's approved.
                             </AlertDescription>
                         </Alert>
                     )}

@@ -1,4 +1,7 @@
-// Styles for the printable A4 poster (2480x3508px @ 300 DPI) built by printListingPoster.
+// Styles for the printable poster built by printListingPoster. The poster is laid out at
+// 2480x3508px (A4 at 300 DPI) and each .sheet scales it onto one sheet of A4 paper. Text is dark
+// on white so the sign stays readable on a black-and-white printer, and everything sits at least
+// 140px (about 11mm) from the edge, inside the area printers can reach.
 export const POSTER_CSS = `
 * {
   margin: 0;
@@ -7,9 +10,7 @@ export const POSTER_CSS = `
 }
 
 html, body {
-  margin: 0;
-  padding: 0;
-  background-color: #f5f5f5;
+  background: white;
   font-family: Arial, sans-serif;
 }
 
@@ -19,7 +20,7 @@ html, body {
   width: 210mm;
   height: 297mm;
   overflow: hidden;
-  background-color: white;
+  background: white;
   break-after: page;
 }
 
@@ -31,208 +32,110 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 2480px;
   height: 3508px;
+  padding: 140px 150px;
   transform-origin: top left;
-  background-color: white;
-  overflow: visible;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-.poster-background {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-  object-fit: cover;
-  display: block;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-.text-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 100;
-  pointer-events: none;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-.text-field {
-  position: absolute;
-  white-space: normal;
-  overflow: visible;
-  word-wrap: break-word;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-.text-title {
-  top: 700px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2200px;
-  height: auto;
-  min-height: 150px;
-  padding: 40px 0;
-  font-size: 100px;
-  font-weight: 700;
-  color: #000000;
-  line-height: 1;
   text-align: center;
-  font-family: Arial, sans-serif;
-  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.8);
-  display: block;
-  border-bottom: 4px solid #ffffff;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
+  color: #111111;
 }
 
-.text-location {
-  top: 900px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2000px;
-  height: auto;
-  min-height: 140px;
-  padding: 40px 0;
-  font-size: 64px;
-  font-weight: 700;
-  color: #ff9500;
-  line-height: 1.2;
-  text-align: center;
-  font-family: Arial, sans-serif;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-  display: block;
-  border-top: 4px solid #ff9500;
-  border-bottom: 4px solid #ff9500;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-.text-date {
-  top: 1130px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2200px;
-  height: auto;
-  min-height: 140px;
-  padding: 30px 0;
-  font-size: 56px;
-  font-weight: 700;
-  color: #ffff00;
-  line-height: 1.4;
-  text-align: center;
-  font-family: Arial, sans-serif;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-  display: block;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  border-top: 4px solid #ffff00;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-.qr-code-container {
-  position: absolute;
-  bottom: 100px;
-  left: 50px;
-  width: 200px;
-  height: 200px;
-  background-color: white;
-  border: 8px solid #1e3a5f;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 100;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-.qr-code-image {
-  max-width: 100%;
-  max-height: 100%;
+.poster-logo {
+  height: 620px;
   object-fit: contain;
-  display: block;
-  image-rendering: crisp-edges;
+  margin: -90px 0 -30px;
+}
+
+.poster-type {
+  font-weight: 900;
+  line-height: 1.05;
+  color: #1e3a5f;
+  white-space: nowrap;
+}
+
+.poster-rule {
+  width: 100%;
+  margin: 50px 0 70px;
+  border-top: 20px solid #f97316;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
-.qr-label {
-  position: absolute;
-  bottom: 110px;
-  left: 300px;
-  width: 1200px;
-  height: auto;
-  padding: 20px 0;
-  font-size: 48px;
+.poster-day {
+  font-size: 190px;
   font-weight: 700;
-  color: #000000;
-  line-height: 1.4;
-  text-align: left;
-  font-family: Arial, sans-serif;
-  text-shadow: none;
+  line-height: 1.2;
+}
+
+.poster-time {
+  margin-top: 20px;
+  font-size: 170px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #c2410c;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.poster-address {
+  margin-top: 110px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #1e3a5f;
+  overflow-wrap: anywhere;
+}
+
+.poster-suburb {
+  margin-top: 20px;
+  font-size: 150px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.poster-qr {
   display: flex;
   align-items: center;
-  z-index: 150;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
+  gap: 90px;
+  margin-top: auto;
+  text-align: left;
 }
 
-/* Screen preview */
+.poster-qr-image {
+  display: block;
+  width: 760px;
+  height: 760px;
+  image-rendering: pixelated;
+}
+
+.poster-qr-label {
+  max-width: 1200px;
+  font-size: 120px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #1e3a5f;
+}
+
+.print-note {
+  padding: 40px;
+  font-size: 18px;
+  text-align: center;
+  color: #475569;
+}
+
+/* The print dialog opens over this window, so the poster itself only shows on paper. */
 @media screen {
-  body {
-    padding: 20px;
-    background: #f0f0f0;
-  }
-
   .sheet {
-    margin: 0 auto 20px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-  }
-
-  .text-field {
-    border: 2px dashed rgba(255, 0, 0, 0.5) !important;
-    background: rgba(255, 255, 255, 0.3) !important;
+    display: none;
   }
 }
 
-/* Print styles */
 @media print {
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
+  .print-note {
+    display: none;
   }
-
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: white;
-  }
-
-  .text-field {
-    background: transparent !important;
-    border: none !important;
-  }
-
-  .qr-code-container {
-    border: 8px solid #1e3a5f !important;
-  }
-
 }
 
 @page {

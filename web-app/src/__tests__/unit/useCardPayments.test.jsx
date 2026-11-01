@@ -31,6 +31,10 @@ afterEach(() => {
 });
 
 describe('stripeAddress', () => {
+  it('sends the suburb as the city', () => {
+    expect(stripeAddress({ address: '25 Moorabool Street', suburb: 'Geelong' }).city).toBe('Geelong');
+  });
+
   it('uses the address on the profile', () => {
     expect(stripeAddress({ address: '26 Seawind Place', state: 'VIC', postcode: '3226' }))
       .toEqual({ address: '26 Seawind Place', state: 'VIC', postcode: '3226' });

@@ -7,12 +7,13 @@ import { API_BASE_URL, apiFetch } from '@/lib/api-base';
 const STRIPE_POPUP_NAMES = ['stripeOnboarding', 'stripeOAuth'];
 
 // The seller's address for their Stripe account. Anything missing or invalid is left out, and
-// Stripe asks for it during sign-up. Profiles have no suburb, so Stripe always asks for that.
+// Stripe asks for it during sign-up.
 export function stripeAddress(user) {
     const state = String(user?.state || '').toUpperCase();
     const postcode = String(user?.postcode || '');
     return {
         address: user?.address,
+        city: user?.suburb || undefined,
         state: AU_STATES.includes(state) ? state : undefined,
         postcode: /^\d{4}$/.test(postcode) ? postcode : undefined,
     };

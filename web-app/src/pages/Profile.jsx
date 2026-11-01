@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { printAfterDialogCloses } from '../utils/printGarageSaleSign';
+import { displayAddress } from '@/lib/addressDetails';
 import { groupProfileListings } from './profile/profileListings';
 import { useCardPayments } from './profile/useCardPayments';
 import ProfileListingCard from './profile/ProfileListingCard';
@@ -252,7 +253,7 @@ export default function Profile() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t">
                             {user.phone && <DetailItem icon={Phone} label="Phone" value={user.phone} />}
-                            {user.address && <DetailItem icon={MapPin} label="Address" value={user.address} />}
+                            {user.address && <DetailItem icon={MapPin} label="Address" value={displayAddress(user)} />}
                             <DetailItem icon={Mail} label="Email" value={user.email} />
                         </div>
                     </div>

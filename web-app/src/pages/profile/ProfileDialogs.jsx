@@ -15,6 +15,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import AddressParts from '@/components/AddressParts';
+import { addressDetails, displayAddress } from '@/lib/addressDetails';
 import { MIN_PASSWORD_LENGTH } from '@/lib/password';
 import { paperSizes } from '../../utils/printGarageSaleSign';
 import { changePasswordProblem } from './profileListings';
@@ -23,6 +25,7 @@ const profileForm = (user) => ({
     email: user?.email || '',
     full_name: user?.full_name || '',
     address: user?.address || '',
+    suburb: user?.suburb || '',
     postcode: user?.postcode || '',
     state: user?.state || '',
     phone: user?.phone || '',
@@ -34,9 +37,13 @@ export function EditProfileDialog({ user, onSaved }) {
     const set = (field) => (value) => setForm((prev) => ({ ...prev, [field]: value }));
 
     const saveMutation = useMutation({
-        mutationFn: (data) => firebase.auth.updateProfile(data),
-        onSuccess: (_, data) => {
-            onSaved(data);
+        mutationFn: async (data) => {
+            const saved = { ...data, ...await addressDetails(data.address, data) };
+            await firebase.auth.updateProfile(saved);
+            return saved;
+        },
+        onSuccess: (saved) => {
+            onSaved(saved);
             setOpen(false);
             toast.success('Profile updated successfully');
         },
@@ -69,20 +76,21 @@ export function EditProfileDialog({ user, onSaved }) {
                     <div>
                         <Label htmlFor="profile-address">Address</Label>
                         <div className="text-sm text-slate-600 mb-2 p-2 bg-slate-50 rounded border border-slate-200">
-                            Saved: {form.address || 'Not set'}
+                            Saved: {displayAddress(user) || 'Not set'}
                         </div>
                         <GooglePlacesAutocomplete
                             id="profile-address"
                             value={form.address}
-                            onChange={set('address')}
+                            onChange={(address) => setForm((prev) => ({ ...prev, address, suburb: '', postcode: '', state: '' }))}
                             onSelect={(place) => {
                                 if (place.address) {
-                                    setForm((prev) => ({ ...prev, address: place.address, postcode: place.postcode || '', state: place.state || '' }));
+                                    setForm((prev) => ({ ...prev, address: place.address, suburb: place.suburb || '', postcode: place.postcode || '', state: place.state || '' }));
                                 }
                             }}
-                            placeholder="123 Main Street, Sydney NSW 2000"
+                            placeholder="Start typing, then pick your address"
                             className="mt-1.5"
                         />
+                        <AddressParts suburb={form.suburb} state={form.state} postcode={form.postcode} />
                     </div>
                     <div>
                         <Label htmlFor="profile-phone">Phone Number</Label>

@@ -34,6 +34,7 @@ export function UserDetailsDialog({ user, onClose }) {
                         <Field label="Email">{user.email}</Field>
                         <Field label="Phone">{user.phone || 'Not provided'}</Field>
                         <Field label="Address">{user.address || 'Not provided'}</Field>
+                        <Field label="Suburb">{user.suburb || 'N/A'}</Field>
                         <div className="grid grid-cols-3 gap-3">
                             <Field label="State">{user.state || 'N/A'}</Field>
                             <Field label="Postcode">{user.postcode || 'N/A'}</Field>

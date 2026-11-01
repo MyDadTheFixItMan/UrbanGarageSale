@@ -71,9 +71,9 @@ service cloud.firestore {
     function validUserProfile() {
       let keys = changedKeys();
       return keys.hasOnly(['email', 'full_name', 'address', 'phone', 'phone_verified',
-                           'postcode', 'state', 'created_date', 'role']) &&
+                           'suburb', 'postcode', 'state', 'created_date', 'role']) &&
              isText(keys, 'email', 254) && isText(keys, 'full_name', 100) &&
-             isText(keys, 'address', 300) && isText(keys, 'phone', 20) &&
+             isText(keys, 'address', 300) && isText(keys, 'suburb', 100) && isText(keys, 'phone', 20) &&
              matchesOrEmpty(keys, 'postcode', '^[0-9]{4}$') && isText(keys, 'state', 3) &&
              isText(keys, 'created_date', 40) && isBool(keys, 'phone_verified');
     }

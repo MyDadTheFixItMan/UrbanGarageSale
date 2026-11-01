@@ -81,9 +81,10 @@ test('profile fields are type and size checked, and unknown fields are refused',
   const db = as.user('alice');
   await assertFails(updateDoc(doc(db, 'users/alice'), { full_name: 'x'.repeat(101) }));
   await assertFails(updateDoc(doc(db, 'users/alice'), { postcode: '30651' }));
+  await assertFails(updateDoc(doc(db, 'users/alice'), { suburb: 'x'.repeat(101) }));
   await assertFails(updateDoc(doc(db, 'users/alice'), { phone_verified: 'yes' }));
   await assertFails(updateDoc(doc(db, 'users/alice'), { is_admin: true }));
-  await assertSucceeds(updateDoc(doc(db, 'users/alice'), { postcode: '3065', state: 'VIC' }));
+  await assertSucceeds(updateDoc(doc(db, 'users/alice'), { suburb: 'Fitzroy', postcode: '3065', state: 'VIC' }));
 });
 
 test('profiles are private to their owner and admins', async () => {

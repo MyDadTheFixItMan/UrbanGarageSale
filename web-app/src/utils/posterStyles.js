@@ -35,27 +35,29 @@ html, body {
 .join-mark {
   position: absolute;
   height: 8mm;
-  border-left: 1mm solid #94a3b8;
+  border-left: 1mm solid #0f172a;
 }
 
 .join-mark-left {
-  left: 6.5mm;
+  left: 8.5mm;
 }
 
 /* Only the sheet on the right of a join gets folded, so only its marks say so. */
 .join-mark-left::before {
-  content: 'fold';
+  content: 'Fold';
   position: absolute;
   top: 50%;
-  left: -0.15mm;
-  transform: translate(-50%, -50%) rotate(-90deg);
+  right: calc(100% + 1.3mm);
+  writing-mode: vertical-rl;
+  transform: translateY(-50%) rotate(180deg);
   font-size: 7pt;
   line-height: 1;
-  color: #0f172a;
+  white-space: nowrap;
+  color: #1e3a5f;
 }
 
 .join-mark-right {
-  right: 6.5mm;
+  right: 8.5mm;
 }
 
 .join-mark-top {

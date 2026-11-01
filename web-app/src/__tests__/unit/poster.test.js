@@ -106,7 +106,7 @@ describe('buildPosterHtml', () => {
     const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
     const shifts = [...html.matchAll(/translateX\((-?\d+)mm\)/g)].map((match) => Number(match[1]));
 
-    expect(shifts).toEqual([-7, 7, -7, 7]);
+    expect(shifts).toEqual([-9, 9, -9, 9]);
   });
 
   it('marks the join on the sheets either side of it', () => {
@@ -120,7 +120,7 @@ describe('buildPosterHtml', () => {
   it('labels only the sheet that gets folded', () => {
     const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
 
-    expect(html).toMatch(/\.join-mark-left::before \{[^}]*content: 'fold'/);
+    expect(html).toMatch(/\.join-mark-left::before \{[^}]*content: 'Fold'/);
     expect(html).not.toMatch(/\.join-mark-right::before/);
   });
 

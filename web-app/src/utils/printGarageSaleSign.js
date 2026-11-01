@@ -30,7 +30,7 @@ const TILED_TOP_FIT = { 1: 1, 2: 0.86, 3: 0.75 };
 // the join. Side-by-side sheets move the join this far in from the paper's edge, onto the printed
 // area, and the right-hand sheet's spare edge is folded under. The marks in posterStyles.js show
 // where, at the same distance.
-const JOIN_INSET_MM = 7;
+const JOIN_INSET_MM = 9;
 
 const SALE_TYPE_LABELS = {
   garage_sale: 'GARAGE SALE',

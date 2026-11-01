@@ -118,13 +118,16 @@ describe('photoProblem', () => {
   const file = (overrides) => ({ name: 'a.jpg', type: 'image/jpeg', size: 1000, ...overrides });
 
   it('accepts a small JPEG, PNG or WEBP', () => {
-    expect(photoProblem(file(), { width: 800, height: 600 })).toBeNull();
-    expect(photoProblem(file({ type: 'image/webp' }), null)).toBeNull();
+    expect(photoProblem(file())).toBeNull();
+    expect(photoProblem(file({ type: 'image/webp' }))).toBeNull();
   });
 
-  it('refuses other types, files over 5MB and images over 2560×1920', () => {
-    expect(photoProblem(file({ type: 'image/gif' }), null)).toMatch(/Only JPEG, PNG, or WEBP/);
-    expect(photoProblem(file({ size: 6 * 1024 * 1024 }), null)).toMatch(/exceeds 5MB/);
-    expect(photoProblem(file(), { width: 4000, height: 3000 })).toMatch(/4000×3000/);
+  it('accepts a typical large phone photo', () => {
+    expect(photoProblem(file({ size: 8 * 1024 * 1024 }))).toBeNull();
+  });
+
+  it('refuses other types and files over 20MB', () => {
+    expect(photoProblem(file({ type: 'image/gif' }))).toMatch(/Only JPEG, PNG, or WEBP/);
+    expect(photoProblem(file({ size: 21 * 1024 * 1024 }))).toMatch(/exceeds 20MB/);
   });
 });

@@ -2,10 +2,16 @@ import QRCode from 'qrcode';
 import { htmlSafeListing } from '@/lib/escape';
 import { POSTER_CSS } from './posterStyles';
 
+// `sheetsAcross`: the poster is split into this many A4 sheets across and down.
 const paperSizes = {
-  A4: { width: 210, height: 297, name: 'A4 (210mm x 297mm)' },
-  A1: { width: 594, height: 841, name: 'A1 - Prints on 4x A4 sheets (tape together)' },
+  A4: { width: 210, height: 297, name: 'A4 (210mm x 297mm)', sheetsAcross: 1 },
+  A2: { width: 420, height: 594, name: 'A2 - Prints on 4 A4 sheets (tape together)', sheetsAcross: 2 },
 };
+
+// The poster is laid out at this pixel size, then scaled to fit the paper.
+const POSTER_WIDTH = 2480;
+const POSTER_HEIGHT = 3508;
+const A4_SCALE = 0.32; // 210mm is 794 CSS pixels, so 794 / 2480
 
 const SALE_TYPE_LABELS = {
   garage_sale: 'GARAGE SALE',
@@ -50,23 +56,30 @@ export function formatPosterDateTime(listing) {
   return `${startLine}\n${weekday(endDate)}, ${longDate(endDate)}${timeSuffix}`;
 }
 
+// One A4 sheet per section of the poster: each is the whole poster, scaled and moved so that only
+// its section lands on the paper.
+function posterSheets(posterHtml, sheetsAcross) {
+  const scale = A4_SCALE * sheetsAcross;
+  const sheets = [];
+  for (let row = 0; row < sheetsAcross; row += 1) {
+    for (let column = 0; column < sheetsAcross; column += 1) {
+      const x = (column * POSTER_WIDTH) / sheetsAcross;
+      const y = (row * POSTER_HEIGHT) / sheetsAcross;
+      sheets.push(`
+      <div class="sheet">
+        <div class="poster-container" style="transform: scale(${scale}) translate(-${x}px, -${y}px)">${posterHtml}</div>
+      </div>`);
+    }
+  }
+  return sheets.join('');
+}
+
 // Full HTML document for the poster. The listing's text is escaped here.
-export function buildPosterHtml(listing, { posterImageUrl, qrCodeDataUrl }) {
+export function buildPosterHtml(listing, { posterImageUrl, qrCodeDataUrl, size = 'A4' }) {
   const safe = htmlSafeListing(listing);
   const saleType = saleTypeLabel(safe.sale_type);
   const location = `${safe.address || ''}${safe.suburb ? ', ' + safe.suburb : ''}`;
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Garage Sale Poster - ${saleType}</title>
-      <style>${POSTER_CSS}</style>
-    </head>
-    <body>
-      <div class="poster-container">
+  const posterHtml = `
         <img src="${posterImageUrl}" alt="Poster Background" class="poster-background">
 
         <div class="text-overlay">
@@ -81,8 +94,18 @@ export function buildPosterHtml(listing, { posterImageUrl, qrCodeDataUrl }) {
 
         <div class="qr-label">
           Scan for full listing & directions
-        </div>
-      </div>
+        </div>`;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Garage Sale Poster - ${saleType}</title>
+      <style>${POSTER_CSS}</style>
+    </head>
+    <body>${posterSheets(posterHtml, paperSizes[size].sheetsAcross)}
     </body>
     </html>
   `;
@@ -99,7 +122,7 @@ export function posterListingUrl(baseUrl, listingId) {
   return `${baseUrl}/ListingDetails?id=${encodeURIComponent(listingId)}`;
 }
 
-export async function printListingPoster(listing) {
+export async function printListingPoster(listing, size = 'A4') {
   const baseUrl = window.location.origin;
   const listingUrl = posterListingUrl(baseUrl, listing.id);
 
@@ -118,7 +141,7 @@ export async function printListingPoster(listing) {
     console.error('Failed to generate QR code:', err);
   }
 
-  const posterHTML = buildPosterHtml(listing, { posterImageUrl: `${baseUrl}/poster-bg.png`, qrCodeDataUrl });
+  const posterHTML = buildPosterHtml(listing, { posterImageUrl: `${baseUrl}/poster-bg.png`, qrCodeDataUrl, size });
 
   // Use blob URL for better reliability with popup windows
   try {

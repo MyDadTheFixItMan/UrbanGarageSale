@@ -129,8 +129,8 @@ export default function Profile() {
         toast.success('Two-factor authentication is on');
     };
 
-    const handlePrint = (listing) => {
-        printListingPoster(listing);
+    const handlePrint = (listing, size) => {
+        printListingPoster(listing, size);
         setPrintingListing(null);
         toast.success('Opening print poster window...');
     };

@@ -7,18 +7,33 @@ export const POSTER_CSS = `
 }
 
 html, body {
-  width: 100%;
-  height: 100%;
   margin: 0;
   padding: 0;
   background-color: #f5f5f5;
   font-family: Arial, sans-serif;
 }
 
-.poster-container {
+/* One sheet of A4 paper, showing its section of the poster. */
+.sheet {
   position: relative;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  background-color: white;
+  break-after: page;
+}
+
+.sheet:last-child {
+  break-after: auto;
+}
+
+.poster-container {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 2480px;
   height: 3508px;
+  transform-origin: top left;
   background-color: white;
   overflow: visible;
   -webkit-print-color-adjust: exact;
@@ -184,11 +199,9 @@ html, body {
     background: #f0f0f0;
   }
 
-  .poster-container {
-    margin: 0 auto;
+  .sheet {
+    margin: 0 auto 20px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    zoom: 0.3;
-    transform-origin: top center;
   }
 
   .text-field {
@@ -208,26 +221,7 @@ html, body {
   html, body {
     margin: 0;
     padding: 0;
-    width: 100%;
-    height: 100%;
     background: white;
-  }
-
-  .poster-container {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    box-shadow: none;
-    zoom: 1;
-    position: absolute;
-    top: 0;
-    left: 0;
-  }
-
-  .poster-background {
-    width: 100% !important;
-    height: 100% !important;
   }
 
   .text-field {
@@ -239,10 +233,10 @@ html, body {
     border: 8px solid #1e3a5f !important;
   }
 
-  @page {
-    size: A4;
-    margin: 0;
-    padding: 0;
-  }
+}
+
+@page {
+  size: A4;
+  margin: 0;
 }
 `;

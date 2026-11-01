@@ -120,7 +120,7 @@ export default function ListingDetails() {
 
     const handlePrintSignConfirm = () => {
         if (sale) {
-            printListingPoster(sale);
+            printListingPoster(sale, selectedPrintSize);
             setPrintDialogOpen(false);
             setSelectedPrintSize('A4');
             toast.success('Opening print poster window...');

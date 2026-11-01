@@ -68,4 +68,11 @@ describe('buildPosterHtml', () => {
     expect(html).toContain('src="/bg.png"');
     expect(html).toContain('src="data:image/png;base64,QR"');
   });
+
+  it('prints A4 on one sheet and A2 across four', () => {
+    const sheets = (size) => buildPosterHtml(listing, { posterImageUrl: '/bg.png', qrCodeDataUrl: 'data:x', size })
+      .match(/class="sheet"/g).length;
+    expect(sheets('A4')).toBe(1);
+    expect(sheets('A2')).toBe(4);
+  });
 });

@@ -5,9 +5,8 @@ export { isPaid, isPaidOrApproved };
 
 export const MAX_PHOTOS = 5;
 export const MAX_SALE_DAYS = 3;
-export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
-export const MAX_PHOTO_WIDTH = 2560;
-export const MAX_PHOTO_HEIGHT = 1920;
+// Before compression: uploadPhoto shrinks each photo to at most 2560×1920 before it's stored.
+export const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
 export const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 const DRAFT_LIFETIME_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -125,12 +124,9 @@ export function buildSaleData(form, { asDraft, isFree, alreadyPaid, locked, coor
     return data;
 }
 
-// Returns why a chosen photo can't be uploaded, or null. `dimensions` is { width, height } or null.
-export function photoProblem(file, dimensions) {
+// Returns why a chosen photo can't be uploaded, or null.
+export function photoProblem(file) {
     if (!ALLOWED_PHOTO_TYPES.includes(file.type)) return `"${file.name}" - Only JPEG, PNG, or WEBP images allowed`;
-    if (file.size > MAX_PHOTO_BYTES) return `"${file.name}" exceeds 5MB limit`;
-    if (dimensions && (dimensions.width > MAX_PHOTO_WIDTH || dimensions.height > MAX_PHOTO_HEIGHT)) {
-        return `"${file.name}" exceeds max resolution (${MAX_PHOTO_WIDTH}×${MAX_PHOTO_HEIGHT}). Current: ${dimensions.width}×${dimensions.height}`;
-    }
+    if (file.size > MAX_PHOTO_BYTES) return `"${file.name}" exceeds 20MB limit`;
     return null;
 }

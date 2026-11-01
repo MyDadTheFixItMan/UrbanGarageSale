@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format, parseISO, isToday, isTomorrow } from 'date-fns';
 import { coverImage } from '@/lib/listings';
+import { geocode } from '@/lib/geocode';
+import { directionsUrl, fullHomeAddress, orderStopsFrom, saleLocation } from '@/lib/route';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -94,13 +96,21 @@ export default function SavedListings() {
         },
     });
 
+    // Routes start from the account's home address. It's looked up ahead of the click because
+    // browsers block a new tab opened after waiting on a lookup.
+    const homeAddress = fullHomeAddress(user);
+    const { data: home, isLoading: homeLoading } = useQuery({
+        queryKey: ['homeLocation', homeAddress],
+        queryFn: () => geocode(homeAddress, { country: 'AU' }),
+        enabled: !!homeAddress,
+        staleTime: Infinity,
+        retry: false,
+    });
+
     const handleGetDirections = (sale) => {
-        if (sale?.latitude && sale?.longitude) {
-            const url = `https://www.google.com/maps/dir/?api=1&destination=${sale.latitude},${sale.longitude}`;
-            window.open(url, '_blank');
-        } else if (sale?.address) {
-            const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(sale.address)}`;
-            window.open(url, '_blank');
+        const location = saleLocation(sale);
+        if (location) {
+            window.open(directionsUrl(homeAddress, [location]), '_blank');
         }
     };
 
@@ -109,18 +119,14 @@ export default function SavedListings() {
 
         if (validSales.length === 0) return;
 
-        let url = `https://www.google.com/maps/dir/?api=1`;
-
-        if (validSales.length === 1) {
-            url += `&destination=${validSales[0].latitude},${validSales[0].longitude}`;
-        } else {
-            const destination = validSales[validSales.length - 1];
-            const waypoints = validSales.slice(0, -1).map(s => `${s.latitude},${s.longitude}`).join('|');
-
-            url += `&destination=${destination.latitude},${destination.longitude}`;
-            url += `&waypoints=${waypoints}`;
+        if (!homeAddress) {
+            toast.info('Add your home address to your profile to start routes from home');
+        } else if (!home) {
+            toast.info("We couldn't find your home address on the map, so stops are in saved order");
         }
-        window.open(url, '_blank');
+
+        const stops = home ? orderStopsFrom(home, validSales) : validSales;
+        window.open(directionsUrl(homeAddress, stops.map(saleLocation)), '_blank');
     };
 
     const getDateLabel = (sale) => {
@@ -191,6 +197,7 @@ export default function SavedListings() {
                     {savedSales.length > 1 && (
                         <Button
                             onClick={handleRouteAll}
+                            disabled={homeLoading}
                             className="bg-[#1e3a5f] hover:bg-[#152a45] gap-2"
                         >
                             <Route className="w-4 h-4" />

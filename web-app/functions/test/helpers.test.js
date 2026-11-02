@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-    isDocId, isRole, escapeHtml, storagePathFromUrl, listingPhotoPaths, isExpiredDraft, refundablePayments,
+    isDocId, isRole, escapeHtml, storagePathFromUrl, listingPhotoPaths, isUnpaidListing, isExpiredDraft, refundablePayments,
     rejectionEmailHtml,
     editRefusedEmailHtml,
 } = require('../lib/helpers');
@@ -41,11 +41,30 @@ test('storagePathFromUrl returns listing paths only', () => {
 
 test('listingPhotoPaths covers photos and thumbnails without duplicates', () => {
     const listing = {
+        user_id: 'u1',
         photos: [photoUrl('listings/u1/a.jpg'), photoUrl('listings/u1/b.jpg')],
         thumbnails: [photoUrl('listings/u1/thumb_a.jpg'), photoUrl('listings/u1/a.jpg'), 'not a url'],
     };
     assert.deepEqual(listingPhotoPaths(listing).sort(), ['listings/u1/a.jpg', 'listings/u1/b.jpg', 'listings/u1/thumb_a.jpg']);
     assert.deepEqual(listingPhotoPaths({}), []);
+});
+
+test("listingPhotoPaths never returns another seller's files", () => {
+    const victim = photoUrl('listings/victim/a.jpg');
+    assert.deepEqual(listingPhotoPaths({ user_id: 'mallory', photos: [victim], thumbnails: [victim] }), []);
+    assert.deepEqual(listingPhotoPaths({ photos: [victim] }), []);
+    assert.deepEqual(listingPhotoPaths({ user_id: 'victi', photos: [victim] }), []);
+    assert.deepEqual(listingPhotoPaths({ user_id: 'mallory', photos: [photoUrl('listings/mallory/../victim/a.jpg')] }), []);
+});
+
+test('isUnpaidListing is true only for unpaid drafts and abandoned payments', () => {
+    assert.equal(isUnpaidListing({ status: 'draft', payment_status: 'pending' }), true);
+    assert.equal(isUnpaidListing({ status: 'pending_payment' }), true);
+    assert.equal(isUnpaidListing({ status: 'draft', payment_status: 'paid' }), false);
+    for (const status of ['pending_approval', 'active', 'rejected', 'completed']) {
+        assert.equal(isUnpaidListing({ status, payment_status: 'pending' }), false, status);
+    }
+    assert.equal(isUnpaidListing(undefined), false);
 });
 
 test('isExpiredDraft uses draft_expires_at, falling back to created_at', () => {
@@ -57,6 +76,13 @@ test('isExpiredDraft uses draft_expires_at, falling back to created_at', () => {
     assert.equal(isExpiredDraft({ status: 'draft', created_at: { toMillis: () => now - 3 * day } }, now), true);
     assert.equal(isExpiredDraft({ status: 'draft', created_at: { toMillis: () => now - day } }, now), false);
     assert.equal(isExpiredDraft({ status: 'draft' }, now), false);
+});
+
+test('isExpiredDraft falls back to created_at when draft_expires_at is unreadable', () => {
+    const now = Date.parse('2026-10-15T00:00:00Z');
+    const day = 24 * 60 * 60 * 1000;
+    assert.equal(isExpiredDraft({ status: 'draft', draft_expires_at: 'never', created_at: { toMillis: () => now - 3 * day } }, now), true);
+    assert.equal(isExpiredDraft({ status: 'draft', draft_expires_at: 'never', created_at: { toMillis: () => now - day } }, now), false);
 });
 
 test('isExpiredDraft covers abandoned payments but never paid listings', () => {

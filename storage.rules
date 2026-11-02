@@ -2,11 +2,16 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Listing photos: public to view; only the owner can upload or delete in their own folder.
+    // Listing photos: anyone with a photo's address can view it, but folders can't be listed, so
+    // draft and rejected photos can't be found. Only the owner can upload or delete in their own
+    // folder, and uploading needs the same 2FA session as creating a listing (firestore.rules).
     match /listings/{userId}/{fileName} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow create, update: if request.auth != null &&
                                request.auth.uid == userId &&
+                               request.auth.token.get('two_fa_enabled', false) == true &&
+                               request.auth.token.firebase.get('sign_in_second_factor', null) != null &&
                                request.resource.size < 10 * 1024 * 1024 &&
                                request.resource.contentType.matches('image/(jpeg|png|webp|gif|heic|heif)');
       allow delete: if request.auth != null && request.auth.uid == userId;

@@ -40,6 +40,23 @@ export async function writeSaleWithStats({ saleDocId, sale }) {
   });
 }
 
+// Returns the seller's live listing. Card payments need one, so an account can't be used to run
+// stolen cards without an approved garage sale behind it.
+export async function getLiveGarageSale(sellerId, garageSaleId) {
+  if (!isDocId(garageSaleId)) {
+    throw new HttpError(400, 'Choose the garage sale you are taking payments for');
+  }
+  const snap = await getFirebaseAdmin().firestore().collection('garageSales').doc(garageSaleId).get();
+  const listing = snap.data();
+  if (!listing || listing.user_id !== sellerId) {
+    throw new HttpError(403, 'That garage sale does not belong to you');
+  }
+  if (listing.status !== 'active') {
+    throw new HttpError(409, 'Card payments are available once your garage sale listing is approved and live.');
+  }
+  return listing;
+}
+
 // Confirms the garage sale exists and belongs to the seller (when one is supplied).
 export async function assertOwnsGarageSale(sellerId, garageSaleId) {
   if (!garageSaleId) return;

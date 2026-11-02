@@ -32,73 +32,104 @@ service cloud.firestore {
     // ---------- Field validation ----------
     // `keys` is the set of fields this write touches: data.keys() on create,
     // diff().affectedKeys() on update, so older documents with legacy fields can still be edited.
-    // Each check passes when the field isn't part of the write.
+    // Each check passes when the field isn't part of the write. `d` is request.resource.data,
+    // passed in because a listing write with every field changed is close to Firestore's limit of
+    // 1000 expressions per request, and looking it up in each check uses up several times more.
     function changedKeys() {
       return resource == null ? request.resource.data.keys()
                               : request.resource.data.diff(resource.data).affectedKeys();
     }
 
-    function isText(keys, field, max) {
+    function isText(d, keys, field, max) {
       return !keys.hasAny([field]) ||
-             (request.resource.data[field] is string && request.resource.data[field].size() <= max);
+             (d[field] is string && d[field].size() <= max);
     }
 
-    function isTextOrNull(keys, field, max) {
-      return !keys.hasAny([field]) || request.resource.data[field] == null ||
-             (request.resource.data[field] is string && request.resource.data[field].size() <= max);
+    function isTextOrNull(d, keys, field, max) {
+      return !keys.hasAny([field]) || d[field] == null ||
+             (d[field] is string && d[field].size() <= max);
     }
 
-    function matchesOrEmpty(keys, field, pattern) {
+    function matchesOrEmpty(d, keys, field, pattern) {
       return !keys.hasAny([field]) ||
-             (request.resource.data[field] is string &&
-              (request.resource.data[field] == '' || request.resource.data[field].matches(pattern)));
+             (d[field] is string &&
+              (d[field] == '' || d[field].matches(pattern)));
     }
 
-    function isNumberOrNull(keys, field) {
-      return !keys.hasAny([field]) || request.resource.data[field] == null || request.resource.data[field] is number;
+    function isCoordinateOrNull(d, keys, field, limit) {
+      return !keys.hasAny([field]) || d[field] == null ||
+             (d[field] is number &&
+              d[field] >= -limit && d[field] <= limit);
     }
 
-    function isBool(keys, field) {
-      return !keys.hasAny([field]) || request.resource.data[field] is bool;
+    function isBool(d, keys, field) {
+      return !keys.hasAny([field]) || d[field] is bool;
     }
 
-    function isShortList(keys, field, max) {
+    // At most 10 Firebase download URLs from the seller's own Storage folder, so a listing can't
+    // show or claim anyone else's files. A thumbnail is null when one couldn't be made.
+    function isPhotoList(d, keys, field) {
       return !keys.hasAny([field]) ||
-             (request.resource.data[field] is list && request.resource.data[field].size() <= max);
+             (d[field] is list && d[field].size() <= 10 &&
+              d[field].removeAll([null]).join(' ').matches(
+                '(https://firebasestorage[.]googleapis[.]com/v0/b/[^/ ]+/o/listings%2F' + request.auth.uid + '%2F[^ ]+ ?)*'));
+    }
+
+    // The limits on the listing form: at most 3 days long (MAX_SALE_DAYS), and not years away, so
+    // one listing can't stay up indefinitely. Only a draft can leave them blank, because
+    // expireListings ends a sale by its end_date. Ending a sale needs no dates.
+    function validSaleDates(d, keys) {
+      let start = d.get('start_date', '');
+      let end = d.get('end_date', '');
+      let status = d.get('status', 'draft');
+      return !keys.hasAny(['start_date', 'end_date', 'status']) || status == 'completed' ||
+             (status == 'draft' && (start == '' || end == '')) ||
+             (start != '' && end != '' && end >= start &&
+              timestamp.value(end + 'T00:00:00Z') <= timestamp.value(start + 'T00:00:00Z') + duration.value(2, 'd') &&
+              timestamp.value(end + 'T00:00:00Z') <= request.time + duration.value(400, 'd'));
+    }
+
+    // A real date, no further ahead than a device with a wrong clock could put the 2-day expiry.
+    function validDraftExpiry(d, keys) {
+      return isTextOrNull(d, keys, 'draft_expires_at', 40) &&
+             (!keys.hasAny(['draft_expires_at']) || d.draft_expires_at == null ||
+              timestamp.value(d.draft_expires_at) <= request.time + duration.value(7, 'd'));
     }
 
     // Fields a user may write on their own profile (protected fields are checked separately).
     function validUserProfile() {
+      let d = request.resource.data;
       let keys = changedKeys();
       return keys.hasOnly(['email', 'full_name', 'address', 'phone', 'phone_verified',
                            'suburb', 'postcode', 'state', 'created_date', 'role']) &&
-             isText(keys, 'email', 254) && isText(keys, 'full_name', 100) &&
-             isText(keys, 'address', 300) && isText(keys, 'suburb', 100) && isText(keys, 'phone', 20) &&
-             matchesOrEmpty(keys, 'postcode', '^[0-9]{4}$') && isText(keys, 'state', 3) &&
-             isText(keys, 'created_date', 40) && isBool(keys, 'phone_verified');
+             isText(d, keys, 'email', 254) && isText(d, keys, 'full_name', 100) &&
+             isText(d, keys, 'address', 300) && isText(d, keys, 'suburb', 100) && isText(d, keys, 'phone', 20) &&
+             matchesOrEmpty(d, keys, 'postcode', '^[0-9]{4}$') && isText(d, keys, 'state', 3) &&
+             isText(d, keys, 'created_date', 40) && isBool(d, keys, 'phone_verified');
     }
 
     // Fields a seller may write on their own listing. Status, payment and ownership rules are
     // in the match block below; this checks shape and size.
     function validListing() {
+      let d = request.resource.data;
       let keys = changedKeys();
       return keys.hasOnly(['title', 'description', 'address', 'suburb', 'postcode', 'state',
                            'latitude', 'longitude', 'geohash', 'start_date', 'end_date',
                            'start_time', 'end_time', 'sale_type', 'photos', 'thumbnails',
                            'status', 'payment_status', 'draft_expires_at', 'user_id', 'created_at']) &&
-             isText(keys, 'title', 150) && isText(keys, 'description', 5000) &&
-             isText(keys, 'address', 300) && isText(keys, 'suburb', 100) &&
-             matchesOrEmpty(keys, 'postcode', '^[0-9]{4}$') && isText(keys, 'state', 3) &&
-             isNumberOrNull(keys, 'latitude') && isNumberOrNull(keys, 'longitude') &&
-             isText(keys, 'geohash', 12) &&
-             matchesOrEmpty(keys, 'start_date', '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
-             matchesOrEmpty(keys, 'end_date', '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
-             matchesOrEmpty(keys, 'start_time', '^[0-9]{2}:[0-9]{2}$') &&
-             matchesOrEmpty(keys, 'end_time', '^[0-9]{2}:[0-9]{2}$') &&
-             isText(keys, 'sale_type', 30) &&
-             isShortList(keys, 'photos', 10) && isShortList(keys, 'thumbnails', 10) &&
-             isTextOrNull(keys, 'draft_expires_at', 40) &&
-             (!keys.hasAny(['created_at']) || request.resource.data.created_at is timestamp);
+             isText(d, keys, 'title', 150) && isText(d, keys, 'description', 5000) &&
+             isText(d, keys, 'address', 300) && isText(d, keys, 'suburb', 100) &&
+             matchesOrEmpty(d, keys, 'postcode', '^[0-9]{4}$') && isText(d, keys, 'state', 3) &&
+             isCoordinateOrNull(d, keys, 'latitude', 90) && isCoordinateOrNull(d, keys, 'longitude', 180) &&
+             isText(d, keys, 'geohash', 12) &&
+             matchesOrEmpty(d, keys, 'start_date', '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$') &&
+             matchesOrEmpty(d, keys, 'end_date', '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$') && validSaleDates(d, keys) &&
+             matchesOrEmpty(d, keys, 'start_time', '^[0-9]{2}:[0-9]{2}$') &&
+             matchesOrEmpty(d, keys, 'end_time', '^[0-9]{2}:[0-9]{2}$') &&
+             isText(d, keys, 'sale_type', 30) &&
+             isPhotoList(d, keys, 'photos') && isPhotoList(d, keys, 'thumbnails') &&
+             validDraftExpiry(d, keys) &&
+             (!keys.hasAny(['created_at']) || d.created_at is timestamp);
     }
 
     // ---------- Users ----------
@@ -201,15 +232,16 @@ service cloud.firestore {
     // from the public listing so buyers only ever see what an admin approved. An admin approves
     // by copying them onto the listing; refusing (Cloud Function) marks them refused with a reason.
     function validListingEdit() {
-      let keys = request.resource.data.keys();
+      let d = request.resource.data;
+      let keys = d.keys();
       return keys.hasOnly(['user_id', 'title', 'description', 'sale_type', 'photos', 'thumbnails',
                            'status', 'submitted_at']) &&
              keys.hasAll(['user_id', 'title', 'status', 'submitted_at']) &&
-             request.resource.data.status == 'pending' &&
-             request.resource.data.submitted_at is timestamp &&
-             isText(keys, 'title', 150) && isText(keys, 'description', 5000) &&
-             isText(keys, 'sale_type', 30) &&
-             isShortList(keys, 'photos', 10) && isShortList(keys, 'thumbnails', 10);
+             d.status == 'pending' &&
+             d.submitted_at is timestamp &&
+             isText(d, keys, 'title', 150) && isText(d, keys, 'description', 5000) &&
+             isText(d, keys, 'sale_type', 30) &&
+             isPhotoList(d, keys, 'photos') && isPhotoList(d, keys, 'thumbnails');
     }
 
     match /listingEdits/{saleId} {
@@ -230,9 +262,8 @@ service cloud.firestore {
       // Only approved listings can be saved. Removing a favourite is always allowed, so one whose
       // listing has since ended or been rejected can still be cleared.
       allow create: if signedIn() && request.auth.uid == request.resource.data.user_id &&
+                       request.resource.data.keys().hasOnly(['garage_sale_id', 'user_id', 'created_at']) &&
                        get(/databases/$(database)/documents/garageSales/$(request.resource.data.garage_sale_id)).data.get('status', '') == 'active';
-      allow update: if signedIn() && request.auth.uid == resource.data.user_id && unchanged('user_id') &&
-                       unchanged('garage_sale_id');
     }
 
     // ---------- Listing fee payments ----------
@@ -243,6 +274,8 @@ service cloud.firestore {
 
       allow create: if isAdmin() ||
                        (signedIn() &&
+                        request.resource.data.keys().hasOnly(['garage_sale_id', 'user_id', 'user_email', 'amount', 'currency',
+                                                              'status', 'payment_method', 'created_at']) &&
                         request.resource.data.user_id == request.auth.uid &&
                         request.resource.data.amount == 0 &&
                         request.resource.data.payment_method == 'free_period' &&
@@ -255,12 +288,15 @@ service cloud.firestore {
 
     // ---------- Contact messages ----------
     // Rate limit: a user may send one contact message per minute. The message and this marker
-    // are written in one batch, and the message is accepted only if the marker was updated
-    // in that same write (getAfter) and the previous one is at least 60 seconds old.
+    // are written in one batch, and the message is accepted only if the marker was updated in
+    // that same write (getAfter), names this message, and the previous one is at least 60 seconds
+    // old. Naming the message stops one marker covering a whole batch of messages.
+    // Replies go to `email`, so it must be the sender's own verified address.
     match /contactRateLimits/{uid} {
       allow create, update: if signedIn() && request.auth.uid == uid &&
-                               request.resource.data.keys().hasOnly(['last']) &&
+                               request.resource.data.keys().hasOnly(['last', 'messageId']) &&
                                request.resource.data.last == request.time &&
+                               request.resource.data.messageId is string &&
                                (resource == null || request.time > resource.data.last + duration.value(60, 's'));
     }
 
@@ -271,10 +307,12 @@ service cloud.firestore {
                        request.resource.data.status == 'unread' &&
                        request.resource.data.created_at == request.time &&
                        request.resource.data.name is string && request.resource.data.name.size() <= 100 &&
-                       request.resource.data.email is string && request.resource.data.email.size() <= 254 &&
+                       request.auth.token.get('email_verified', false) == true &&
+                       request.resource.data.email == request.auth.token.email &&
                        request.resource.data.message is string &&
                        request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 4000 &&
-                       getAfter(/databases/$(database)/documents/contactRateLimits/$(request.auth.uid)).data.last == request.time;
+                       getAfter(/databases/$(database)/documents/contactRateLimits/$(request.auth.uid)).data.last == request.time &&
+                       getAfter(/databases/$(database)/documents/contactRateLimits/$(request.auth.uid)).data.messageId == messageId;
       allow read, update, delete: if isAdmin();
     }
 

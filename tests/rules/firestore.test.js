@@ -27,6 +27,7 @@ const secondFactor = { firebase: { sign_in_provider: 'password', sign_in_second_
 const as = {
   anon: () => env.unauthenticatedContext().firestore(),
   user: (uid = 'alice') => env.authenticatedContext(uid).firestore(),
+  verified: (uid = 'alice') => env.authenticatedContext(uid, { email: `${uid}@x.com`, email_verified: true }).firestore(),
   seller: (uid = 'alice') => env.authenticatedContext(uid, { ...secondFactor, two_fa_enabled: true }).firestore(),
   admin: (uid = 'boss') => env.authenticatedContext(uid, { ...secondFactor, two_fa_enabled: true, admin: true }).firestore(),
   adminNo2fa: (uid = 'boss') => env.authenticatedContext(uid, { two_fa_enabled: true, admin: true }).firestore(),
@@ -34,6 +35,12 @@ const as = {
 
 // Writes test data with rules switched off.
 const seed = (path, data) => env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), path), data));
+
+const photo = (uid, name = '1.jpg') =>
+  `https://firebasestorage.googleapis.com/v0/b/test.appspot.com/o/listings%2F${uid}%2F${name}?alt=media&token=t`;
+
+// A date string `days` from now, so tests of the "not years away" limit don't go stale.
+const daysAhead = (days) => new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
 const listing = (overrides = {}) => ({
   title: 'Moving sale',
@@ -92,6 +99,7 @@ test('only active listings can be saved to favourites, and a favourite can alway
   await assertFails(save('no-such-listing'));
   await assertFails(updateDoc(doc(db, 'savedListings/active'), { garage_sale_id: 'draft' }));
 
+  await assertFails(setDoc(doc(db, 'savedListings/extra'), { garage_sale_id: 'active', user_id: 'alice', junk: 'x' }));
   await seed('savedListings/ended', { garage_sale_id: 'rejected', user_id: 'alice' });
   await assertSucceeds(deleteDoc(doc(db, 'savedListings/ended')));
 });
@@ -167,9 +175,38 @@ test('listing fields are schema checked', async () => {
   await assertFails(setDoc(doc(db, 'garageSales/c'), listing({ postcode: 'ABCD' })));
   await assertFails(setDoc(doc(db, 'garageSales/d'), listing({ latitude: 'north' })));
   await assertFails(setDoc(doc(db, 'garageSales/e'), listing({ start_date: '7 Nov 2026' })));
-  await assertFails(setDoc(doc(db, 'garageSales/f'), listing({ photos: Array(11).fill('https://x') })));
+  await assertFails(setDoc(doc(db, 'garageSales/f'), listing({ photos: Array(11).fill(photo('alice')) })));
   await assertFails(setDoc(doc(db, 'garageSales/g'), listing({ is_featured: true })));
   await assertSucceeds(setDoc(doc(db, 'garageSales/h'), listing()));
+});
+
+test("photos must be the seller's own uploads", async () => {
+  const db = as.seller('alice');
+  const save = (id, fields) => setDoc(doc(db, `garageSales/${id}`), listing(fields));
+  await assertSucceeds(save('own', { photos: [photo('alice'), photo('alice', '2.jpg')], thumbnails: [photo('alice', 't.jpg'), null] }));
+  await assertFails(save('other', { photos: [photo('bob')] }));
+  await assertFails(save('mixed', { photos: [photo('alice'), photo('bob')] }));
+  await assertFails(save('thumb', { thumbnails: [photo('bob')] }));
+  await assertFails(save('site', { photos: ['https://example.test/1.jpg'] }));
+  await assertFails(save('junk', { photos: [{ a: 1 }, 42] }));
+  await assertFails(save('script', { photos: ['javascript:alert(1)'] }));
+});
+
+test('coordinates, sale dates and draft expiry must be real and in range', async () => {
+  const db = as.seller('alice');
+  const save = (id, fields) => setDoc(doc(db, `garageSales/${id}`), listing(fields));
+  await assertFails(save('a', { latitude: 91 }));
+  await assertFails(save('b', { longitude: -181 }));
+  await assertFails(save('c', { end_date: '2099-12-31' }));
+  await assertFails(save('d', { start_date: '2026-11-08', end_date: '2026-11-07' }));
+  await assertFails(save('e', { start_date: '2026-11-07', end_date: '2026-11-10' }));
+  await assertFails(save('f', { start_date: '2026-13-45', end_date: '2026-13-45' }));
+  await assertFails(save('g', { start_date: daysAhead(500), end_date: daysAhead(500) }));
+  await assertFails(save('h', { draft_expires_at: 'never' }));
+  await assertFails(save('i', { draft_expires_at: '2099-01-01T00:00:00.000Z' }));
+  await assertSucceeds(save('j', { start_date: daysAhead(30), end_date: daysAhead(32) }));
+  await assertSucceeds(save('k', { start_date: '', end_date: '' }));
+  await assertSucceeds(save('l', { draft_expires_at: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString() }));
 });
 
 test('legacy listings with extra fields can still be edited', async () => {
@@ -209,8 +246,8 @@ test('edits to a live listing wait privately, and only an admin can put them liv
     title: 'New title',
     description: 'New description',
     sale_type: 'estate_sale',
-    photos: ['https://example.test/1.jpg'],
-    thumbnails: ['https://example.test/1-thumb.jpg'],
+    photos: [photo('alice')],
+    thumbnails: [photo('alice', '1-thumb.jpg')],
     status: 'pending',
     submitted_at: Timestamp.now(),
   };
@@ -314,6 +351,7 @@ test('clients may only record a $0 free-period payment for their own free listin
   await assertFails(setDoc(doc(db, 'payments/p2'), payment({ amount: 10, payment_method: 'stripe' })));
   await assertFails(setDoc(doc(db, 'payments/p3'), payment({ garage_sale_id: 'unpaid' })));
   await assertFails(setDoc(doc(as.user('bob'), 'payments/p4'), payment({ user_id: 'bob' })));
+  await assertFails(setDoc(doc(db, 'payments/p5'), payment({ transaction_id: 'pi_fake' })));
 });
 
 test('payments are readable by their owner and admins only; updates are admin only', async () => {
@@ -339,22 +377,39 @@ test('sales and stats are server-written only', async () => {
 
 // ---------- Contact messages ----------
 
+const message = (uid, overrides = {}) => ({
+  name: 'Alice', email: `${uid}@x.com`, message: 'Hello', user_id: uid, status: 'unread', created_at: serverTimestamp(), ...overrides,
+});
+
 const sendMessage = (db, uid, overrides = {}) => {
   const batch = writeBatch(db);
-  batch.set(doc(db, `contactRateLimits/${uid}`), { last: serverTimestamp() });
-  batch.set(doc(collection(db, 'contactMessages')), {
-    name: 'Alice', email: 'a@x.com', message: 'Hello', user_id: uid, status: 'unread', created_at: serverTimestamp(), ...overrides,
-  });
+  const messageRef = doc(collection(db, 'contactMessages'));
+  batch.set(doc(db, `contactRateLimits/${uid}`), { last: serverTimestamp(), messageId: messageRef.id });
+  batch.set(messageRef, message(uid, overrides));
   return batch.commit();
 };
 
 test('contact messages are size-limited and rate limited to one a minute', async () => {
-  const db = as.user('alice');
+  const db = as.verified('alice');
   await assertSucceeds(sendMessage(db, 'alice'));
   await assertFails(sendMessage(db, 'alice'));
-  await assertFails(sendMessage(as.user('bob'), 'bob', { message: 'x'.repeat(4001) }));
-  await assertFails(sendMessage(as.user('carol'), 'carol', { status: 'replied' }));
-  await assertFails(sendMessage(as.user('dave'), 'dave', { user_id: 'alice' }));
+  await assertFails(sendMessage(as.verified('bob'), 'bob', { message: 'x'.repeat(4001) }));
+  await assertFails(sendMessage(as.verified('carol'), 'carol', { status: 'replied' }));
+  await assertFails(sendMessage(as.verified('dave'), 'dave', { user_id: 'alice' }));
+});
+
+test('one marker cannot cover a whole batch of contact messages', async () => {
+  const db = as.verified('alice');
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'contactRateLimits/alice'), { last: serverTimestamp(), messageId: 'm0' });
+  for (let i = 0; i < 3; i++) batch.set(doc(db, `contactMessages/m${i}`), message('alice'));
+  await assertFails(batch.commit());
+});
+
+test('contact replies can only go to the sender\'s own verified email', async () => {
+  await assertFails(sendMessage(as.verified('alice'), 'alice', { email: 'stranger@x.com' }));
+  await assertFails(sendMessage(env.authenticatedContext('bob', { email: 'bob@x.com', email_verified: false }).firestore(), 'bob'));
+  await assertFails(sendMessage(as.user('carol'), 'carol'));
 });
 
 test('contact messages are readable by admins only', async () => {

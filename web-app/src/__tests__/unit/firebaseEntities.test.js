@@ -69,7 +69,7 @@ beforeEach(() => {
   store.commit = undefined;
   store.getDocs.mockReset().mockResolvedValue(snapshot([]));
   store.getDoc.mockReset().mockResolvedValue(docSnap(null));
-  auth.currentUser = { uid: 'user-1', email: 'seller@example.com' };
+  auth.currentUser = { uid: 'user-1', email: 'seller@example.com', emailVerified: true };
   jest.clearAllMocks();
 });
 
@@ -157,11 +157,18 @@ describe('SavedListing', () => {
 
 describe('ContactMessage.create', () => {
   it('writes the message and the rate-limit marker in one batch, trimming long fields', async () => {
-    await firebaseEntities.ContactMessage.create({ name: 'N'.repeat(500), email: 'a@b.c', message: 'hello' });
+    await firebaseEntities.ContactMessage.create({ name: 'N'.repeat(500), email: 'forged@b.c', message: 'hello' });
     const [batch] = store.batches;
     expect(batch.writes.map((w) => w.ref.path[0])).toEqual(['contactRateLimits', 'contactMessages']);
-    expect(batch.writes[1].data).toMatchObject({ email: 'a@b.c', message: 'hello', user_id: 'user-1', status: 'unread' });
+    expect(batch.writes[1].data).toMatchObject({ email: 'seller@example.com', message: 'hello', user_id: 'user-1', status: 'unread' });
+    expect(batch.writes[0].data.messageId).toBe(batch.writes[1].ref.id);
     expect(batch.writes[1].data.name).toHaveLength(100);
+  });
+
+  it('asks unverified accounts to verify their email first', async () => {
+    auth.currentUser.emailVerified = false;
+    await expect(firebaseEntities.ContactMessage.create({ message: 'hi' })).rejects.toThrow('verify your email');
+    expect(store.batches).toHaveLength(0);
   });
 
   it('explains the per-minute limit when Firestore rejects the write', async () => {

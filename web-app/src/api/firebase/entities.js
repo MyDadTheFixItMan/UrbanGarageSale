@@ -294,16 +294,21 @@ export const firebaseEntities = {
   },
 
   ContactMessage: {
-    // Written together with the sender's rate-limit marker; Firestore rules allow one
-    // message per user per minute and limit field sizes.
+    // Written together with the sender's rate-limit marker; Firestore rules allow one message
+    // per user per minute and limit field sizes. Replies go to the verified account email.
     create: async (data) => {
       const user = requireUser('Please sign in to send a message.');
+      if (!user.emailVerified) {
+        throw new AppError('Please verify your email address first. Check your inbox for the verification link.', {
+          code: 'auth/unverified-email',
+        });
+      }
       const messageRef = doc(collection(db, 'contactMessages'));
       const batch = writeBatch(db);
-      batch.set(doc(db, 'contactRateLimits', user.uid), { last: serverTimestamp() });
+      batch.set(doc(db, 'contactRateLimits', user.uid), { last: serverTimestamp(), messageId: messageRef.id });
       batch.set(messageRef, {
         name: String(data.name || '').slice(0, 100),
-        email: String(data.email || '').slice(0, 254),
+        email: user.email,
         message: String(data.message || '').slice(0, 4000),
         user_id: user.uid,
         status: 'unread',

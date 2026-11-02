@@ -1,9 +1,10 @@
-// Storage security rules tests: listing photos are public to view, and only their owner can
-// upload (images under 10 MB) or delete them. Everything else is closed.
+// Storage security rules tests: listing photos are public to view but folders can't be listed,
+// and only their owner can upload (images under 10 MB, in a 2FA session) or delete them.
+// Everything else is closed.
 import test, { before, after } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { ref, uploadBytes, getBytes, deleteObject } from 'firebase/storage';
+import { ref, uploadBytes, getBytes, deleteObject, listAll } from 'firebase/storage';
 
 let env;
 
@@ -17,12 +18,27 @@ after(() => env.cleanup());
 
 const image = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
 const jpeg = { contentType: 'image/jpeg' };
-const storageFor = (uid) => (uid ? env.authenticatedContext(uid) : env.unauthenticatedContext()).storage();
+const secondFactor = { firebase: { sign_in_provider: 'password', sign_in_second_factor: 'phone' }, two_fa_enabled: true };
+const storageFor = (uid) => (uid ? env.authenticatedContext(uid, secondFactor) : env.unauthenticatedContext()).storage();
 
 test('owners can upload images to their own folder only', async () => {
   await assertSucceeds(uploadBytes(ref(storageFor('alice'), 'listings/alice/a.jpg'), image, jpeg));
   await assertFails(uploadBytes(ref(storageFor('bob'), 'listings/alice/b.jpg'), image, jpeg));
   await assertFails(uploadBytes(ref(storageFor(null), 'listings/alice/c.jpg'), image, jpeg));
+});
+
+test('uploading needs the 2FA claim and a session that passed the second factor', async () => {
+  const path = 'listings/alice/d.jpg';
+  await assertFails(uploadBytes(ref(env.authenticatedContext('alice').storage(), path), image, jpeg));
+  await assertFails(uploadBytes(ref(env.authenticatedContext('alice', { two_fa_enabled: true }).storage(), path), image, jpeg));
+  await assertFails(uploadBytes(ref(env.authenticatedContext('alice', { firebase: secondFactor.firebase }).storage(), path), image, jpeg));
+});
+
+test('folders cannot be listed', async () => {
+  await env.withSecurityRulesDisabled((ctx) => uploadBytes(ref(ctx.storage(), 'listings/alice/l.jpg'), image, jpeg));
+  await assertFails(listAll(ref(storageFor(null), 'listings/alice')));
+  await assertFails(listAll(ref(storageFor('bob'), 'listings/alice')));
+  await assertFails(listAll(ref(storageFor('alice'), 'listings/alice')));
 });
 
 test('only image types under 10 MB are accepted', async () => {

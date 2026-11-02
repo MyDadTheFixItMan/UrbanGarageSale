@@ -12,7 +12,7 @@ const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
     isDocId, isRole, escapeHtml, rejectionEmailHtml, editRefusedEmailHtml, listingPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
-    isExpiredDraft, refundablePayments,
+    isUnpaidListing, isExpiredDraft, refundablePayments,
 } = require('./lib/helpers');
 
 const REGION = 'australia-southeast1';
@@ -122,8 +122,26 @@ async function deleteStorageFiles(paths) {
     await Promise.all(paths.map((path) => bucket.file(path).delete({ ignoreNotFound: true })));
 }
 
-// Marks a listing paid from a completed Checkout session. Idempotent: the payment record
-// is keyed by the Checkout session ID, so verifying twice (or via webhook) changes nothing.
+// Refunds one listing-fee payment. The idempotency key makes retrying safe.
+async function refundPayment(paymentId, paymentIntent, saleId) {
+    const refund = await getStripe().refunds.create(
+        { payment_intent: paymentIntent, reason: 'requested_by_customer', metadata: { sale_id: saleId } },
+        { idempotencyKey: `listing-refund-${paymentId}` },
+    );
+    await db.collection('payments').doc(paymentId).update({
+        status: 'refunded',
+        refund_id: refund.id,
+        refunded_at: FieldValue.serverTimestamp(),
+    });
+    return refund;
+}
+
+// Marks a listing paid from a completed Checkout session, and returns whether it did. Idempotent:
+// the payment record is keyed by the Checkout session ID, so verifying twice (or via webhook)
+// changes nothing. Only an unpaid listing can be paid for. A Checkout session left open can be
+// paid after that has changed, and it must not put a live or rejected listing back in the
+// approval queue, where rejecting it would refund a sale that has already run. Those payments are
+// refunded instead, and refund_due lets a Stripe webhook retry finish one that failed.
 async function recordListingPayment(session) {
     const saleId = session.metadata?.sale_id;
     const userId = session.metadata?.user_id;
@@ -134,28 +152,36 @@ async function recordListingPayment(session) {
     const paymentRef = db.collection('payments').doc(session.id);
     const listingRef = db.collection('garageSales').doc(saleId);
 
-    await db.runTransaction(async (tx) => {
+    const status = await db.runTransaction(async (tx) => {
         const [payment, listing] = await Promise.all([tx.get(paymentRef), tx.get(listingRef)]);
-        if (payment.exists) return;
+        if (payment.exists) return payment.data().status;
 
+        const payable = listing.exists && listing.data().user_id === userId && isUnpaidListing(listing.data());
+        const newStatus = payable ? 'completed' : 'refund_due';
         tx.set(paymentRef, {
             garage_sale_id: saleId,
             user_id: userId,
             user_email: session.customer_details?.email || session.customer_email || null,
             amount: (session.amount_total || 0) / 100,
             currency: (session.currency || 'aud').toUpperCase(),
-            status: 'completed',
+            status: newStatus,
             payment_method: 'stripe',
             transaction_id: session.payment_intent,
             checkout_session_id: session.id,
             created_at: FieldValue.serverTimestamp(),
         });
 
-        if (listing.exists && listing.data().user_id === userId) {
+        if (payable) {
             tx.update(listingRef, { status: 'pending_approval', payment_status: 'paid' });
         }
+        return newStatus;
     });
-    return true;
+
+    if (status === 'refund_due') {
+        logger.warn(`Refunding payment ${session.id}: listing ${saleId} can't be paid for`);
+        await refundPayment(session.id, session.payment_intent, saleId);
+    }
+    return status === 'completed';
 }
 
 // ---------------------------------------------------------------------------
@@ -172,8 +198,8 @@ exports.createStripeCheckout = callable(['STRIPE_SECRET_KEY'], async (request) =
     if (!APP_URL) {
         throw new HttpsError('failed-precondition', 'APP_URL is not configured');
     }
-    if (listingData.payment_status === 'paid' || listingData.payment_status === 'completed') {
-        throw new HttpsError('failed-precondition', 'This listing has already been paid for');
+    if (!isUnpaidListing(listingData)) {
+        throw new HttpsError('failed-precondition', 'This listing has already been paid for or has ended');
     }
 
     // Restart the unpaid clock, so cleanupExpiredDrafts can't delete the listing mid-payment.
@@ -238,7 +264,9 @@ exports.verifyStripePayment = callable(['STRIPE_SECRET_KEY'], async (request) =>
         return { success: false, message: 'Payment not completed' };
     }
 
-    await recordListingPayment(session);
+    if (!await recordListingPayment(session)) {
+        return { success: false, message: "This listing can't be paid for any more, so your payment has been refunded." };
+    }
     return { success: true };
 });
 
@@ -334,7 +362,7 @@ async function emailRejection(saleId, listing, reason, refunded) {
 }
 
 // Reject a listing, refund its listing fee and tell the seller why (admin only). The Terms promise
-// a refund when a listing is rejected. Refunds use an idempotency key per payment, so retrying is safe.
+// a refund when a listing is rejected.
 exports.rejectListing = callable(['STRIPE_SECRET_KEY', 'SENDGRID_API_KEY'], async (request) => {
     const adminUid = requireAdmin(request);
     await rateLimit(adminUid, 'rejectListing', 30);
@@ -358,15 +386,7 @@ exports.rejectListing = callable(['STRIPE_SECRET_KEY', 'SENDGRID_API_KEY'], asyn
     const payments = paymentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const refunds = [];
     for (const payment of refundablePayments(payments)) {
-        const refund = await getStripe().refunds.create(
-            { payment_intent: payment.transaction_id, reason: 'requested_by_customer', metadata: { sale_id: saleId } },
-            { idempotencyKey: `listing-refund-${payment.id}` },
-        );
-        await db.collection('payments').doc(payment.id).update({
-            status: 'refunded',
-            refund_id: refund.id,
-            refunded_at: FieldValue.serverTimestamp(),
-        });
+        const refund = await refundPayment(payment.id, payment.transaction_id, saleId);
         refunds.push({ paymentId: payment.id, refundId: refund.id, amount: payment.amount });
     }
 
@@ -568,6 +588,11 @@ function logReportedError(service, message, context = {}) {
     });
 }
 
+// The API sends the site's Origin too. Anyone can post here, and a forged report must not be able
+// to send an alert email, so reports from elsewhere are only logged as warnings. A script can fake
+// the header, so this stops casual abuse rather than a determined attacker.
+const isSiteOrigin = (origin) => REPORT_ORIGINS.includes(origin);
+
 // Crude per-instance flood guard: a public endpoint must not be usable to fill the logs.
 let reportWindowStart = 0;
 let reportsInWindow = 0;
@@ -584,7 +609,7 @@ function reportAllowed() {
 // Receives error reports from the website (browser) and the Urban Pay API (server).
 exports.reportClientError = onRequest({ maxInstances: 3 }, (req, res) => {
     const origin = req.get('origin');
-    if (origin && REPORT_ORIGINS.includes(origin)) {
+    if (isSiteOrigin(origin)) {
         res.set('Access-Control-Allow-Origin', origin);
         res.set('Vary', 'Origin');
     }
@@ -626,6 +651,12 @@ exports.reportClientError = onRequest({ maxInstances: 3 }, (req, res) => {
     }
     const source = REPORT_SOURCES.includes(body?.source) ? body.source : 'unknown';
     const message = text(body?.stack, 4000) || text(body?.message, 500) || 'Unknown error';
+
+    if (!isSiteOrigin(origin)) {
+        logger.warn('Error report from outside the site', { source, message: message.slice(0, 500) });
+        res.status(204).send('');
+        return;
+    }
 
     // Error Reporting needs a stack trace in `message`; an empty reportLocation makes it drop
     // the entry, so the React component trail is appended to the message instead.

@@ -70,10 +70,13 @@ function storagePathFromUrl(url) {
     return path.startsWith('listings/') && !path.includes('..') ? path : null;
 }
 
-// Every Storage path a listing's photos and thumbnails occupy.
+// Every Storage path a listing's photos and thumbnails occupy. Only the seller's own folder
+// counts: sellers write these URLs themselves, and the cleanup deletes with admin rights.
 function listingPhotoPaths(listing) {
-    const urls = [...(listing?.photos || []), ...(listing?.thumbnails || [])];
-    return [...new Set(urls.map(storagePathFromUrl).filter(Boolean))];
+    if (!listing?.user_id) return [];
+    const urls = [...(listing.photos || []), ...(listing.thumbnails || [])];
+    const ownFolder = `listings/${listing.user_id}/`;
+    return [...new Set(urls.map(storagePathFromUrl).filter((path) => path?.startsWith(ownFolder)))];
 }
 
 // Calendar date (YYYY-MM-DD) in Melbourne, the format listings store start_date/end_date in.
@@ -87,14 +90,18 @@ const UNPAID_STATUSES = ['draft', 'pending_payment'];
 // while its seller is paying.
 const DRAFT_LIFETIME_MS = 2 * 24 * 60 * 60 * 1000;
 
-// An unpaid listing is due for deletion once its expiry has passed. Listings saved before
-// draft_expires_at was set on them are kept for the same lifetime from when they were created.
+// A listing that can still be paid for. Anything else has been paid, approved, rejected or ended,
+// and a payment must not change it.
+function isUnpaidListing(listing) {
+    return UNPAID_STATUSES.includes(listing?.status) && (listing.payment_status ?? 'pending') === 'pending';
+}
+
+// An unpaid listing is due for deletion once its expiry has passed. Listings with no readable
+// draft_expires_at are kept for the same lifetime from when they were created.
 function isExpiredDraft(listing, now = Date.now(), lifetimeMs = DRAFT_LIFETIME_MS) {
     if (!UNPAID_STATUSES.includes(listing?.status)) return false;
-    if (listing.draft_expires_at) {
-        const expires = Date.parse(listing.draft_expires_at);
-        return Number.isFinite(expires) && expires < now;
-    }
+    const expires = Date.parse(listing.draft_expires_at ?? '');
+    if (Number.isFinite(expires)) return expires < now;
     const created = listing.created_at?.toMillis?.() ?? Date.parse(listing.created_at);
     return Number.isFinite(created) && created + lifetimeMs < now;
 }
@@ -115,6 +122,7 @@ module.exports = {
     melbourneDate,
     UNPAID_STATUSES,
     DRAFT_LIFETIME_MS,
+    isUnpaidListing,
     isExpiredDraft,
     refundablePayments,
     rejectionEmailHtml,

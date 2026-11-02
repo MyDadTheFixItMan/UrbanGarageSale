@@ -76,6 +76,25 @@ test('users cannot set role, 2FA or Stripe fields on their profile', async () =>
   await assertSucceeds(updateDoc(doc(db, 'users/alice'), { full_name: 'Alice B', phone: '+61412345678' }));
 });
 
+test('only active listings can be saved to favourites, and a favourite can always be removed', async () => {
+  for (const status of ['active', 'draft', 'pending_payment', 'pending_approval', 'completed', 'rejected']) {
+    await seed(`garageSales/${status}`, listing({ status }));
+  }
+  const db = as.user('alice');
+  const save = (saleId, id = saleId) =>
+    setDoc(doc(db, 'savedListings', id), { garage_sale_id: saleId, user_id: 'alice', created_at: new Date() });
+
+  await assertSucceeds(save('active'));
+  for (const status of ['draft', 'pending_payment', 'pending_approval', 'completed', 'rejected']) {
+    await assertFails(save(status));
+  }
+  await assertFails(save('no-such-listing'));
+  await assertFails(updateDoc(doc(db, 'savedListings/active'), { garage_sale_id: 'draft' }));
+
+  await seed('savedListings/ended', { garage_sale_id: 'rejected', user_id: 'alice' });
+  await assertSucceeds(deleteDoc(doc(db, 'savedListings/ended')));
+});
+
 test('profile fields are type and size checked, and unknown fields are refused', async () => {
   await seed('users/alice', { full_name: 'Alice', role: 'user' });
   const db = as.user('alice');

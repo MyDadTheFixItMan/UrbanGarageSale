@@ -141,17 +141,17 @@ service cloud.firestore {
              data.start_date <= settings.get('free_listing_end', '');
     }
 
-    // Once a listing is paid for or approved, its dates and location are fixed, so one fee
-    // (or one free-period listing) can't be moved to another weekend or address.
+    // Once a listing is paid for or approved, the seller can change only what buyers read and see,
+    // so one fee (or one free-period listing) can't be moved to another weekend or address.
     function isPaidOrApproved(data) {
       return data.get('status', '') in ['active', 'pending_approval'] ||
              data.get('payment_status', '') in ['paid', 'completed', 'free'];
     }
 
-    function lockedFieldsUnchanged() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(
-        ['start_date', 'end_date', 'start_time', 'end_time',
-         'address', 'suburb', 'postcode', 'state', 'latitude', 'longitude', 'geohash']);
+    // Status stays on the list because the rule below lets a seller end their own sale.
+    function onlyLiveEditsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+        ['title', 'description', 'sale_type', 'photos', 'thumbnails', 'status']);
     }
 
     // Unpaid listings the owner controls. Paid/approved states are set by the server or an admin.
@@ -178,7 +178,7 @@ service cloud.firestore {
                        (signedIn() && request.auth.uid == resource.data.user_id &&
                         unchanged('user_id') && unchanged('created_by') && unchanged('is_free_listing') &&
                         validListing() &&
-                        (!isPaidOrApproved(resource.data) || lockedFieldsUnchanged()) &&
+                        (!isPaidOrApproved(resource.data) || onlyLiveEditsChanged()) &&
                         (
                           // Ordinary edits that leave the status alone
                           (unchanged('status') && unchanged('payment_status')) ||

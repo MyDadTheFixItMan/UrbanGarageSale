@@ -176,6 +176,33 @@ test('legacy listings with extra fields can still be edited', async () => {
   await assertSucceeds(updateDoc(doc(as.seller('alice'), 'garageSales/old'), { title: 'New title' }));
 });
 
+test('a live listing can only change its title, description, sale type and photos', async () => {
+  await seed('garageSales/live', listing({ status: 'active', payment_status: 'paid' }));
+  const db = as.seller('alice');
+  const live = doc(db, 'garageSales/live');
+
+  await assertSucceeds(updateDoc(live, {
+    title: 'New title',
+    description: 'New description',
+    sale_type: 'estate_sale',
+    photos: ['https://example.test/1.jpg'],
+    thumbnails: ['https://example.test/1-thumb.jpg'],
+  }));
+  for (const change of [
+    { start_date: '2026-12-05' }, { end_date: '2026-12-06' }, { start_time: '06:00' }, { end_time: '20:00' },
+    { address: '2 Other St' }, { suburb: 'Carlton' }, { postcode: '3053' }, { state: 'NSW' },
+    { latitude: -33.8 }, { longitude: 151.2 }, { geohash: 'r1r0g' },
+    { draft_expires_at: '2026-12-01T00:00:00.000Z' }, { created_at: Timestamp.now() },
+  ]) {
+    await assertFails(updateDoc(live, change));
+  }
+  await assertFails(updateDoc(live, { status: 'draft' }));
+
+  // A seller can still end their own sale, and an admin isn't limited.
+  await assertSucceeds(updateDoc(doc(as.admin(), 'garageSales/live'), { address: '3 Admin St' }));
+  await assertSucceeds(updateDoc(live, { status: 'completed' }));
+});
+
 test('dates and location are locked once a listing is paid or approved', async () => {
   await seed('garageSales/paid', listing({ status: 'pending_approval', payment_status: 'paid' }));
   const db = as.seller('alice');

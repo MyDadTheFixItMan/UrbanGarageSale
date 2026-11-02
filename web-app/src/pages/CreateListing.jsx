@@ -13,7 +13,7 @@ import { geocode } from '@/lib/geocode';
 import { BasicInfoSection, LocationSection, DateTimeSection } from './createListing/ListingSections';
 import PhotosSection from './createListing/PhotosSection';
 import {
-    EMPTY_FORM, formFromListing, isPaid, isPaidOrApproved, listingFormProblem, isInFreePeriod, buildSaleData,
+    EMPTY_FORM, formFromListing, isPaidOrApproved, listingFormProblem, isInFreePeriod, buildSaleData, liveEditData,
 } from './createListing/listingForm';
 
 const goToProfile = () => { window.location.href = createPageUrl('Profile'); };
@@ -52,10 +52,9 @@ export default function CreateListing() {
 
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    // Paid or approved listings keep their dates and location (enforced by firestore.rules).
+    // On a paid or approved listing only the title, description, sale type and photos can change
+    // (enforced by firestore.rules).
     const [isActiveEdit, setIsActiveEdit] = useState(false);
-    // Payment status of the listing being edited; paid listings keep their status on save.
-    const [editPaymentStatus, setEditPaymentStatus] = useState(null);
     const [promoIndex, setPromoIndex] = useState(0);
     const [formData, setFormData] = useState(EMPTY_FORM);
 
@@ -117,7 +116,6 @@ export default function CreateListing() {
                 const [listing] = await firebase.entities.GarageSale.filter({ id: editId });
                 if (listing && listing.user_id === userData.id) {
                     setIsActiveEdit(isPaidOrApproved(listing));
-                    setEditPaymentStatus(listing.payment_status || null);
                     setFormData(formFromListing(listing));
                 }
             }
@@ -136,27 +134,29 @@ export default function CreateListing() {
 
     const createMutation = useMutation({
         mutationFn: async ({ asDraft, isFree }) => {
+            if (isActiveEdit) {
+                await firebase.entities.GarageSale.update(editId, liveEditData(formData));
+                return { liveEdit: true };
+            }
+
             // Google Places validated the address when it was selected; suburb and postcode come from it.
             if (!formData.suburb || !formData.postcode) {
                 throw new Error('Please select a valid Australian address with suburb and postcode.');
             }
             const coords = await coordinatesFor(formData);
-            const alreadyPaid = Boolean(editId) && isPaid(editPaymentStatus);
-            const saleData = buildSaleData(formData, {
-                asDraft, isFree, alreadyPaid, coords, locked: Boolean(editId) && isActiveEdit,
-            });
+            const saleData = buildSaleData(formData, { asDraft, isFree, coords });
 
             if (editId) {
                 await firebase.entities.GarageSale.update(editId, saleData);
-                return { id: editId, asDraft, isFree: isFree && !alreadyPaid, alreadyPaid };
+                return { id: editId, asDraft, isFree };
             }
             const result = await firebase.entities.GarageSale.create(saleData);
-            return { id: result.id, asDraft, isFree, alreadyPaid: false };
+            return { id: result.id, asDraft, isFree };
         },
-        onSuccess: async ({ id, asDraft, isFree, alreadyPaid }) => {
+        onSuccess: async ({ id, asDraft, isFree, liveEdit }) => {
             queryClient.invalidateQueries({ queryKey: ['userListings', user?.email] });
 
-            if (alreadyPaid) {
+            if (liveEdit) {
                 toast.success('Listing updated');
                 goToProfile();
             } else if (asDraft) {
@@ -190,7 +190,7 @@ export default function CreateListing() {
         }
     });
 
-    const freePeriod = isInFreePeriod(appSettings, formData.start_date);
+    const freePeriod = !isActiveEdit && isInFreePeriod(appSettings, formData.start_date);
 
     const handleSubmit = (asDraft) => {
         const problem = listingFormProblem(formData);
@@ -251,17 +251,21 @@ export default function CreateListing() {
                         <Plus className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-[#1e3a5f]">Create Listing</h1>
-                        <p className="text-slate-500">Add a new garage sale to the platform</p>
+                        <h1 className="text-2xl font-bold text-[#1e3a5f]">{isActiveEdit ? 'Edit Listing' : 'Create Listing'}</h1>
+                        <p className="text-slate-500">
+                            {isActiveEdit ? 'You can change the title, description, sale type and photos' : 'Add a new garage sale to the platform'}
+                        </p>
                     </div>
                 </div>
 
                 {/* Pricing Info */}
-                <Alert className="mb-6 border-[#FF9500]/30 bg-[#FF9500]/10">
-                    <AlertDescription className="text-[#1e3a5f] text-center">
-                        Listings are <strong>{formatAud(LISTING_FEE_AUD, { withCode: true })}</strong> to publish. Drafts are free. Anything not paid for is saved for 2 days, then deleted.
-                    </AlertDescription>
-                </Alert>
+                {!isActiveEdit && (
+                    <Alert className="mb-6 border-[#FF9500]/30 bg-[#FF9500]/10">
+                        <AlertDescription className="text-[#1e3a5f] text-center">
+                            Listings are <strong>{formatAud(LISTING_FEE_AUD, { withCode: true })}</strong> to publish. Drafts are free. Anything not paid for is saved for 2 days, then deleted.
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 <div className="space-y-8">
                     <BasicInfoSection form={formData} onChange={handleInputChange} />
@@ -279,15 +283,17 @@ export default function CreateListing() {
 
                     {/* Actions */}
                     <div className="flex flex-col sm:flex-row gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={() => handleSubmit(true)}
-                            disabled={createMutation.isPending}
-                            className="flex-1 h-12 gap-2"
-                        >
-                            <Save className="w-5 h-5" />
-                            Save as Draft
-                        </Button>
+                        {!isActiveEdit && (
+                            <Button
+                                variant="outline"
+                                onClick={() => handleSubmit(true)}
+                                disabled={createMutation.isPending}
+                                className="flex-1 h-12 gap-2"
+                            >
+                                <Save className="w-5 h-5" />
+                                Save as Draft
+                            </Button>
+                        )}
                         <Button
                             onClick={() => handleSubmit(false)}
                             disabled={createMutation.isPending}
@@ -295,6 +301,11 @@ export default function CreateListing() {
                         >
                             {createMutation.isPending ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : isActiveEdit ? (
+                                <>
+                                    <Save className="w-5 h-5" />
+                                    Save Changes
+                                </>
                             ) : (
                                 <>
                                     <Send className="w-5 h-5" />

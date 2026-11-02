@@ -2,8 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
     isDocId, isRole, escapeHtml, storagePathFromUrl, listingPhotoPaths, isUnpaidListing, isExpiredDraft, refundablePayments,
+    approvalEmailHtml,
     rejectionEmailHtml,
     editRefusedEmailHtml,
+    contactResponseEmailHtml,
 } = require('../lib/helpers');
 
 const photoUrl = (path) =>
@@ -122,4 +124,31 @@ test('rejectionEmailHtml only mentions a refund when there was one', () => {
     const email = (refunded) => rejectionEmailHtml({ title: 'Sale', reason: 'No', refunded, footer: '' });
     assert.match(email(10), /A\$10\.00 has been refunded/);
     assert.doesNotMatch(email(0), /refund/i);
+});
+
+test('approvalEmailHtml names the listing and escapes its title', () => {
+    const html = approvalEmailHtml({ title: '<b>Sale</b>', footer: 'Footer' });
+    assert.match(html, /has been approved/);
+    assert.match(html, /&lt;b&gt;Sale&lt;\/b&gt;/);
+    assert.doesNotMatch(html, /<b>Sale<\/b>/);
+});
+
+test('contactResponseEmailHtml escapes the name and both messages', () => {
+    const html = contactResponseEmailHtml({ userName: '<i>Sam</i>', originalMessage: 'Is <x> ok?', responseMessage: 'Yes & <y>', footer: 'Footer' });
+    assert.match(html, /Hi &lt;i&gt;Sam&lt;\/i&gt;/);
+    assert.match(html, /Is &lt;x&gt; ok\?/);
+    assert.match(html, /Yes &amp; &lt;y&gt;/);
+});
+
+test('every email carries the brand header and the footer', () => {
+    const emails = [
+        approvalEmailHtml({ title: 'Sale', footer: 'Footer' }),
+        rejectionEmailHtml({ title: 'Sale', reason: 'No', refunded: 0, footer: 'Footer' }),
+        editRefusedEmailHtml({ title: 'Sale', reason: 'No', footer: 'Footer' }),
+        contactResponseEmailHtml({ responseMessage: 'Yes', footer: 'Footer' }),
+    ];
+    for (const html of emails) {
+        assert.match(html, />Urban<\/span> <span[^>]*>Garage Sale</);
+        assert.match(html, /Footer/);
+    }
 });

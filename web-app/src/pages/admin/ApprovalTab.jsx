@@ -94,7 +94,7 @@ export default function ApprovalTab() {
                     <DialogHeader>
                         <DialogTitle>Reject Listing</DialogTitle>
                         <DialogDescription>
-                            Provide a reason for rejecting this listing. The seller sees this reason by email and on their profile. Any listing fee paid is refunded to them automatically.
+                            Provide a reason for rejecting this listing. The seller sees this reason by email and on their profile. Any listing fee paid is refunded to them automatically.{listingToReject?.edited_after_approval && ' This is an edit to a listing that was already live, so rejecting it ends the whole listing, not just the changes.'}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">

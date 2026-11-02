@@ -8,7 +8,7 @@ import { createPageUrl } from '../utils';
 import { Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import OAuthButtons, { signInWithProvider } from './login/OAuthButtons';
-import SecondFactorForm, { RECAPTCHA_CONTAINER_ID } from './login/SecondFactorForm';
+import SecondFactorDialog, { RECAPTCHA_CONTAINER_ID } from './login/SecondFactorDialog';
 import SignUpForm from './login/SignUpForm';
 import { oauthErrorMessage } from './login/loginForms';
 
@@ -246,20 +246,7 @@ export default function Login() {
                   Forgot password?
                 </Link>
 
-                {secondFactor ? (
-                  <SecondFactorForm
-                    phoneHint={secondFactor.phoneHint}
-                    error={secondFactor.error}
-                    onVerified={async () => {
-                      setSecondFactor(null);
-                      await finishSignIn();
-                      toast.success('Signed in');
-                    }}
-                    onCancel={cancelSecondFactor}
-                  />
-                ) : (
-                  <OAuthButtons onSelect={handleOAuthSignIn} disabled={signInLoading} label="Or continue with" />
-                )}
+                <OAuthButtons onSelect={handleOAuthSignIn} disabled={signInLoading} label="Or continue with" />
               </>
             )}
 
@@ -269,6 +256,19 @@ export default function Login() {
           </div>
         </div>
       </section>
+
+      {secondFactor && (
+        <SecondFactorDialog
+          phoneHint={secondFactor.phoneHint}
+          error={secondFactor.error}
+          onVerified={async () => {
+            setSecondFactor(null);
+            await finishSignIn();
+            toast.success('Signed in');
+          }}
+          onCancel={cancelSecondFactor}
+        />
+      )}
     </div>
   );
 }

@@ -85,8 +85,7 @@ service cloud.firestore {
       return keys.hasOnly(['title', 'description', 'address', 'suburb', 'postcode', 'state',
                            'latitude', 'longitude', 'geohash', 'start_date', 'end_date',
                            'start_time', 'end_time', 'sale_type', 'photos', 'thumbnails',
-                           'status', 'payment_status', 'draft_expires_at', 'edited_after_approval',
-                           'user_id', 'created_at']) &&
+                           'status', 'payment_status', 'draft_expires_at', 'user_id', 'created_at']) &&
              isText(keys, 'title', 150) && isText(keys, 'description', 5000) &&
              isText(keys, 'address', 300) && isText(keys, 'suburb', 100) &&
              matchesOrEmpty(keys, 'postcode', '^[0-9]{4}$') && isText(keys, 'state', 3) &&
@@ -98,7 +97,7 @@ service cloud.firestore {
              matchesOrEmpty(keys, 'end_time', '^[0-9]{2}:[0-9]{2}$') &&
              isText(keys, 'sale_type', 30) &&
              isShortList(keys, 'photos', 10) && isShortList(keys, 'thumbnails', 10) &&
-             isTextOrNull(keys, 'draft_expires_at', 40) && isBool(keys, 'edited_after_approval') &&
+             isTextOrNull(keys, 'draft_expires_at', 40) &&
              (!keys.hasAny(['created_at']) || request.resource.data.created_at is timestamp);
     }
 
@@ -143,25 +142,19 @@ service cloud.firestore {
     }
 
     // Once a listing is paid for or approved, the seller can change only what buyers read and see,
-    // so one fee (or one free-period listing) can't be moved to another weekend or address.
+    // so one fee (or one free-period listing) can't be moved to another weekend or address. A live
+    // listing's content changes only when an admin approves an edit (see listingEdits below).
     function isPaidOrApproved(data) {
       return data.get('status', '') in ['active', 'pending_approval'] ||
              data.get('payment_status', '') in ['paid', 'completed', 'free'];
     }
 
-    // Status stays on the list because the rule below lets a seller end their own sale or send
-    // an edited listing back for approval.
-    function onlyLiveEditsChanged() {
+    // Status stays allowed because the rule below lets a seller end their own sale.
+    function paidListingChangeAllowed() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-        ['title', 'description', 'sale_type', 'photos', 'thumbnails', 'status', 'edited_after_approval']);
-    }
-
-    // Buyers only see what an admin approved, so changing an approved listing's content takes it
-    // out of public view until an admin approves it again.
-    function changesApprovedContent() {
-      return resource.data.get('status', '') == 'active' &&
-             request.resource.data.diff(resource.data).affectedKeys().hasAny(
-               ['title', 'description', 'sale_type', 'photos', 'thumbnails']);
+        resource.data.get('status', '') == 'active'
+          ? ['status']
+          : ['title', 'description', 'sale_type', 'photos', 'thumbnails', 'status']);
     }
 
     // Unpaid listings the owner controls. Paid/approved states are set by the server or an admin.
@@ -188,15 +181,10 @@ service cloud.firestore {
                        (signedIn() && request.auth.uid == resource.data.user_id &&
                         unchanged('user_id') && unchanged('created_by') && unchanged('is_free_listing') &&
                         validListing() &&
-                        (!isPaidOrApproved(resource.data) || onlyLiveEditsChanged()) &&
+                        (!isPaidOrApproved(resource.data) || paidListingChangeAllowed()) &&
                         (
                           // Ordinary edits that leave the status alone
-                          (unchanged('status') && unchanged('payment_status') && !changesApprovedContent()) ||
-                          // Edited live listing goes back for approval
-                          (resource.data.get('status', '') == 'active' &&
-                           request.resource.data.get('status', '') == 'pending_approval' &&
-                           request.resource.data.get('edited_after_approval', false) == true &&
-                           unchanged('payment_status')) ||
+                          (unchanged('status') && unchanged('payment_status')) ||
                           // Owner ends their own sale
                           (request.resource.data.get('status', '') == 'completed' && unchanged('payment_status')) ||
                           // Moving between unpaid states (e.g. draft -> pending_payment)
@@ -205,6 +193,34 @@ service cloud.firestore {
                           (resource.data.get('payment_status', 'pending') == 'pending' && isFreeListing(request.resource.data))
                         ));
 
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == resource.data.user_id);
+    }
+
+    // ---------- Changes to live listings ----------
+    // A seller's proposed title, description, sale type and photos, one per listing, stored apart
+    // from the public listing so buyers only ever see what an admin approved. An admin approves
+    // by copying them onto the listing; refusing (Cloud Function) marks them refused with a reason.
+    function validListingEdit() {
+      let keys = request.resource.data.keys();
+      return keys.hasOnly(['user_id', 'title', 'description', 'sale_type', 'photos', 'thumbnails',
+                           'status', 'submitted_at']) &&
+             keys.hasAll(['user_id', 'title', 'status', 'submitted_at']) &&
+             request.resource.data.status == 'pending' &&
+             request.resource.data.submitted_at is timestamp &&
+             isText(keys, 'title', 150) && isText(keys, 'description', 5000) &&
+             isText(keys, 'sale_type', 30) &&
+             isShortList(keys, 'photos', 10) && isShortList(keys, 'thumbnails', 10);
+    }
+
+    match /listingEdits/{saleId} {
+      function sellerOfLiveListing() {
+        let sale = get(/databases/$(database)/documents/garageSales/$(saleId)).data;
+        return sale.get('user_id', '') == request.auth.uid && sale.get('status', '') == 'active';
+      }
+
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == resource.data.user_id);
+      allow create, update: if signedIn() && request.auth.uid == request.resource.data.user_id &&
+                               sellerOfLiveListing() && validListingEdit();
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == resource.data.user_id);
     }
 

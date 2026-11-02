@@ -18,6 +18,7 @@ jest.mock('@/api/firebaseClient', () => ({
     entities: {
       AppSettings: { get: jest.fn() },
       GarageSale: { filter: jest.fn(), update: jest.fn() },
+      ListingEdit: { get: jest.fn(), submit: jest.fn() },
     },
     firestore: { collection: () => ({ getDocs: async () => [] }) },
   },
@@ -71,6 +72,8 @@ beforeEach(() => {
   firebase.auth.hasSecondFactorSession.mockResolvedValue(true);
   firebase.entities.AppSettings.get.mockResolvedValue({ is_active: true, free_listing_start: '2099-01-01', free_listing_end: '2099-12-31' });
   firebase.entities.GarageSale.update.mockResolvedValue();
+  firebase.entities.ListingEdit.get.mockResolvedValue(null);
+  firebase.entities.ListingEdit.submit.mockResolvedValue();
 });
 
 describe('editing a live listing', () => {
@@ -87,10 +90,10 @@ describe('editing a live listing', () => {
     expect(screen.getByLabelText('Suburb & Postcode')).toHaveAttribute('readonly');
   });
 
-  it('warns the listing will be hidden and offers one button, with no draft, publish or pricing options', async () => {
+  it('says the listing stays live and offers one button, with no draft, publish or pricing options', async () => {
     await openEditor(listing());
 
-    expect(screen.getByText(/hidden from buyers/i)).toBeInTheDocument();
+    expect(screen.getByText(/keep seeing your listing/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send for Approval' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /draft/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /publish/i })).not.toBeInTheDocument();
@@ -103,38 +106,56 @@ describe('editing a live listing', () => {
     await userEvent.type(screen.getByLabelText('Title *'), ' today');
     await userEvent.click(screen.getByRole('button', { name: 'Send for Approval' }));
 
-    await waitFor(() => expect(firebase.entities.GarageSale.update).toHaveBeenCalled());
-    expect(firebase.entities.GarageSale.update).toHaveBeenCalledWith('sale-1', {
+    await waitFor(() => expect(firebase.entities.ListingEdit.submit).toHaveBeenCalled());
+    expect(firebase.entities.GarageSale.update).not.toHaveBeenCalled();
+    expect(firebase.entities.ListingEdit.submit).toHaveBeenCalledWith('sale-1', {
       title: 'Big sale today',
       description: 'Lots of tools',
       sale_type: 'garage_sale',
       photos: ['https://example.test/1.jpg'],
       thumbnails: ['https://example.test/1-thumb.jpg'],
-      status: 'pending_approval',
-      edited_after_approval: true,
     });
     expect(geocode).not.toHaveBeenCalled();
   });
 
-  it('leaves the listing live when nothing was changed', async () => {
+  it('sends nothing when nothing was changed', async () => {
     await openEditor(listing());
     await userEvent.click(screen.getByRole('button', { name: 'Send for Approval' }));
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('No changes to save'));
-    expect(firebase.entities.GarageSale.update).not.toHaveBeenCalled();
+    expect(firebase.entities.ListingEdit.submit).not.toHaveBeenCalled();
+  });
+
+  it('picks up changes already waiting for approval', async () => {
+    firebase.entities.ListingEdit.get.mockResolvedValue({ ...listing({ title: 'Waiting title' }), status: 'pending' });
+    await openEditor(listing());
+
+    expect(screen.getByLabelText('Title *')).toHaveValue('Waiting title');
+    expect(screen.getByText(/waiting for approval/i)).toBeInTheDocument();
+  });
+
+  it('shows why changes were refused, so they can be fixed and sent again', async () => {
+    firebase.entities.ListingEdit.get.mockResolvedValue({
+      ...listing({ title: 'Refused title' }), status: 'refused', refusal_reason: 'No phone numbers in titles',
+    });
+    await openEditor(listing());
+
+    expect(screen.getByLabelText('Title *')).toHaveValue('Refused title');
+    expect(screen.getByText('No phone numbers in titles')).toBeInTheDocument();
   });
 });
 
 describe('editing a listing already awaiting approval', () => {
   it('saves the changes without a warning, leaving its status alone', async () => {
     await openEditor(listing({ status: 'pending_approval' }));
-    expect(screen.queryByText(/hidden from buyers/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/keep seeing your listing/i)).not.toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText('Title *'), ' today');
     await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
     await waitFor(() => expect(firebase.entities.GarageSale.update).toHaveBeenCalled());
     expect(firebase.entities.GarageSale.update.mock.calls[0][1]).not.toHaveProperty('status');
+    expect(firebase.entities.ListingEdit.submit).not.toHaveBeenCalled();
   });
 });
 

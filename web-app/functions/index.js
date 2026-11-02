@@ -11,7 +11,7 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
-    isDocId, isRole, escapeHtml, rejectionEmailHtml, listingPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
+    isDocId, isRole, escapeHtml, rejectionEmailHtml, editRefusedEmailHtml, listingPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
     isExpiredDraft, refundablePayments,
 } = require('./lib/helpers');
 
@@ -382,6 +382,46 @@ exports.rejectListing = callable(['STRIPE_SECRET_KEY', 'SENDGRID_API_KEY'], asyn
     return { success: true, refunded, emailed };
 });
 
+// Refuse a seller's changes to their live listing and tell them why (admin only). The listing
+// stays live as it was approved, so no refund is due.
+exports.refuseListingEdit = callable(['SENDGRID_API_KEY'], async (request) => {
+    const adminUid = requireAdmin(request);
+    await rateLimit(adminUid, 'refuseListingEdit', 30);
+
+    const saleId = requireDocId(request.data?.saleId, 'sale ID');
+    const reason = typeof request.data?.reason === 'string' ? request.data.reason.trim().slice(0, 1000) : '';
+    if (!reason) {
+        throw new HttpsError('invalid-argument', 'A reason is required');
+    }
+
+    const editRef = db.collection('listingEdits').doc(saleId);
+    const edit = await editRef.get();
+    if (!edit.exists || edit.data().status !== 'pending') {
+        throw new HttpsError('failed-precondition', 'Only changes awaiting approval can be refused');
+    }
+
+    await editRef.update({ status: 'refused', refusal_reason: reason });
+    await audit('refuseListingEdit', adminUid, { saleId, reason });
+
+    let emailed = false;
+    try {
+        const listing = await db.collection('garageSales').doc(saleId).get();
+        const to = await sellerEmail(edit.data().user_id);
+        if (to) {
+            emailed = await sendEmail({
+                to,
+                from: FROM_EMAIL,
+                subject: "Your listing changes weren't approved",
+                html: editRefusedEmailHtml({ title: listing.data()?.title, reason, footer: BUSINESS_FOOTER }),
+            });
+        }
+        if (!emailed) logger.warn(`Refusal email not sent for listing ${saleId}`);
+    } catch (error) {
+        logger.error(`Refusal email failed for listing ${saleId}: ${error.message}`);
+    }
+    return { success: true, emailed };
+});
+
 // Make a user an admin or a regular user (admin only). The role is a custom claim, which
 // firestore.rules and requireAdmin() check without reading Firestore; users/{uid}.role mirrors
 // it for display. Demoting revokes the user's sessions so they sign in again without the claim
@@ -483,6 +523,7 @@ exports.deleteUser = callable([], async (request) => {
     email = email || profile.data()?.email || null;
 
     await deleteQueryInBatches(db.collection('garageSales').where('user_id', '==', userId));
+    await deleteQueryInBatches(db.collection('listingEdits').where('user_id', '==', userId));
     await deleteQueryInBatches(db.collection('savedListings').where('user_id', '==', userId));
     await deleteQueryInBatches(db.collection('sales').where('sellerId', '==', userId));
     await deleteQueryInBatches(db.collection('saleStats').where('sellerId', '==', userId));
@@ -640,10 +681,14 @@ exports.expireListings = onSchedule({ schedule: 'every day 00:15', timeZone: TIM
     // Updated listings leave the query, so each pass reads the next batch.
     let expired = 0;
     for (;;) {
-        const snap = await query.limit(400).get();
+        const snap = await query.limit(200).get();
         if (snap.empty) break;
         const batch = db.batch();
-        snap.docs.forEach((doc) => batch.update(doc.ref, { status: 'completed' }));
+        snap.docs.forEach((doc) => {
+            batch.update(doc.ref, { status: 'completed' });
+            // Changes that were still waiting no longer apply once the sale is over.
+            batch.delete(db.collection('listingEdits').doc(doc.id));
+        });
         await batch.commit();
         expired += snap.size;
     }

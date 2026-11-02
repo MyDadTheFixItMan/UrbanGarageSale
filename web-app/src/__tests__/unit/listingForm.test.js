@@ -1,6 +1,6 @@
 import {
   EMPTY_FORM, formFromListing, isPaidOrApproved, listingFormProblem,
-  isInFreePeriod, buildSaleData, liveEditData, liveEditUpdate, photoProblem,
+  isInFreePeriod, buildSaleData, liveEditData, photoProblem,
 } from '@/pages/createListing/listingForm';
 
 const form = (overrides = {}) => ({
@@ -95,18 +95,6 @@ describe('liveEditData', () => {
       photos,
       thumbnails: ['1-thumb.jpg'],
     });
-  });
-});
-
-describe('liveEditUpdate', () => {
-  it('sends an approved listing back for approval, marked as an edit', () => {
-    expect(liveEditUpdate(form(), 'active')).toMatchObject({ title: 'Moving sale', status: 'pending_approval', edited_after_approval: true });
-  });
-
-  it('leaves the status of a listing not yet approved alone', () => {
-    const data = liveEditUpdate(form(), 'pending_approval');
-    expect(data).not.toHaveProperty('status');
-    expect(data).not.toHaveProperty('edited_after_approval');
   });
 });
 

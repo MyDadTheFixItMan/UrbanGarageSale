@@ -29,7 +29,7 @@ const statusConfig = {
     rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700' },
 };
 
-export default function ProfileListingCard({ listing, onDelete, onPrint }) {
+export default function ProfileListingCard({ listing, edit, onDelete, onPrint }) {
     const status = statusConfig[listing.status] || statusConfig.draft;
     const actions = listingActions(listing);
 
@@ -67,6 +67,21 @@ export default function ProfileListingCard({ listing, onDelete, onPrint }) {
                     <div className="text-sm text-red-700 bg-red-50 rounded-lg p-3 mb-4">
                         <p className="font-medium mb-1">Why it wasn't approved</p>
                         <p className="whitespace-pre-line break-words">{listing.rejection_reason}</p>
+                    </div>
+                )}
+
+                {edit?.status === 'pending' && (
+                    <div className="text-sm text-blue-700 bg-blue-50 rounded-lg p-3 mb-4">
+                        <p className="font-medium mb-1">Changes waiting for approval</p>
+                        <p>Buyers see your listing as it is now until they're approved.</p>
+                    </div>
+                )}
+
+                {edit?.status === 'refused' && (
+                    <div className="text-sm text-red-700 bg-red-50 rounded-lg p-3 mb-4">
+                        <p className="font-medium mb-1">Your changes weren't approved</p>
+                        <p className="whitespace-pre-line break-words">{edit.refusal_reason}</p>
+                        <p className="mt-1">Your listing is still live as it was.</p>
                     </div>
                 )}
 

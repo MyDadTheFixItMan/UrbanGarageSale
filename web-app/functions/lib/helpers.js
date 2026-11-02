@@ -41,6 +41,18 @@ function rejectionEmailHtml({ title, reason, refunded, footer }) {
         `;
 }
 
+function editRefusedEmailHtml({ title, reason, footer }) {
+    return `
+            <h2>Your changes weren't approved</h2>
+            <p>The changes you made to your garage sale listing "<strong>${escapeHtml(title || 'your listing')}</strong>" weren't approved. Your listing is still live, exactly as it was before you changed it.</p>
+            <p><strong>Reason:</strong></p>
+            <p style="white-space: pre-line;">${escapeHtml(reason)}</p>
+            <p>You can edit your listing from your profile and send new changes for approval. If you have any questions, contact support@urbangaragesales.com.au.</p>
+            <hr>
+            <p><small>You received this email because you listed a garage sale on Urban Garage Sale.<br>${footer}</small></p>
+        `;
+}
+
 // The Storage object path inside a Firebase download URL
 // (https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<encoded path>?alt=media&token=…),
 // or null for anything else. Only paths under listings/ are returned, so a crafted URL can't
@@ -106,4 +118,5 @@ module.exports = {
     isExpiredDraft,
     refundablePayments,
     rejectionEmailHtml,
+    editRefusedEmailHtml,
 };

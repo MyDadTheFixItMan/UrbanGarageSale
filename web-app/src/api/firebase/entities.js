@@ -159,8 +159,55 @@ export const firebaseEntities = {
         const { photos = [], thumbnails = [] } = snap.data();
         await Promise.all([...photos, ...thumbnails].map((url) => deleteObject(ref(storage, url)).catch(() => null)));
       }
+      await deleteDoc(doc(db, 'listingEdits', id)).catch(() => null);
       await deleteDoc(doc(db, 'garageSales', id));
       return { id, deleted: true };
+    }
+  },
+
+  // A seller's proposed changes to their live listing, one per listing and keyed by its ID. The
+  // listing itself stays as approved until an admin approves them.
+  ListingEdit: {
+    get: async (saleId) => {
+      const snap = await getDoc(doc(db, 'listingEdits', saleId));
+      return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    },
+
+    mine: async () => {
+      const user = requireUser();
+      return toRecords(await getDocs(query(collection(db, 'listingEdits'), where('user_id', '==', user.uid))));
+    },
+
+    // Replaces any earlier edit, including one that was refused.
+    submit: async (saleId, changes) => {
+      const user = requireUser();
+      await setDoc(doc(db, 'listingEdits', saleId), {
+        ...changes,
+        user_id: user.uid,
+        status: 'pending',
+        submitted_at: serverTimestamp()
+      });
+    },
+
+    // Admin: one page of edits waiting for approval.
+    /** @param {{ cursor?: any }} [options] */
+    page: ({ cursor } = {}) => fetchPage('listingEdits', [
+      where('status', '==', 'pending'),
+      orderBy(documentId())
+    ], cursor),
+
+    // Admin: puts the changes live on the listing.
+    approve: async ({ id, title, description, sale_type, photos, thumbnails }) => {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'garageSales', id), { title, description, sale_type, photos, thumbnails });
+      batch.delete(doc(db, 'listingEdits', id));
+      await batch.commit();
+    },
+
+    // Admin: keeps the listing as it is and tells the seller why (Cloud Function).
+    refuse: async (saleId, reason) => {
+      const result = await httpsCallable(functions, 'refuseListingEdit')({ saleId, reason });
+      return result.data;
     }
   },
 
@@ -298,12 +345,13 @@ export const firebaseEntities = {
       monthStart.setHours(0, 0, 0, 0);
 
       const [
-        totalListings, activeListings, pendingListings, draftListings, completedListings,
+        totalListings, activeListings, pendingListings, pendingEdits, draftListings, completedListings,
         totalRevenue, monthlyRevenue, unreadMessages, totalUsers, listingsByState, usersByState
       ] = await Promise.all([
         countOf('garageSales'),
         countOf('garageSales', where('status', '==', LISTING_STATUS.ACTIVE), where('end_date', '>=', localIsoDate())),
         countOf('garageSales', where('status', '==', LISTING_STATUS.PENDING_APPROVAL)),
+        countOf('listingEdits', where('status', '==', 'pending')),
         countOf('garageSales', where('status', '==', LISTING_STATUS.DRAFT)),
         countOf('garageSales', where('status', '==', LISTING_STATUS.COMPLETED)),
         sumOf('payments', 'amount', where('status', '==', PAYMENT_STATUS.COMPLETED)),
@@ -315,7 +363,7 @@ export const firebaseEntities = {
       ]);
 
       return {
-        totalListings, activeListings, pendingListings, draftListings, completedListings,
+        totalListings, activeListings, pendingListings, pendingEdits, draftListings, completedListings,
         totalRevenue, monthlyRevenue, unreadMessages, totalUsers,
         byState: AU_STATES.map((state, i) => ({ state, listings: listingsByState[i], users: usersByState[i] }))
       };

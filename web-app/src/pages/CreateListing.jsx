@@ -15,7 +15,6 @@ import { BasicInfoSection, LocationSection, DateTimeSection } from './createList
 import PhotosSection from './createListing/PhotosSection';
 import {
     EMPTY_FORM, formFromListing, isPaidOrApproved, listingFormProblem, isInFreePeriod, buildSaleData, liveEditData,
-    liveEditUpdate,
 } from './createListing/listingForm';
 
 const goToProfile = () => { window.location.href = createPageUrl('Profile'); };
@@ -54,12 +53,15 @@ export default function CreateListing() {
 
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    // On a paid or approved listing only the title, description, sale type and photos can change,
-    // and changes to an approved one go back for approval (both enforced by firestore.rules).
-    // Holds the listing as it was opened; null when creating or editing an unpaid listing.
+    // On a paid or approved listing only the title, description, sale type and photos can change.
+    // Changes to an approved one wait for an admin, and buyers keep seeing it as approved until
+    // then (both enforced by firestore.rules). Null when creating or editing an unpaid listing.
     const [liveListing, setLiveListing] = useState(null);
     const isActiveEdit = Boolean(liveListing);
     const needsReapproval = liveListing?.status === LISTING_STATUS.ACTIVE;
+    // Changes already sent for this listing, if any, and the form as it was opened.
+    const [liveEdit, setLiveEdit] = useState(null);
+    const [openedForm, setOpenedForm] = useState(EMPTY_FORM);
     const [promoIndex, setPromoIndex] = useState(0);
     const [formData, setFormData] = useState(EMPTY_FORM);
 
@@ -120,8 +122,12 @@ export default function CreateListing() {
             if (editId) {
                 const [listing] = await firebase.entities.GarageSale.filter({ id: editId });
                 if (listing && listing.user_id === userData.id) {
+                    const edit = listing.status === LISTING_STATUS.ACTIVE ? await firebase.entities.ListingEdit.get(editId) : null;
+                    const form = formFromListing({ ...listing, ...(edit ? liveEditData(edit) : {}) });
                     if (isPaidOrApproved(listing)) setLiveListing(listing);
-                    setFormData(formFromListing(listing));
+                    setLiveEdit(edit);
+                    setOpenedForm(form);
+                    setFormData(form);
                 }
             }
             setLoading(false);
@@ -140,12 +146,16 @@ export default function CreateListing() {
     const createMutation = useMutation({
         mutationFn: async ({ asDraft, isFree }) => {
             if (isActiveEdit) {
-                const original = formFromListing(liveListing);
-                if (JSON.stringify(liveEditData(formData)) === JSON.stringify(liveEditData(original))) {
+                const changes = liveEditData(formData);
+                if (JSON.stringify(changes) === JSON.stringify(liveEditData(openedForm))) {
                     return { liveEdit: 'unchanged' };
                 }
-                await firebase.entities.GarageSale.update(editId, liveEditUpdate(formData, liveListing.status));
-                return { liveEdit: needsReapproval ? 'sent' : 'saved' };
+                if (needsReapproval) {
+                    await firebase.entities.ListingEdit.submit(editId, changes);
+                    return { liveEdit: 'sent' };
+                }
+                await firebase.entities.GarageSale.update(editId, changes);
+                return { liveEdit: 'saved' };
             }
 
             // Google Places validated the address when it was selected; suburb and postcode come from it.
@@ -162,15 +172,15 @@ export default function CreateListing() {
             const result = await firebase.entities.GarageSale.create(saleData);
             return { id: result.id, asDraft, isFree };
         },
-        onSuccess: async ({ id, asDraft, isFree, liveEdit }) => {
+        onSuccess: async ({ id, asDraft, isFree, liveEdit: liveEditResult }) => {
             queryClient.invalidateQueries({ queryKey: ['userListings', user?.email] });
 
-            if (liveEdit) {
+            if (liveEditResult) {
                 toast.success({
                     unchanged: 'No changes to save',
-                    sent: "Changes sent for approval. Your listing is hidden until they're approved.",
+                    sent: 'Changes sent for approval. Your listing stays live as it is until then.',
                     saved: 'Listing updated',
-                }[liveEdit]);
+                }[liveEditResult]);
                 goToProfile();
             } else if (asDraft) {
                 toast.success('Draft saved successfully');
@@ -274,7 +284,24 @@ export default function CreateListing() {
                 {needsReapproval && (
                     <Alert className="mb-6 border-[#FF9500]/30 bg-[#FF9500]/10">
                         <AlertDescription className="text-[#1e3a5f] text-center">
-                            Changes need admin approval. <strong>Your listing is hidden from buyers until they're approved.</strong>
+                            Changes need admin approval. <strong>Buyers keep seeing your listing as it is now until they're approved.</strong>
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                {liveEdit?.status === 'pending' && (
+                    <Alert className="mb-6 bg-blue-50 border-blue-200">
+                        <AlertDescription className="text-blue-700 text-center">
+                            These changes are waiting for approval. Sending new ones replaces them.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                {liveEdit?.status === 'refused' && (
+                    <Alert className="mb-6 bg-red-50 border-red-200">
+                        <AlertDescription className="text-red-700 text-center">
+                            <strong>These changes weren't approved:</strong>{' '}
+                            <span className="whitespace-pre-line break-words">{liveEdit.refusal_reason}</span>
                         </AlertDescription>
                     </Alert>
                 )}

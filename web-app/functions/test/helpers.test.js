@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
     isDocId, isRole, escapeHtml, storagePathFromUrl, listingPhotoPaths, isExpiredDraft, refundablePayments,
     rejectionEmailHtml,
+    editRefusedEmailHtml,
 } = require('../lib/helpers');
 
 const photoUrl = (path) =>
@@ -75,6 +76,13 @@ test('refundablePayments picks completed Stripe payments with a PaymentIntent', 
         { id: '4', payment_method: 'stripe', status: 'completed', transaction_id: null },
     ];
     assert.deepEqual(refundablePayments(payments).map((p) => p.id), ['1']);
+});
+
+test('editRefusedEmailHtml says the listing is still live and escapes what was typed', () => {
+    const html = editRefusedEmailHtml({ title: '<b>Sale</b>', reason: 'Photos show <prices>', footer: 'Footer' });
+    assert.match(html, /still live/);
+    assert.match(html, /Photos show &lt;prices&gt;/);
+    assert.doesNotMatch(html, /<b>Sale<\/b>/);
 });
 
 test('rejectionEmailHtml gives the reason and escapes what the seller or admin typed', () => {

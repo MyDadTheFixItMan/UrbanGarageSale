@@ -43,7 +43,7 @@ function DetailItem({ icon: Icon, label, value }) {
     );
 }
 
-function ListingGrid({ loading, listings, empty, onDelete, onPrint }) {
+function ListingGrid({ loading, listings, edits = [], empty, onDelete, onPrint }) {
     if (loading) {
         return (
             <div className="flex justify-center py-12">
@@ -57,7 +57,13 @@ function ListingGrid({ loading, listings, empty, onDelete, onPrint }) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {listings.map((listing) => (
-                <ProfileListingCard key={listing.id} listing={listing} onDelete={onDelete} onPrint={onPrint} />
+                <ProfileListingCard
+                    key={listing.id}
+                    listing={listing}
+                    edit={edits.find((edit) => edit.id === listing.id)}
+                    onDelete={onDelete}
+                    onPrint={onPrint}
+                />
             ))}
         </div>
     );
@@ -106,6 +112,11 @@ export default function Profile() {
         enabled: !!user?.id,
     });
     const listings = useMemo(() => groupProfileListings(userListings), [userListings]);
+    const { data: listingEdits = [] } = useQuery({
+        queryKey: ['listingEdits', user?.id],
+        queryFn: () => firebase.entities.ListingEdit.mine(),
+        enabled: !!user?.id,
+    });
 
     const deleteMutation = useMutation({
         mutationFn: (id) => firebase.entities.GarageSale.delete(id),
@@ -293,6 +304,7 @@ export default function Profile() {
                             <ListingGrid
                                 loading={listingsLoading}
                                 listings={listings.active}
+                                edits={listingEdits}
                                 onDelete={deleteMutation.mutate}
                                 onPrint={setPrintingListing}
                                 empty={(

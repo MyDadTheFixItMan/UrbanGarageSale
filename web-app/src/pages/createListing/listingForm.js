@@ -107,15 +107,6 @@ export function liveEditData(form) {
     return Object.fromEntries(LIVE_EDITABLE_FIELDS.map((field) => [field, form[field]]));
 }
 
-// What saving an edit changes. An approved listing goes back for approval, marked so the admin
-// can tell it from a new one, and is hidden from buyers until then.
-export function liveEditUpdate(form, status) {
-    return {
-        ...liveEditData(form),
-        ...(status === LISTING_STATUS.ACTIVE ? { status: LISTING_STATUS.PENDING_APPROVAL, edited_after_approval: true } : {}),
-    };
-}
-
 // The listing document to save for a listing that hasn't been paid for or approved.
 export function buildSaleData(form, { asDraft, isFree, coords, now = Date.now() }) {
     /** @type {string} */

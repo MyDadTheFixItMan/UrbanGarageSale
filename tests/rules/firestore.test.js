@@ -2,6 +2,7 @@
 // everything the website reads and writes directly, so every allow/deny that matters is here.
 // Run: cd tests/rules && npm test   (starts the emulators; needs Java)
 import test, { before, after, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
@@ -176,49 +177,75 @@ test('legacy listings with extra fields can still be edited', async () => {
   await assertSucceeds(updateDoc(doc(as.seller('alice'), 'garageSales/old'), { title: 'New title' }));
 });
 
-test('a live listing can only change its title, description, sale type and photos', async () => {
+test('a seller can only end a live listing; everything else goes through an approved edit', async () => {
   await seed('garageSales/live', listing({ status: 'active', payment_status: 'paid' }));
   const db = as.seller('alice');
   const live = doc(db, 'garageSales/live');
 
-  const forApproval = { status: 'pending_approval', edited_after_approval: true };
   for (const change of [
+    { title: 'New title' }, { description: 'New description' }, { sale_type: 'estate_sale' },
+    { photos: ['https://example.test/1.jpg'] }, { thumbnails: ['https://example.test/1-thumb.jpg'] },
 
     { start_date: '2026-12-05' }, { end_date: '2026-12-06' }, { start_time: '06:00' }, { end_time: '20:00' },
     { address: '2 Other St' }, { suburb: 'Carlton' }, { postcode: '3053' }, { state: 'NSW' },
     { latitude: -33.8 }, { longitude: 151.2 }, { geohash: 'r1r0g' },
     { draft_expires_at: '2026-12-01T00:00:00.000Z' }, { created_at: Timestamp.now() },
   ]) {
-    await assertFails(updateDoc(live, { ...change, ...forApproval }));
+    await assertFails(updateDoc(live, change));
   }
   await assertFails(updateDoc(live, { status: 'draft' }));
+  // Sending it back would let a rejection refund a sale that already ran.
+  await assertFails(updateDoc(live, { status: 'pending_approval' }));
+  await assertFails(updateDoc(live, { status: 'completed', title: 'Sneaked in' }));
 
   // A seller can still end their own sale, and an admin isn't limited.
   await assertSucceeds(updateDoc(doc(as.admin(), 'garageSales/live'), { address: '3 Admin St' }));
   await assertSucceeds(updateDoc(live, { status: 'completed' }));
 });
 
-test('editing a live listing sends it back for approval, and only an admin can put it live', async () => {
-  const edited = {
+test('edits to a live listing wait privately, and only an admin can put them live', async () => {
+  const change = {
+    user_id: 'alice',
     title: 'New title',
     description: 'New description',
     sale_type: 'estate_sale',
     photos: ['https://example.test/1.jpg'],
     thumbnails: ['https://example.test/1-thumb.jpg'],
+    status: 'pending',
+    submitted_at: Timestamp.now(),
   };
   await seed('garageSales/live', listing({ status: 'active', payment_status: 'paid' }));
-  const live = doc(as.seller('alice'), 'garageSales/live');
+  await seed('garageSales/draft', listing({ status: 'draft' }));
+  const seller = as.seller('alice');
+  const edit = doc(seller, 'listingEdits/live');
 
-  for (const [field, value] of Object.entries(edited)) {
-    await assertFails(updateDoc(live, { [field]: value }));
-  }
-  await assertFails(updateDoc(live, { ...edited, status: 'pending_approval' }));
-  await assertSucceeds(updateDoc(live, { ...edited, status: 'pending_approval', edited_after_approval: true }));
+  // Only the owner of a live listing, and only the allowed fields.
+  await assertFails(setDoc(doc(seller, 'listingEdits/draft'), change));
+  await assertFails(setDoc(doc(seller, 'listingEdits/missing'), change));
+  await assertFails(setDoc(doc(as.seller('bob'), 'listingEdits/live'), { ...change, user_id: 'bob' }));
+  await assertFails(setDoc(edit, { ...change, address: '2 Other St' }));
+  await assertFails(setDoc(edit, { ...change, start_date: '2026-12-05' }));
+  await assertFails(setDoc(edit, { ...change, status: 'approved' }));
+  await assertFails(setDoc(edit, { ...change, refusal_reason: 'Faked' }));
+  await assertFails(setDoc(edit, { ...change, title: 'x'.repeat(151) }));
+  await assertSucceeds(setDoc(edit, change));
 
-  // Still the owner's to fix up, but they can't approve it themselves.
-  await assertSucceeds(updateDoc(live, { title: 'Newer title' }));
-  await assertFails(updateDoc(live, { status: 'active' }));
-  await assertSucceeds(updateDoc(doc(as.admin(), 'garageSales/live'), { status: 'active', edited_after_approval: false }));
+  // Private until approved: the public listing is unchanged and the edit can't be read.
+  await assertFails(getDoc(doc(as.anon(), 'listingEdits/live')));
+  await assertFails(getDoc(doc(as.user('bob'), 'listingEdits/live')));
+  await assertSucceeds(getDoc(doc(seller, 'listingEdits/live')));
+  await assertSucceeds(getDoc(doc(as.admin(), 'listingEdits/live')));
+  const stillPublic = await getDoc(doc(as.anon(), 'garageSales/live'));
+  assert.equal(stillPublic.data().title, listing().title);
+
+  // A new edit replaces a refused one, and the seller can withdraw it.
+  await seed('listingEdits/live', { ...change, status: 'refused', refusal_reason: 'No' });
+  await assertSucceeds(setDoc(edit, change));
+  await assertSucceeds(deleteDoc(edit));
+
+  // An admin approves by copying the changes onto the listing.
+  const { user_id, status, submitted_at, ...content } = change;
+  await assertSucceeds(updateDoc(doc(as.admin(), 'garageSales/live'), content));
 });
 
 test('dates and location are locked once a listing is paid or approved', async () => {

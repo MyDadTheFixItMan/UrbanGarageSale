@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { firebase } from '@/api/firebaseClient';
 import { useQuery } from '@tanstack/react-query';
+import { canBeSaved } from '@/lib/listings';
 import { usePromotions } from '@/lib/usePromotions';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
@@ -210,7 +211,7 @@ export default function ListingDetails() {
                         </Button>
                     </Link>
                     
-                    {isAuthenticated && (
+                    {isAuthenticated && canBeSaved(sale) && (
                         <Button
                             onClick={() => saveMutation.mutate(saleId)}
                             disabled={saveMutation.isPending}

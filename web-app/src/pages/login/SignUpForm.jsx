@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { firebase } from '@/api/firebaseClient';
 import { Button } from '@/components/ui/button';
+import AddressParts from '@/components/AddressParts';
 import GooglePlacesAutocomplete from '@/components/GooglePlacesAutocomplete';
 import { MIN_PASSWORD_LENGTH } from '@/lib/password';
 import { createPageUrl } from '@/utils';
 import OAuthButtons, { signInWithProvider } from './OAuthButtons';
-import { PHONE_PREFIX, PHONE_PLACEHOLDER, normalizePhone, signUpProblem, postcodeAndState, oauthErrorMessage } from './loginForms';
+import { addressDetails } from '@/lib/addressDetails';
+import { PHONE_PREFIX, PHONE_PLACEHOLDER, normalizePhone, signUpProblem, oauthErrorMessage } from './loginForms';
 
+// Editing the address means these may no longer match it; saving looks them up again.
+const NO_ADDRESS_PARTS = { suburb: '', postcode: '', state: '' };
 const INPUT_CLASS = 'w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent';
 
 function Field({ id, label, hint, children }) {
@@ -46,7 +50,7 @@ function SignUpComplete() {
 export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
     const navigate = useNavigate();
     const [fields, setFields] = useState({
-        fullName: '', address: '', postcode: '', state: '', email: '',
+        fullName: '', address: '', suburb: '', postcode: '', state: '', email: '',
         phone: PHONE_PREFIX, password: '', confirmPassword: '',
     });
     const [error, setError] = useState('');
@@ -70,13 +74,14 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
         try {
             // Firebase emails a verification link; a verified email is needed before the mobile
             // number can be enrolled for 2FA in the Profile page.
+            const location = await addressDetails(fields.address, fields);
             await firebase.auth.signUp(fields.email, fields.password);
             await firebase.auth.updateProfile({
                 phone: normalizePhone(fields.phone).phone,
                 phone_verified: false,
                 full_name: fields.fullName,
                 address: fields.address,
-                ...postcodeAndState(fields.address, fields.postcode, fields.state),
+                ...location,
                 created_date: new Date().toISOString(),
                 role: 'user',
             });
@@ -138,15 +143,16 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
                     <GooglePlacesAutocomplete
                         id="signup-address"
                         value={fields.address}
-                        onChange={(address) => setFields((prev) => ({ ...prev, address }))}
+                        onChange={(address) => setFields((prev) => ({ ...prev, address, ...NO_ADDRESS_PARTS }))}
                         onSelect={(place) => {
                             if (place.address) {
-                                setFields((prev) => ({ ...prev, address: place.address, postcode: place.postcode || '', state: place.state || '' }));
+                                setFields((prev) => ({ ...prev, address: place.address, suburb: place.suburb || '', postcode: place.postcode || '', state: place.state || '' }));
                             }
                         }}
-                        placeholder="123 Main Street, Sydney NSW 2000"
+                        placeholder="Start typing, then pick your address"
                         className="w-full"
                     />
+                    <AddressParts suburb={fields.suburb} state={fields.state} postcode={fields.postcode} />
                 </Field>
 
                 <Field id="signup-email" label="Email Address">

@@ -11,7 +11,8 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
-    isDocId, isRole, escapeHtml, listingPhotoPaths, melbourneDate, isExpiredDraft, refundablePayments,
+    isDocId, isRole, escapeHtml, rejectionEmailHtml, editRefusedEmailHtml, listingPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
+    isUnpaidListing, isExpiredDraft, refundablePayments,
 } = require('./lib/helpers');
 
 const REGION = 'australia-southeast1';
@@ -121,8 +122,26 @@ async function deleteStorageFiles(paths) {
     await Promise.all(paths.map((path) => bucket.file(path).delete({ ignoreNotFound: true })));
 }
 
-// Marks a listing paid from a completed Checkout session. Idempotent: the payment record
-// is keyed by the Checkout session ID, so verifying twice (or via webhook) changes nothing.
+// Refunds one listing-fee payment. The idempotency key makes retrying safe.
+async function refundPayment(paymentId, paymentIntent, saleId) {
+    const refund = await getStripe().refunds.create(
+        { payment_intent: paymentIntent, reason: 'requested_by_customer', metadata: { sale_id: saleId } },
+        { idempotencyKey: `listing-refund-${paymentId}` },
+    );
+    await db.collection('payments').doc(paymentId).update({
+        status: 'refunded',
+        refund_id: refund.id,
+        refunded_at: FieldValue.serverTimestamp(),
+    });
+    return refund;
+}
+
+// Marks a listing paid from a completed Checkout session, and returns whether it did. Idempotent:
+// the payment record is keyed by the Checkout session ID, so verifying twice (or via webhook)
+// changes nothing. Only an unpaid listing can be paid for. A Checkout session left open can be
+// paid after that has changed, and it must not put a live or rejected listing back in the
+// approval queue, where rejecting it would refund a sale that has already run. Those payments are
+// refunded instead, and refund_due lets a Stripe webhook retry finish one that failed.
 async function recordListingPayment(session) {
     const saleId = session.metadata?.sale_id;
     const userId = session.metadata?.user_id;
@@ -133,28 +152,36 @@ async function recordListingPayment(session) {
     const paymentRef = db.collection('payments').doc(session.id);
     const listingRef = db.collection('garageSales').doc(saleId);
 
-    await db.runTransaction(async (tx) => {
+    const status = await db.runTransaction(async (tx) => {
         const [payment, listing] = await Promise.all([tx.get(paymentRef), tx.get(listingRef)]);
-        if (payment.exists) return;
+        if (payment.exists) return payment.data().status;
 
+        const payable = listing.exists && listing.data().user_id === userId && isUnpaidListing(listing.data());
+        const newStatus = payable ? 'completed' : 'refund_due';
         tx.set(paymentRef, {
             garage_sale_id: saleId,
             user_id: userId,
             user_email: session.customer_details?.email || session.customer_email || null,
             amount: (session.amount_total || 0) / 100,
             currency: (session.currency || 'aud').toUpperCase(),
-            status: 'completed',
+            status: newStatus,
             payment_method: 'stripe',
             transaction_id: session.payment_intent,
             checkout_session_id: session.id,
             created_at: FieldValue.serverTimestamp(),
         });
 
-        if (listing.exists && listing.data().user_id === userId) {
+        if (payable) {
             tx.update(listingRef, { status: 'pending_approval', payment_status: 'paid' });
         }
+        return newStatus;
     });
-    return true;
+
+    if (status === 'refund_due') {
+        logger.warn(`Refunding payment ${session.id}: listing ${saleId} can't be paid for`);
+        await refundPayment(session.id, session.payment_intent, saleId);
+    }
+    return status === 'completed';
 }
 
 // ---------------------------------------------------------------------------
@@ -171,9 +198,12 @@ exports.createStripeCheckout = callable(['STRIPE_SECRET_KEY'], async (request) =
     if (!APP_URL) {
         throw new HttpsError('failed-precondition', 'APP_URL is not configured');
     }
-    if (listingData.payment_status === 'paid' || listingData.payment_status === 'completed') {
-        throw new HttpsError('failed-precondition', 'This listing has already been paid for');
+    if (!isUnpaidListing(listingData)) {
+        throw new HttpsError('failed-precondition', 'This listing has already been paid for or has ended');
     }
+
+    // Restart the unpaid clock, so cleanupExpiredDrafts can't delete the listing mid-payment.
+    await listing.ref.update({ draft_expires_at: new Date(Date.now() + DRAFT_LIFETIME_MS).toISOString() });
 
     try {
         const user = await auth.getUser(uid);
@@ -234,7 +264,9 @@ exports.verifyStripePayment = callable(['STRIPE_SECRET_KEY'], async (request) =>
         return { success: false, message: 'Payment not completed' };
     }
 
-    await recordListingPayment(session);
+    if (!await recordListingPayment(session)) {
+        return { success: false, message: "This listing can't be paid for any more, so your payment has been refunded." };
+    }
     return { success: true };
 });
 
@@ -265,6 +297,11 @@ exports.stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHO
 // Admin actions
 // ---------------------------------------------------------------------------
 
+// Listings don't store the seller's email (they are public); look it up from their account.
+async function sellerEmail(sellerId) {
+    return (await auth.getUser(sellerId).catch(() => null))?.email;
+}
+
 // Send listing-approved email (admin only)
 exports.sendApprovalEmail = callable(['SENDGRID_API_KEY'], async (request) => {
     const adminUid = requireAdmin(request);
@@ -275,9 +312,8 @@ exports.sendApprovalEmail = callable(['SENDGRID_API_KEY'], async (request) => {
     if (!listing.exists || !listing.data().user_id) {
         throw new HttpsError('not-found', 'Listing not found');
     }
-    // Listings don't store the seller's email (they are public); look it up from their account.
     const { user_id: sellerId, title } = listing.data();
-    const userEmail = (await auth.getUser(sellerId).catch(() => null))?.email;
+    const userEmail = await sellerEmail(sellerId);
     if (!userEmail) {
         throw new HttpsError('not-found', 'Seller has no email address');
     }
@@ -302,9 +338,32 @@ exports.sendApprovalEmail = callable(['SENDGRID_API_KEY'], async (request) => {
     return { success: true, message: 'Approval notification sent' };
 });
 
-// Reject a listing and refund its listing fee (admin only). The Terms promise a refund when a
-// listing is rejected. Refunds use an idempotency key per payment, so retrying is safe.
-exports.rejectListing = callable(['STRIPE_SECRET_KEY'], async (request) => {
+// Tells the seller why their listing was rejected. Returns whether the email went out. Never
+// throws: the rejection and any refund have already happened, and the reason is on their profile.
+async function emailRejection(saleId, listing, reason, refunded) {
+    try {
+        const to = listing.user_id ? await sellerEmail(listing.user_id) : null;
+        if (!to) {
+            logger.warn(`Rejection email not sent: no seller email for listing ${saleId}`);
+            return false;
+        }
+        const sent = await sendEmail({
+            to,
+            from: FROM_EMAIL,
+            subject: "Your garage sale listing wasn't approved",
+            html: rejectionEmailHtml({ title: listing.title, reason, refunded, footer: BUSINESS_FOOTER }),
+        });
+        if (!sent) logger.warn(`Email not sent (SendGrid not configured). Rejection of listing ${saleId}`);
+        return sent;
+    } catch (error) {
+        logger.error(`Rejection email failed for listing ${saleId}: ${error.message}`);
+        return false;
+    }
+}
+
+// Reject a listing, refund its listing fee and tell the seller why (admin only). The Terms promise
+// a refund when a listing is rejected.
+exports.rejectListing = callable(['STRIPE_SECRET_KEY', 'SENDGRID_API_KEY'], async (request) => {
     const adminUid = requireAdmin(request);
     await rateLimit(adminUid, 'rejectListing', 30);
 
@@ -327,15 +386,7 @@ exports.rejectListing = callable(['STRIPE_SECRET_KEY'], async (request) => {
     const payments = paymentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const refunds = [];
     for (const payment of refundablePayments(payments)) {
-        const refund = await getStripe().refunds.create(
-            { payment_intent: payment.transaction_id, reason: 'requested_by_customer', metadata: { sale_id: saleId } },
-            { idempotencyKey: `listing-refund-${payment.id}` },
-        );
-        await db.collection('payments').doc(payment.id).update({
-            status: 'refunded',
-            refund_id: refund.id,
-            refunded_at: FieldValue.serverTimestamp(),
-        });
+        const refund = await refundPayment(payment.id, payment.transaction_id, saleId);
         refunds.push({ paymentId: payment.id, refundId: refund.id, amount: payment.amount });
     }
 
@@ -345,7 +396,50 @@ exports.rejectListing = callable(['STRIPE_SECRET_KEY'], async (request) => {
         ...(refunds.length ? { payment_status: 'refunded' } : {}),
     });
     await audit('rejectListing', adminUid, { saleId, reason, refunds });
-    return { success: true, refunded: refunds.reduce((total, r) => total + (r.amount || 0), 0) };
+
+    const refunded = refunds.reduce((total, r) => total + (r.amount || 0), 0);
+    const emailed = await emailRejection(saleId, listing.data(), reason, refunded);
+    return { success: true, refunded, emailed };
+});
+
+// Refuse a seller's changes to their live listing and tell them why (admin only). The listing
+// stays live as it was approved, so no refund is due.
+exports.refuseListingEdit = callable(['SENDGRID_API_KEY'], async (request) => {
+    const adminUid = requireAdmin(request);
+    await rateLimit(adminUid, 'refuseListingEdit', 30);
+
+    const saleId = requireDocId(request.data?.saleId, 'sale ID');
+    const reason = typeof request.data?.reason === 'string' ? request.data.reason.trim().slice(0, 1000) : '';
+    if (!reason) {
+        throw new HttpsError('invalid-argument', 'A reason is required');
+    }
+
+    const editRef = db.collection('listingEdits').doc(saleId);
+    const edit = await editRef.get();
+    if (!edit.exists || edit.data().status !== 'pending') {
+        throw new HttpsError('failed-precondition', 'Only changes awaiting approval can be refused');
+    }
+
+    await editRef.update({ status: 'refused', refusal_reason: reason });
+    await audit('refuseListingEdit', adminUid, { saleId, reason });
+
+    let emailed = false;
+    try {
+        const listing = await db.collection('garageSales').doc(saleId).get();
+        const to = await sellerEmail(edit.data().user_id);
+        if (to) {
+            emailed = await sendEmail({
+                to,
+                from: FROM_EMAIL,
+                subject: "Your listing changes weren't approved",
+                html: editRefusedEmailHtml({ title: listing.data()?.title, reason, footer: BUSINESS_FOOTER }),
+            });
+        }
+        if (!emailed) logger.warn(`Refusal email not sent for listing ${saleId}`);
+    } catch (error) {
+        logger.error(`Refusal email failed for listing ${saleId}: ${error.message}`);
+    }
+    return { success: true, emailed };
 });
 
 // Make a user an admin or a regular user (admin only). The role is a custom claim, which
@@ -449,6 +543,7 @@ exports.deleteUser = callable([], async (request) => {
     email = email || profile.data()?.email || null;
 
     await deleteQueryInBatches(db.collection('garageSales').where('user_id', '==', userId));
+    await deleteQueryInBatches(db.collection('listingEdits').where('user_id', '==', userId));
     await deleteQueryInBatches(db.collection('savedListings').where('user_id', '==', userId));
     await deleteQueryInBatches(db.collection('sales').where('sellerId', '==', userId));
     await deleteQueryInBatches(db.collection('saleStats').where('sellerId', '==', userId));
@@ -493,6 +588,11 @@ function logReportedError(service, message, context = {}) {
     });
 }
 
+// The API sends the site's Origin too. Anyone can post here, and a forged report must not be able
+// to send an alert email, so reports from elsewhere are only logged as warnings. A script can fake
+// the header, so this stops casual abuse rather than a determined attacker.
+const isSiteOrigin = (origin) => REPORT_ORIGINS.includes(origin);
+
 // Crude per-instance flood guard: a public endpoint must not be usable to fill the logs.
 let reportWindowStart = 0;
 let reportsInWindow = 0;
@@ -509,7 +609,7 @@ function reportAllowed() {
 // Receives error reports from the website (browser) and the Urban Pay API (server).
 exports.reportClientError = onRequest({ maxInstances: 3 }, (req, res) => {
     const origin = req.get('origin');
-    if (origin && REPORT_ORIGINS.includes(origin)) {
+    if (isSiteOrigin(origin)) {
         res.set('Access-Control-Allow-Origin', origin);
         res.set('Vary', 'Origin');
     }
@@ -551,6 +651,12 @@ exports.reportClientError = onRequest({ maxInstances: 3 }, (req, res) => {
     }
     const source = REPORT_SOURCES.includes(body?.source) ? body.source : 'unknown';
     const message = text(body?.stack, 4000) || text(body?.message, 500) || 'Unknown error';
+
+    if (!isSiteOrigin(origin)) {
+        logger.warn('Error report from outside the site', { source, message: message.slice(0, 500) });
+        res.status(204).send('');
+        return;
+    }
 
     // Error Reporting needs a stack trace in `message`; an empty reportLocation makes it drop
     // the entry, so the React component trail is appended to the message instead.
@@ -597,37 +703,41 @@ exports.healthCheck = onSchedule({ schedule: 'every 10 minutes', timeZone: TIME_
 
 // Once a sale's end date has passed it is marked completed, so it drops out of public search
 // and admin counts. Runs just after midnight Melbourne time (end_date is a YYYY-MM-DD string).
-// Drafts are left to cleanupExpiredDrafts.
+// Unpaid listings are left to cleanupExpiredDrafts.
 exports.expireListings = onSchedule({ schedule: 'every day 00:15', timeZone: TIME_ZONE }, async () => {
     const query = db.collection('garageSales')
-        .where('status', 'in', ['active', 'pending_approval', 'pending_payment'])
+        .where('status', 'in', ['active', 'pending_approval'])
         .where('end_date', '<', melbourneDate());
 
     // Updated listings leave the query, so each pass reads the next batch.
     let expired = 0;
     for (;;) {
-        const snap = await query.limit(400).get();
+        const snap = await query.limit(200).get();
         if (snap.empty) break;
         const batch = db.batch();
-        snap.docs.forEach((doc) => batch.update(doc.ref, { status: 'completed' }));
+        snap.docs.forEach((doc) => {
+            batch.update(doc.ref, { status: 'completed' });
+            // Changes that were still waiting no longer apply once the sale is over.
+            batch.delete(db.collection('listingEdits').doc(doc.id));
+        });
         await batch.commit();
         expired += snap.size;
     }
     logger.info(`Marked ${expired} ended listing(s) completed`);
 });
 
-// Drafts are kept for two days, as the listing form tells sellers (APP 11.2: don't keep
-// personal information longer than needed). Deletes expired drafts and their photos.
+// Unpaid listings are kept for two days, as the listing form tells sellers (APP 11.2: don't keep
+// personal information longer than needed). Deletes expired ones and their photos.
 exports.cleanupExpiredDrafts = onSchedule({ schedule: 'every day 01:00', timeZone: TIME_ZONE }, async () => {
     const now = Date.now();
-    const snap = await db.collection('garageSales').where('status', '==', 'draft').get();
+    const snap = await db.collection('garageSales').where('status', 'in', UNPAID_STATUSES).get();
     const expired = snap.docs.filter((doc) => isExpiredDraft(doc.data(), now));
 
     for (const doc of expired) {
         await deleteStorageFiles(listingPhotoPaths(doc.data()));
         await doc.ref.delete();
     }
-    logger.info(`Deleted ${expired.length} expired draft(s)`);
+    logger.info(`Deleted ${expired.length} expired unpaid listing(s)`);
 });
 
 // Top 10 postcodes by number of listings (optionally within one state) for the admin

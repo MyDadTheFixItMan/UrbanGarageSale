@@ -122,3 +122,9 @@ html,
   -moz-user-select: none !important;
   user-select: none !important;
 }
+
+/* Popups switch off clicks on the rest of the page, but reCAPTCHA's challenge sits outside
+   them. Without this, anyone asked to pick the pictures while sending an SMS code is stuck. */
+iframe[src*="recaptcha"] {
+  pointer-events: auto;
+}

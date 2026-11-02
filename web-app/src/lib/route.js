@@ -10,6 +10,7 @@ export function fullHomeAddress(user) {
     if (!street) return undefined;
 
     const parts = [street];
+    if (user.suburb && !street.toLowerCase().includes(user.suburb.toLowerCase())) parts.push(user.suburb);
     if (!user.postcode || !street.includes(user.postcode)) {
         parts.push([user.state, user.postcode].filter(Boolean).join(' '));
     }

@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 jest.mock('@/api/firebaseClient', () => ({ firebase: { auth: {} } }));
 jest.mock('@/components/GooglePlacesAutocomplete', () => () => null);
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
-jest.mock('@/utils/printGarageSaleSign', () => ({ paperSizes: { A4: { name: 'A4' }, A2: { name: 'A2' } } }));
+jest.mock('@/utils/printGarageSaleSign', () => ({ paperSizes: { A4: { name: 'A4' }, A2: { name: 'A2', note: 'Fold and tape' } } }));
 // A real dialog stays on screen while it animates closed; keep it rendered to test that moment.
 jest.mock('@/components/ui/dialog', () => {
   const Pass = ({ children }) => <div>{children}</div>;
@@ -30,6 +30,15 @@ describe('PrintSignDialog', () => {
     await userEvent.click(screen.getByLabelText('A2'));
     await userEvent.click(screen.getByRole('button', { name: 'Print Sign' }));
     expect(onPrint).toHaveBeenCalledWith(listing, 'A2');
+  });
+
+  it('explains how to put a multi-sheet poster together, only when one is chosen', async () => {
+    render(<PrintSignDialog listing={listing} onClose={() => {}} onPrint={() => {}} />);
+    expect(screen.queryByText('Fold and tape')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText('A2'));
+
+    expect(screen.getByText('Fold and tape')).toBeInTheDocument();
   });
 
   it('still has the listing if clicked again while closing', async () => {

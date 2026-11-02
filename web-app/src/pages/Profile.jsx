@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { printAfterDialogCloses } from '../utils/printGarageSaleSign';
+import { displayAddress } from '@/lib/addressDetails';
 import { groupProfileListings } from './profile/profileListings';
 import { useCardPayments } from './profile/useCardPayments';
 import ProfileListingCard from './profile/ProfileListingCard';
@@ -42,7 +43,7 @@ function DetailItem({ icon: Icon, label, value }) {
     );
 }
 
-function ListingGrid({ loading, listings, empty, onDelete, onPrint }) {
+function ListingGrid({ loading, listings, edits = [], empty, onDelete, onPrint }) {
     if (loading) {
         return (
             <div className="flex justify-center py-12">
@@ -56,7 +57,13 @@ function ListingGrid({ loading, listings, empty, onDelete, onPrint }) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {listings.map((listing) => (
-                <ProfileListingCard key={listing.id} listing={listing} onDelete={onDelete} onPrint={onPrint} />
+                <ProfileListingCard
+                    key={listing.id}
+                    listing={listing}
+                    edit={edits.find((edit) => edit.id === listing.id)}
+                    onDelete={onDelete}
+                    onPrint={onPrint}
+                />
             ))}
         </div>
     );
@@ -105,6 +112,11 @@ export default function Profile() {
         enabled: !!user?.id,
     });
     const listings = useMemo(() => groupProfileListings(userListings), [userListings]);
+    const { data: listingEdits = [] } = useQuery({
+        queryKey: ['listingEdits', user?.id],
+        queryFn: () => firebase.entities.ListingEdit.mine(),
+        enabled: !!user?.id,
+    });
 
     const deleteMutation = useMutation({
         mutationFn: (id) => firebase.entities.GarageSale.delete(id),
@@ -252,7 +264,7 @@ export default function Profile() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t">
                             {user.phone && <DetailItem icon={Phone} label="Phone" value={user.phone} />}
-                            {user.address && <DetailItem icon={MapPin} label="Address" value={user.address} />}
+                            {user.address && <DetailItem icon={MapPin} label="Address" value={displayAddress(user)} />}
                             <DetailItem icon={Mail} label="Email" value={user.email} />
                         </div>
                     </div>
@@ -292,6 +304,7 @@ export default function Profile() {
                             <ListingGrid
                                 loading={listingsLoading}
                                 listings={listings.active}
+                                edits={listingEdits}
                                 onDelete={deleteMutation.mutate}
                                 onPrint={setPrintingListing}
                                 empty={(

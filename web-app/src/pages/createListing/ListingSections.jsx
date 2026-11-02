@@ -22,6 +22,10 @@ export function FormSection({ title, icon: Icon, children, className = 'mb-6' })
     );
 }
 
+function LockedNote() {
+    return <p className="text-xs text-slate-500 italic text-center mb-4">Cannot be changed once listing has been made active</p>;
+}
+
 export function BasicInfoSection({ form, onChange }) {
     return (
         <FormSection title="Basic Information">
@@ -80,7 +84,8 @@ export function LocationSection({ form, onChange, locked }) {
     };
 
     return (
-        <FormSection title="Location" icon={MapPin}>
+        <FormSection title="Location" icon={MapPin} className={locked ? 'mb-2' : 'mb-6'}>
+            {locked && <LockedNote />}
             <div className="space-y-4">
                 <div>
                     <Label htmlFor="address">Street Address *</Label>
@@ -110,7 +115,7 @@ export function LocationSection({ form, onChange, locked }) {
                         value={form.state || ''}
                         onChange={(e) => onChange('state', e.target.value)}
                         className="mt-1.5 border rounded px-3 py-2 w-full"
-                        disabled={!!form.state}
+                        disabled={locked || !!form.state}
                     >
                         <option value="">Select State</option>
                         {STATES.map(([value, label]) => (
@@ -146,9 +151,7 @@ export function DateTimeSection({ form, onChange, locked }) {
 
     return (
         <FormSection title="Date & Time" icon={Calendar} className="mb-2">
-            {locked && (
-                <p className="text-xs text-slate-500 italic text-center mb-4">Cannot be changed once listing has been made active</p>
-            )}
+            {locked && <LockedNote />}
             <div className={!locked ? "mt-4" : ""}></div>
 
             <div className="space-y-4">

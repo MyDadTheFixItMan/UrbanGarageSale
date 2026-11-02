@@ -14,6 +14,13 @@ describe('fullHomeAddress', () => {
       .toBe('12 Smith St, Ocean Grove VIC 3226, Australia');
   });
 
+  it('adds the suburb, so a street name can only match one place', () => {
+    expect(fullHomeAddress({ address: '25 Moorabool Street', suburb: 'Geelong', state: 'VIC', postcode: '3220' }))
+      .toBe('25 Moorabool Street, Geelong, VIC 3220, Australia');
+    expect(fullHomeAddress({ address: '26 Seawind Place Ocean Grove', suburb: 'Ocean Grove', state: 'VIC', postcode: '3226' }))
+      .toBe('26 Seawind Place Ocean Grove, VIC 3226, Australia');
+  });
+
   it('copes with a missing state or postcode', () => {
     expect(fullHomeAddress({ address: '12 Smith St', state: '', postcode: '' })).toBe('12 Smith St, Australia');
     expect(fullHomeAddress({ address: '12 Smith St', state: 'VIC' })).toBe('12 Smith St, VIC, Australia');

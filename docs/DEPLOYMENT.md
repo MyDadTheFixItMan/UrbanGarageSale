@@ -234,6 +234,9 @@ same credentials from `.env` (`FIREBASE_SERVICE_ACCOUNT_JSON`).
 
 ## Mobile app (Flutter)
 
+The Android app bundle needs the real signing key in `android/key.properties` (not in git: `storeFile`,
+`storePassword`, `keyAlias`, `keyPassword`), and refuses to build without it. Test APKs still use the debug keys.
+
 Build with your publishable key (and, for a non-production API, its address):
 `flutter build appbundle --dart-define=STRIPE_PUBLISHABLE_KEY=pk_live_… [--dart-define=API_BASE_URL=https://…/api]`
 (Android) or `flutter build ipa --dart-define=…` (iOS). Needs Flutter 3.44 or later. Tap to Pay setup, testing and the iPhone entitlement:

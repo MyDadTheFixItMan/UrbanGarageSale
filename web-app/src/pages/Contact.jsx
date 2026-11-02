@@ -15,7 +15,6 @@ export default function Contact() {
     const [promoIndex, setPromoIndex] = useState(0);
     const [formData, setFormData] = useState({
         name: '',
-        email: '',
         message: ''
     });
     const [isLoading, setIsLoading] = useState(false);
@@ -53,7 +52,7 @@ export default function Contact() {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!formData.name || !formData.email || !formData.message) {
+        if (!formData.name || !formData.message) {
             toast.error('Please fill in all fields');
             return;
         }
@@ -62,13 +61,11 @@ export default function Contact() {
         try {
             await firebase.entities.ContactMessage.create({
                 name: formData.name,
-                email: formData.email,
                 message: formData.message
             });
 
             setFormData({
                 name: '',
-                email: '',
                 message: ''
             });
             setShowSuccessDialog(true);
@@ -116,7 +113,7 @@ export default function Contact() {
             <section className="max-w-2xl mx-auto px-4 sm:px-6 pt-24 pb-12 relative z-10">
                 <div className="bg-white rounded-lg shadow-md p-8">
                     <h1 className="text-4xl font-bold text-[#001f3f] mb-2">Contact Us</h1>
-                    <p className="text-slate-600 mb-8">We'd love to hear from you! Send us a message and we'll respond as soon as possible.</p>
+                    <p className="text-slate-600 mb-8">We'd love to hear from you! Send us a message and we'll reply to the email address on your account.</p>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Name Field */}
@@ -131,23 +128,6 @@ export default function Contact() {
                                 value={formData.name}
                                 onChange={handleChange}
                                 placeholder="Enter your full name"
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF9500]"
-                                required
-                            />
-                        </div>
-
-                        {/* Email Field */}
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-[#001f3f] mb-2">
-                                Email Address
-                            </label>
-                            <input
-                                type="email"
-                                id="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                placeholder="your.email@example.com"
                                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF9500]"
                                 required
                             />

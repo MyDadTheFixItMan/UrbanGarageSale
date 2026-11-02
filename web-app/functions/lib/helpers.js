@@ -24,6 +24,35 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+// The email telling a seller their listing was rejected. Title and reason are escaped.
+function rejectionEmailHtml({ title, reason, refunded, footer }) {
+    const refundLine = refunded > 0
+        ? `<p>Your listing fee of A$${refunded.toFixed(2)} has been refunded to the card you paid with. Refunds usually appear within 5–10 business days.</p>`
+        : '';
+    return `
+            <h2>Your listing wasn't approved</h2>
+            <p>Your garage sale listing "<strong>${escapeHtml(title || 'your listing')}</strong>" wasn't approved, so it won't appear on Urban Garage Sale.</p>
+            <p><strong>Reason:</strong></p>
+            <p style="white-space: pre-line;">${escapeHtml(reason)}</p>
+            ${refundLine}
+            <p>You're welcome to create a new listing with these changes. If you have any questions, contact support@urbangaragesales.com.au.</p>
+            <hr>
+            <p><small>You received this email because you listed a garage sale on Urban Garage Sale.<br>${footer}</small></p>
+        `;
+}
+
+function editRefusedEmailHtml({ title, reason, footer }) {
+    return `
+            <h2>Your changes weren't approved</h2>
+            <p>The changes you made to your garage sale listing "<strong>${escapeHtml(title || 'your listing')}</strong>" weren't approved. Your listing is still live, exactly as it was before you changed it.</p>
+            <p><strong>Reason:</strong></p>
+            <p style="white-space: pre-line;">${escapeHtml(reason)}</p>
+            <p>You can edit your listing from your profile and send new changes for approval. If you have any questions, contact support@urbangaragesales.com.au.</p>
+            <hr>
+            <p><small>You received this email because you listed a garage sale on Urban Garage Sale.<br>${footer}</small></p>
+        `;
+}
+
 // The Storage object path inside a Firebase download URL
 // (https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<encoded path>?alt=media&token=…),
 // or null for anything else. Only paths under listings/ are returned, so a crafted URL can't
@@ -41,10 +70,13 @@ function storagePathFromUrl(url) {
     return path.startsWith('listings/') && !path.includes('..') ? path : null;
 }
 
-// Every Storage path a listing's photos and thumbnails occupy.
+// Every Storage path a listing's photos and thumbnails occupy. Only the seller's own folder
+// counts: sellers write these URLs themselves, and the cleanup deletes with admin rights.
 function listingPhotoPaths(listing) {
-    const urls = [...(listing?.photos || []), ...(listing?.thumbnails || [])];
-    return [...new Set(urls.map(storagePathFromUrl).filter(Boolean))];
+    if (!listing?.user_id) return [];
+    const urls = [...(listing.photos || []), ...(listing.thumbnails || [])];
+    const ownFolder = `listings/${listing.user_id}/`;
+    return [...new Set(urls.map(storagePathFromUrl).filter((path) => path?.startsWith(ownFolder)))];
 }
 
 // Calendar date (YYYY-MM-DD) in Melbourne, the format listings store start_date/end_date in.
@@ -52,14 +84,24 @@ function melbourneDate(date = new Date()) {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne' }).format(date);
 }
 
-// A draft is due for deletion once its expiry has passed. Drafts saved before draft_expires_at
-// existed are kept for the same lifetime from when they were created.
-function isExpiredDraft(listing, now = Date.now(), lifetimeMs = 2 * 24 * 60 * 60 * 1000) {
-    if (listing?.status !== 'draft') return false;
-    if (listing.draft_expires_at) {
-        const expires = Date.parse(listing.draft_expires_at);
-        return Number.isFinite(expires) && expires < now;
-    }
+// Listings that were never paid for: saved drafts, and publishes abandoned at Stripe Checkout.
+const UNPAID_STATUSES = ['draft', 'pending_payment'];
+// Longer than a Stripe Checkout session stays open (24 hours), so a listing can't be deleted
+// while its seller is paying.
+const DRAFT_LIFETIME_MS = 2 * 24 * 60 * 60 * 1000;
+
+// A listing that can still be paid for. Anything else has been paid, approved, rejected or ended,
+// and a payment must not change it.
+function isUnpaidListing(listing) {
+    return UNPAID_STATUSES.includes(listing?.status) && (listing.payment_status ?? 'pending') === 'pending';
+}
+
+// An unpaid listing is due for deletion once its expiry has passed. Listings with no readable
+// draft_expires_at are kept for the same lifetime from when they were created.
+function isExpiredDraft(listing, now = Date.now(), lifetimeMs = DRAFT_LIFETIME_MS) {
+    if (!UNPAID_STATUSES.includes(listing?.status)) return false;
+    const expires = Date.parse(listing.draft_expires_at ?? '');
+    if (Number.isFinite(expires)) return expires < now;
     const created = listing.created_at?.toMillis?.() ?? Date.parse(listing.created_at);
     return Number.isFinite(created) && created + lifetimeMs < now;
 }
@@ -78,6 +120,11 @@ module.exports = {
     storagePathFromUrl,
     listingPhotoPaths,
     melbourneDate,
+    UNPAID_STATUSES,
+    DRAFT_LIFETIME_MS,
+    isUnpaidListing,
     isExpiredDraft,
     refundablePayments,
+    rejectionEmailHtml,
+    editRefusedEmailHtml,
 };

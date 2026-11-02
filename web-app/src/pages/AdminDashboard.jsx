@@ -110,7 +110,7 @@ export default function AdminDashboard() {
 
     const statValue = (value, format = (v) => v) => (stats ? format(value) : '–');
     const unreadCount = stats?.unreadMessages ?? 0;
-    const pendingCount = stats?.pendingListings ?? 0;
+    const pendingCount = (stats?.pendingListings ?? 0) + (stats?.pendingEdits ?? 0);
 
     if (!user) {
         return (

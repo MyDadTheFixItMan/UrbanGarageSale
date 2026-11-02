@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   HttpError, readJsonBody, requireSecondFactor, parseAudAmount, toCents, cleanText, isDocId, sendError,
+  MAX_CARD_AUD_AMOUNT,
 } from '../../api/_shared/http.js';
 
 const fakeRes = () => {
@@ -16,6 +17,11 @@ test('parseAudAmount accepts numbers and numeric strings, rounded to cents', () 
   assert.equal(parseAudAmount(12.345), 12.35);
   assert.equal(parseAudAmount(' 7.5 '), 7.5);
   assert.equal(parseAudAmount(0.05, { min: 0.05 }), 0.05);
+});
+
+test('card charges stop at the lower card limit', () => {
+  assert.equal(parseAudAmount(2000, { max: MAX_CARD_AUD_AMOUNT }), 2000);
+  assert.throws(() => parseAudAmount(2000.01, { max: MAX_CARD_AUD_AMOUNT }), (e) => e instanceof HttpError && e.status === 400);
 });
 
 test('parseAudAmount rejects NaN, negatives and out-of-range values', () => {

@@ -5,6 +5,7 @@
 // (user_id, garage_sale_id, created_at). Urban Pay's sales, sellerStats and saleStats use
 // camelCase (sellerId, garageSaleId, createdAt) because the mobile app and API read them that
 // way. New fields follow the convention of the collection they are added to.
+import { format } from 'date-fns';
 
 export const LISTING_STATUS = Object.freeze({
     DRAFT: 'draft',
@@ -33,6 +34,11 @@ export const isLiveStatus = (listing) =>
 
 export const isUnpaidDraft = (listing) =>
     listing.status === LISTING_STATUS.DRAFT || listing.status === LISTING_STATUS.PENDING_PAYMENT;
+
+// Only approved sales that haven't finished can be saved to favourites. The status is also checked
+// by firestore.rules; the date covers finished sales the nightly job hasn't marked completed yet.
+export const canBeSaved = (listing, today = format(new Date(), 'yyyy-MM-dd')) =>
+    listing.status === LISTING_STATUS.ACTIVE && (!listing.end_date || listing.end_date >= today);
 
 // Mirrors isPaidOrApproved() in firestore.rules.
 export const isPaidOrApproved = (listing) => isLiveStatus(listing) || isPaid(listing.payment_status);

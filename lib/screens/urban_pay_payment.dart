@@ -1,7 +1,9 @@
 // lib/screens/urban_pay_payment.dart
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
+import '../models/sale.dart';
 import '../services/urban_pay_service.dart';
 
 class UrbanPayPaymentScreen extends StatefulWidget {
@@ -16,12 +18,34 @@ class _UrbanPayPaymentScreenState extends State<UrbanPayPaymentScreen> {
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
 
+  List<GarageSaleOption>? _garageSales;
+  String? _garageSaleId;
   double _selectedAmount = 0;
   bool _isProcessing = false;
   String? _error;
 
   // Quick amount buttons
   final List<double> _quickAmounts = [5, 10, 20, 50];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGarageSales();
+  }
+
+  Future<void> _loadGarageSales() async {
+    try {
+      final sellerId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      final sales = await _urbanPayService.getActiveGarageSales(sellerId);
+      if (!mounted) return;
+      setState(() {
+        _garageSales = sales;
+        _garageSaleId = sales.length == 1 ? sales.first.id : null;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not load your garage sales. Go back and try again.');
+    }
+  }
 
   @override
   void dispose() {
@@ -39,6 +63,14 @@ class _UrbanPayPaymentScreenState extends State<UrbanPayPaymentScreen> {
   }
 
   Future<void> _processPayment() async {
+    final garageSaleId = _garageSaleId;
+    if (garageSaleId == null) {
+      setState(() {
+        _error = 'Choose the garage sale you are selling at';
+      });
+      return;
+    }
+
     if (_selectedAmount <= 0) {
       setState(() {
         _error = 'Please enter a valid amount';
@@ -63,6 +95,7 @@ class _UrbanPayPaymentScreenState extends State<UrbanPayPaymentScreen> {
       final paymentIntent = await _urbanPayService.createPaymentIntent(
         amount: _selectedAmount,
         description: _descriptionController.text,
+        garageSaleId: garageSaleId,
       );
 
       // Step 2: Initialize Payment Sheet
@@ -110,6 +143,49 @@ class _UrbanPayPaymentScreenState extends State<UrbanPayPaymentScreen> {
     }
   }
 
+  // Card payments need a live listing (createPaymentIntent refuses them otherwise).
+  Widget _buildGarageSaleCard() {
+    final sales = _garageSales;
+    final Widget content;
+    if (sales == null) {
+      content = const Center(child: CircularProgressIndicator());
+    } else if (sales.isEmpty) {
+      content = const Text(
+        'You need a live (approved) garage sale listing to take card payments. '
+        'Create one on the Urban Garage Sale website.',
+      );
+    } else {
+      content = DropdownButtonFormField<String>(
+        initialValue: _garageSaleId,
+        isExpanded: true,
+        hint: const Text('Choose a garage sale'),
+        items: [
+          for (final sale in sales)
+            DropdownMenuItem(value: sale.id, child: Text(sale.label, overflow: TextOverflow.ellipsis)),
+        ],
+        onChanged: _isProcessing ? null : (id) => setState(() => _garageSaleId = id),
+      );
+    }
+
+    return Card(
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Garage sale',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF001F3F)),
+            ),
+            const SizedBox(height: 12),
+            content,
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -136,6 +212,9 @@ class _UrbanPayPaymentScreenState extends State<UrbanPayPaymentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildGarageSaleCard(),
+              const SizedBox(height: 16),
+
               // Amount Section
               Card(
                 color: Colors.white,

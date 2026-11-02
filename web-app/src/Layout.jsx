@@ -10,17 +10,11 @@ export default function Layout({ children, currentPageName }) {
     const [user, setUser] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-    useEffect(() => {
-        const checkAuth = async () => {
-            const authenticated = await firebase.auth.isAuthenticated();
-            setIsAuthenticated(authenticated);
-            if (authenticated) {
-                const userData = await firebase.auth.me();
-                setUser(userData);
-            }
-        };
-        checkAuth();
-    }, []);
+    // Follows logins as they happen: signing up changes pages without reloading this header.
+    useEffect(() => firebase.auth.onAuthStateChanged(async (authUser) => {
+        setIsAuthenticated(!!authUser);
+        setUser(authUser ? await firebase.auth.me() : null);
+    }), []);
 
     const handleLogout = async () => {
         try {

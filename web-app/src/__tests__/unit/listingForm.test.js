@@ -1,6 +1,6 @@
 import {
-  EMPTY_FORM, LOCKED_FIELDS, formFromListing, isPaidOrApproved, listingFormProblem,
-  isInFreePeriod, buildSaleData, photoProblem,
+  EMPTY_FORM, formFromListing, isPaidOrApproved, listingFormProblem,
+  isInFreePeriod, buildSaleData, liveEditData, photoProblem,
 } from '@/pages/createListing/listingForm';
 
 const form = (overrides = {}) => ({
@@ -69,31 +69,32 @@ describe('buildSaleData', () => {
   const NOW = Date.UTC(2026, 10, 1);
 
   it('saves a draft as unpaid with a two-day expiry', () => {
-    const data = buildSaleData(form(), { asDraft: true, isFree: false, alreadyPaid: false, locked: false, coords, now: NOW });
+    const data = buildSaleData(form(), { asDraft: true, isFree: false, coords, now: NOW });
     expect(data).toMatchObject({ status: 'draft', payment_status: 'pending', latitude: -37.8, longitude: 144.97 });
     expect(data.draft_expires_at).toBe('2026-11-03T00:00:00.000Z');
   });
 
-  it('waits for payment when publishing a paid listing', () => {
-    const data = buildSaleData(form(), { asDraft: false, isFree: false, alreadyPaid: false, locked: false, coords });
-    expect(data).toMatchObject({ status: 'pending_payment', payment_status: 'pending', draft_expires_at: null });
+  it('waits for payment when publishing a paid listing, with the same two-day expiry', () => {
+    const data = buildSaleData(form(), { asDraft: false, isFree: false, coords, now: NOW });
+    expect(data).toMatchObject({ status: 'pending_payment', payment_status: 'pending', draft_expires_at: '2026-11-03T00:00:00.000Z' });
   });
 
-  it('publishes a free-period listing straight away', () => {
-    const data = buildSaleData(form(), { asDraft: false, isFree: true, alreadyPaid: false, locked: false, coords });
-    expect(data).toMatchObject({ status: 'active', payment_status: 'completed' });
+  it('sends a free-period listing for admin approval, with no expiry', () => {
+    const data = buildSaleData(form(), { asDraft: false, isFree: true, coords });
+    expect(data).toMatchObject({ status: 'pending_approval', payment_status: 'completed', draft_expires_at: null });
   });
+});
 
-  it('leaves the status of an already-paid listing alone', () => {
-    const data = buildSaleData(form(), { asDraft: false, isFree: false, alreadyPaid: true, locked: false, coords });
-    expect(data).not.toHaveProperty('status');
-    expect(data).not.toHaveProperty('payment_status');
-  });
-
-  it('leaves out the locked fields of a paid or approved listing', () => {
-    const data = buildSaleData(form(), { asDraft: false, isFree: false, alreadyPaid: true, locked: true, coords });
-    LOCKED_FIELDS.forEach((field) => expect(data).not.toHaveProperty(field));
-    expect(data.title).toBe('Moving sale');
+describe('liveEditData', () => {
+  it('holds only what can change on a paid or approved listing', () => {
+    const photos = ['1.jpg'];
+    expect(liveEditData(form({ description: 'Tools', sale_type: 'yard_sale', photos, thumbnails: ['1-thumb.jpg'] }))).toEqual({
+      title: 'Moving sale',
+      description: 'Tools',
+      sale_type: 'yard_sale',
+      photos,
+      thumbnails: ['1-thumb.jpg'],
+    });
   });
 });
 

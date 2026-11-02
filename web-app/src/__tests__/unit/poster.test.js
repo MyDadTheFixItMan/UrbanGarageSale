@@ -95,6 +95,41 @@ describe('buildPosterHtml', () => {
     expect(html).toContain('src="data:image/png;base64,QR"');
   });
 
+  it('keeps the rows off the join only on a multi-sheet poster', () => {
+    const html = (size) => buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size });
+
+    expect(html('A4')).not.toContain('class="poster-container poster-tiled"');
+    expect(html('A2')).toContain('class="poster-container poster-tiled"');
+  });
+
+  it('shifts side-by-side sheets so the join stays inside what a printer can reach', () => {
+    const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
+    const shifts = [...html.matchAll(/translateX\((-?\d+)mm\)/g)].map((match) => Number(match[1]));
+
+    expect(shifts).toEqual([-9, 9, -9, 9]);
+  });
+
+  it('marks the join on the sheets either side of it', () => {
+    const marks = (size) => buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size })
+      .match(/<div class="join-mark /g)?.length ?? 0;
+
+    expect(marks('A2')).toBe(8);
+    expect(marks('A4')).toBe(0);
+  });
+
+  it('labels the mark to fold on the right-hand sheet and the mark to join to on the left', () => {
+    const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
+
+    expect(html).toMatch(/\.join-mark-left::before \{[^}]*content: 'Fold'/);
+    expect(html).toMatch(/\.join-mark-right::before \{[^}]*content: 'Join'/);
+  });
+
+  it('stops the browser splitting a sheet across pages when printing', () => {
+    const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size: 'A2' });
+
+    expect(html).toMatch(/\.sheet \{[^}]*contain: strict/);
+  });
+
   it('prints A4 on one sheet and A2 across four', () => {
     const sheets = (size) => buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', size })
       .match(/class="sheet"/g).length;

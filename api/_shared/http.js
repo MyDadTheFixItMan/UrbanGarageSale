@@ -84,6 +84,8 @@ export function requireSecondFactor(decoded) {
 // Stripe's minimum charge for AUD is A$0.50.
 export const MIN_AUD_AMOUNT = 0.5;
 export const MAX_AUD_AMOUNT = 10000;
+// Card charges carry the fraud risk, so they stop well below the limit on recorded cash sales.
+export const MAX_CARD_AUD_AMOUNT = 2000;
 
 // Parses a dollar amount and returns it rounded to cents. Rejects NaN, negatives and out-of-range values.
 export function parseAudAmount(value, { min = MIN_AUD_AMOUNT, max = MAX_AUD_AMOUNT } = {}) {
@@ -125,7 +127,8 @@ async function reportServerError(error, context) {
   try {
     await fetch(ERROR_REPORT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // reportClientError only raises alerts for reports with the site's Origin.
+      headers: { 'Content-Type': 'application/json', Origin: 'https://urbangaragesales.com.au' },
       body: JSON.stringify({
         source: 'urban-pay-api',
         message: `${context}: ${error?.message || error}`,

@@ -10,9 +10,8 @@ export const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
 export const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 const DRAFT_LIFETIME_MS = 2 * 24 * 60 * 60 * 1000;
 
-// Once a listing is paid for or approved, these can't change (enforced by firestore.rules).
-export const LOCKED_FIELDS = ['start_date', 'end_date', 'start_time', 'end_time', 'address', 'suburb',
-    'postcode', 'state', 'latitude', 'longitude', 'geohash'];
+// Once a listing is paid for or approved, only these can change (enforced by firestore.rules).
+const LIVE_EDITABLE_FIELDS = ['title', 'description', 'sale_type', 'photos', 'thumbnails'];
 
 export const SALE_TYPES = [
     ['garage_sale', 'Garage Sale'],
@@ -103,25 +102,29 @@ export function isInFreePeriod(settings, startDate) {
     return Boolean(from && to) && startDate >= from && startDate <= to;
 }
 
-// The listing document to save. Paid listings keep their status; paid or approved listings
-// leave their locked fields out, so the update doesn't touch them.
-export function buildSaleData(form, { asDraft, isFree, alreadyPaid, locked, coords, now = Date.now() }) {
+// The editable part of a paid or approved listing, to save or to compare.
+export function liveEditData(form) {
+    return Object.fromEntries(LIVE_EDITABLE_FIELDS.map((field) => [field, form[field]]));
+}
+
+// The listing document to save for a listing that hasn't been paid for or approved.
+export function buildSaleData(form, { asDraft, isFree, coords, now = Date.now() }) {
     /** @type {string} */
     let status = LISTING_STATUS.PENDING_PAYMENT;
     if (asDraft) status = LISTING_STATUS.DRAFT;
-    else if (isFree) status = LISTING_STATUS.ACTIVE;
+    else if (isFree) status = LISTING_STATUS.PENDING_APPROVAL;
 
-    const data = {
+    // Anything left unpaid expires, including a publish abandoned at checkout.
+    const expires = asDraft || !isFree;
+
+    return {
         ...form,
         latitude: coords.lat,
         longitude: coords.lng,
-        draft_expires_at: asDraft ? new Date(now + DRAFT_LIFETIME_MS).toISOString() : null,
-        ...(alreadyPaid ? {} : { status, payment_status: isFree ? PAYMENT_STATUS.COMPLETED : PAYMENT_STATUS.PENDING }),
+        draft_expires_at: expires ? new Date(now + DRAFT_LIFETIME_MS).toISOString() : null,
+        status,
+        payment_status: isFree ? PAYMENT_STATUS.COMPLETED : PAYMENT_STATUS.PENDING,
     };
-    if (locked) {
-        LOCKED_FIELDS.forEach((field) => delete data[field]);
-    }
-    return data;
 }
 
 // Returns why a chosen photo can't be uploaded, or null.

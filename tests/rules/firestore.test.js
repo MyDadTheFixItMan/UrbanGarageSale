@@ -181,26 +181,44 @@ test('a live listing can only change its title, description, sale type and photo
   const db = as.seller('alice');
   const live = doc(db, 'garageSales/live');
 
-  await assertSucceeds(updateDoc(live, {
-    title: 'New title',
-    description: 'New description',
-    sale_type: 'estate_sale',
-    photos: ['https://example.test/1.jpg'],
-    thumbnails: ['https://example.test/1-thumb.jpg'],
-  }));
+  const forApproval = { status: 'pending_approval', edited_after_approval: true };
   for (const change of [
+
     { start_date: '2026-12-05' }, { end_date: '2026-12-06' }, { start_time: '06:00' }, { end_time: '20:00' },
     { address: '2 Other St' }, { suburb: 'Carlton' }, { postcode: '3053' }, { state: 'NSW' },
     { latitude: -33.8 }, { longitude: 151.2 }, { geohash: 'r1r0g' },
     { draft_expires_at: '2026-12-01T00:00:00.000Z' }, { created_at: Timestamp.now() },
   ]) {
-    await assertFails(updateDoc(live, change));
+    await assertFails(updateDoc(live, { ...change, ...forApproval }));
   }
   await assertFails(updateDoc(live, { status: 'draft' }));
 
   // A seller can still end their own sale, and an admin isn't limited.
   await assertSucceeds(updateDoc(doc(as.admin(), 'garageSales/live'), { address: '3 Admin St' }));
   await assertSucceeds(updateDoc(live, { status: 'completed' }));
+});
+
+test('editing a live listing sends it back for approval, and only an admin can put it live', async () => {
+  const edited = {
+    title: 'New title',
+    description: 'New description',
+    sale_type: 'estate_sale',
+    photos: ['https://example.test/1.jpg'],
+    thumbnails: ['https://example.test/1-thumb.jpg'],
+  };
+  await seed('garageSales/live', listing({ status: 'active', payment_status: 'paid' }));
+  const live = doc(as.seller('alice'), 'garageSales/live');
+
+  for (const [field, value] of Object.entries(edited)) {
+    await assertFails(updateDoc(live, { [field]: value }));
+  }
+  await assertFails(updateDoc(live, { ...edited, status: 'pending_approval' }));
+  await assertSucceeds(updateDoc(live, { ...edited, status: 'pending_approval', edited_after_approval: true }));
+
+  // Still the owner's to fix up, but they can't approve it themselves.
+  await assertSucceeds(updateDoc(live, { title: 'Newer title' }));
+  await assertFails(updateDoc(live, { status: 'active' }));
+  await assertSucceeds(updateDoc(doc(as.admin(), 'garageSales/live'), { status: 'active', edited_after_approval: false }));
 });
 
 test('dates and location are locked once a listing is paid or approved', async () => {

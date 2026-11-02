@@ -71,6 +71,9 @@ export default function ListingRow({ listing, overrideStatus = null, onApprove, 
                 </div>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
+                {listing.edited_after_approval && listing.status === 'pending_approval' && (
+                    <Badge className="bg-amber-100 text-amber-800 transition-none whitespace-nowrap">Edited</Badge>
+                )}
                 <Badge className={`${statusConfig[displayStatus]?.color} transition-none whitespace-nowrap`}>
                     {statusConfig[displayStatus]?.label}
                 </Badge>

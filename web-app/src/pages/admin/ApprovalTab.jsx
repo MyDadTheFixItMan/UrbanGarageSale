@@ -28,7 +28,7 @@ export default function ApprovalTab() {
 
     const approveMutation = useMutation({
         mutationFn: async (listing) => {
-            const result = await firebase.entities.GarageSale.update(listing.id, { status: LISTING_STATUS.ACTIVE });
+            const result = await firebase.entities.GarageSale.update(listing.id, { status: LISTING_STATUS.ACTIVE, edited_after_approval: false });
             // The approval stands even if the notification email fails.
             if (listing.user_id) {
                 try {

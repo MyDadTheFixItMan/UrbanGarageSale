@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { geocode } from '@/lib/geocode';
+import { toast } from 'sonner';
 import CreateListing from '@/pages/CreateListing';
 
 jest.mock('@/api/firebaseClient', () => ({
@@ -22,6 +23,7 @@ jest.mock('@/api/firebaseClient', () => ({
   },
 }));
 jest.mock('@/lib/geocode', () => ({ geocode: jest.fn() }));
+jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
 jest.mock('@/components/GooglePlacesAutocomplete', () => function MockAutocomplete({ id, value, disabled }) {
   return <input id={id} defaultValue={value} disabled={disabled} />;
 });
@@ -85,20 +87,21 @@ describe('editing a live listing', () => {
     expect(screen.getByLabelText('Suburb & Postcode')).toHaveAttribute('readonly');
   });
 
-  it('offers saving changes only, with no draft, publish or pricing options', async () => {
+  it('warns the listing will be hidden and offers one button, with no draft, publish or pricing options', async () => {
     await openEditor(listing());
 
-    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
+    expect(screen.getByText(/hidden from buyers/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send for Approval' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /draft/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /publish/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/to publish/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/free listing period/i)).not.toBeInTheDocument();
   });
 
-  it('saves only the editable fields, even when the address details are incomplete', async () => {
+  it('sends only the editable fields for approval, even when the address details are incomplete', async () => {
     await openEditor(listing());
     await userEvent.type(screen.getByLabelText('Title *'), ' today');
-    await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send for Approval' }));
 
     await waitFor(() => expect(firebase.entities.GarageSale.update).toHaveBeenCalled());
     expect(firebase.entities.GarageSale.update).toHaveBeenCalledWith('sale-1', {
@@ -107,8 +110,31 @@ describe('editing a live listing', () => {
       sale_type: 'garage_sale',
       photos: ['https://example.test/1.jpg'],
       thumbnails: ['https://example.test/1-thumb.jpg'],
+      status: 'pending_approval',
+      edited_after_approval: true,
     });
     expect(geocode).not.toHaveBeenCalled();
+  });
+
+  it('leaves the listing live when nothing was changed', async () => {
+    await openEditor(listing());
+    await userEvent.click(screen.getByRole('button', { name: 'Send for Approval' }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('No changes to save'));
+    expect(firebase.entities.GarageSale.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('editing a listing already awaiting approval', () => {
+  it('saves the changes without a warning, leaving its status alone', async () => {
+    await openEditor(listing({ status: 'pending_approval' }));
+    expect(screen.queryByText(/hidden from buyers/i)).not.toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Title *'), ' today');
+    await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => expect(firebase.entities.GarageSale.update).toHaveBeenCalled());
+    expect(firebase.entities.GarageSale.update.mock.calls[0][1]).not.toHaveProperty('status');
   });
 });
 

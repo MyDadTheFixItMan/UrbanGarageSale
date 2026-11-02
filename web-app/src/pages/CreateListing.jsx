@@ -4,6 +4,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { usePromotions } from '@/lib/usePromotions';
 import { createPageUrl } from '../utils';
 import { formatAud } from '@/lib/format';
+import { LISTING_STATUS } from '@/lib/listings';
 import { LISTING_FEE_AUD } from '@/lib/pricing';
 import { Loader2, Save, Send, Plus } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { BasicInfoSection, LocationSection, DateTimeSection } from './createList
 import PhotosSection from './createListing/PhotosSection';
 import {
     EMPTY_FORM, formFromListing, isPaidOrApproved, listingFormProblem, isInFreePeriod, buildSaleData, liveEditData,
+    liveEditUpdate,
 } from './createListing/listingForm';
 
 const goToProfile = () => { window.location.href = createPageUrl('Profile'); };
@@ -52,9 +54,12 @@ export default function CreateListing() {
 
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    // On a paid or approved listing only the title, description, sale type and photos can change
-    // (enforced by firestore.rules).
-    const [isActiveEdit, setIsActiveEdit] = useState(false);
+    // On a paid or approved listing only the title, description, sale type and photos can change,
+    // and changes to an approved one go back for approval (both enforced by firestore.rules).
+    // Holds the listing as it was opened; null when creating or editing an unpaid listing.
+    const [liveListing, setLiveListing] = useState(null);
+    const isActiveEdit = Boolean(liveListing);
+    const needsReapproval = liveListing?.status === LISTING_STATUS.ACTIVE;
     const [promoIndex, setPromoIndex] = useState(0);
     const [formData, setFormData] = useState(EMPTY_FORM);
 
@@ -115,7 +120,7 @@ export default function CreateListing() {
             if (editId) {
                 const [listing] = await firebase.entities.GarageSale.filter({ id: editId });
                 if (listing && listing.user_id === userData.id) {
-                    setIsActiveEdit(isPaidOrApproved(listing));
+                    if (isPaidOrApproved(listing)) setLiveListing(listing);
                     setFormData(formFromListing(listing));
                 }
             }
@@ -135,8 +140,12 @@ export default function CreateListing() {
     const createMutation = useMutation({
         mutationFn: async ({ asDraft, isFree }) => {
             if (isActiveEdit) {
-                await firebase.entities.GarageSale.update(editId, liveEditData(formData));
-                return { liveEdit: true };
+                const original = formFromListing(liveListing);
+                if (JSON.stringify(liveEditData(formData)) === JSON.stringify(liveEditData(original))) {
+                    return { liveEdit: 'unchanged' };
+                }
+                await firebase.entities.GarageSale.update(editId, liveEditUpdate(formData, liveListing.status));
+                return { liveEdit: needsReapproval ? 'sent' : 'saved' };
             }
 
             // Google Places validated the address when it was selected; suburb and postcode come from it.
@@ -157,7 +166,11 @@ export default function CreateListing() {
             queryClient.invalidateQueries({ queryKey: ['userListings', user?.email] });
 
             if (liveEdit) {
-                toast.success('Listing updated');
+                toast.success({
+                    unchanged: 'No changes to save',
+                    sent: "Changes sent for approval. Your listing is hidden until they're approved.",
+                    saved: 'Listing updated',
+                }[liveEdit]);
                 goToProfile();
             } else if (asDraft) {
                 toast.success('Draft saved successfully');
@@ -258,6 +271,14 @@ export default function CreateListing() {
                     </div>
                 </div>
 
+                {needsReapproval && (
+                    <Alert className="mb-6 border-[#FF9500]/30 bg-[#FF9500]/10">
+                        <AlertDescription className="text-[#1e3a5f] text-center">
+                            Changes need admin approval. <strong>Your listing is hidden from buyers until they're approved.</strong>
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 {/* Pricing Info */}
                 {!isActiveEdit && (
                     <Alert className="mb-6 border-[#FF9500]/30 bg-[#FF9500]/10">
@@ -304,7 +325,7 @@ export default function CreateListing() {
                             ) : isActiveEdit ? (
                                 <>
                                     <Save className="w-5 h-5" />
-                                    Save Changes
+                                    {needsReapproval ? 'Send for Approval' : 'Save Changes'}
                                 </>
                             ) : (
                                 <>

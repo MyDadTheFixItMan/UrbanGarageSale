@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { usePromotions } from '@/lib/usePromotions';
 import { BUSINESS_ABN } from '@/lib/business';
+import { CARD_FEES, describeCardFee } from '@/lib/pricing';
 
 export default function Terms() {
     const [promoIndex, setPromoIndex] = useState(0);
@@ -127,7 +128,7 @@ export default function Terms() {
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>Publishing a listing costs the fee shown before you pay (currently A$10.00). All prices are in Australian dollars.</li>
                                     <li>Listing fees are processed by Stripe. Listings are reviewed before going live; if we reject your listing we refund the fee automatically to the card you paid with. Refunds usually appear within 5–10 business days.</li>
-                                    <li>Urban Pay card payments are processed by Stripe and paid to the seller's own Stripe account. Stripe's fees and terms apply to those payments.</li>
+                                    <li>Urban Pay card payments are processed by Stripe and paid to the seller's own Stripe account, less a card fee that covers Stripe's processing cost: {describeCardFee(CARD_FEES.tap_to_pay)} per Tap to Pay sale, {describeCardFee(CARD_FEES.terminal)} per card reader sale, or {describeCardFee(CARD_FEES.online)} when card details are entered in the app. Stripe's terms also apply to those payments. Cash sales have no fee.</li>
                                     <li>Nothing in this section limits any refund or remedy you are entitled to under the Australian Consumer Law.</li>
                                     {BUSINESS_ABN && <li>Urban Garage Sale ABN: {BUSINESS_ABN}.</li>}
                                 </ul>

@@ -1,11 +1,13 @@
 // Create a card PaymentIntent for an Urban Pay sale.
 // Funds are routed to the seller's connected Stripe account (destination charge),
-// so the platform never holds the seller's sale proceeds.
+// so the platform never holds the seller's sale proceeds. The card fee (see _shared/fees.js) is
+// taken from the seller's payout as an application fee, so Stripe's processing cost isn't the platform's.
 import { getStripe } from '../_shared/stripe.js';
 import { getFirestore } from '../_shared/firebase-admin.js';
 import { applyCors, getTrustedOrigin } from '../_shared/security.js';
 import { rateLimit } from '../_shared/rateLimit.js';
 import { getLiveGarageSale } from '../_shared/sales.js';
+import { cardFeeCents } from '../_shared/fees.js';
 import {
   HttpError, readJsonBody, requireUser, requireSecondFactor, parseAudAmount, toCents, cleanText, sendError,
   MAX_CARD_AUD_AMOUNT,
@@ -33,7 +35,10 @@ export default async (req, res) => {
     // so an unchecked ID would take the customer's money and then fail to record the sale.
     await getLiveGarageSale(uid, garageSaleId);
     // Card-present (Terminal / Tap to Pay) intents need an explicit payment method type.
-    const cardPresent = body.channel === 'terminal' || body.channel === 'tap_to_pay';
+    const channel = body.channel === 'terminal' || body.channel === 'tap_to_pay' ? body.channel : 'online';
+    const cardPresent = channel !== 'online';
+    const amountCents = toCents(amount);
+    const feeCents = cardFeeCents(amountCents, channel);
 
     const userDoc = await getFirestore().collection('users').doc(uid).get();
     const user = userDoc.data() || {};
@@ -42,12 +47,13 @@ export default async (req, res) => {
     }
 
     const paymentIntent = await getStripe().paymentIntents.create({
-      amount: toCents(amount),
+      amount: amountCents,
       currency: 'aud',
       description: `Urban Pay Sale - ${description}`,
       ...(cardPresent
         ? { payment_method_types: ['card_present'], capture_method: 'automatic' }
         : { automatic_payment_methods: { enabled: true } }),
+      application_fee_amount: feeCents,
       on_behalf_of: user.stripeConnectId,
       transfer_data: { destination: user.stripeConnectId },
       metadata: {
@@ -61,6 +67,7 @@ export default async (req, res) => {
       success: true,
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
+      cardFee: feeCents / 100,
     });
   } catch (error) {
     return sendError(res, error, 'Failed to create payment');

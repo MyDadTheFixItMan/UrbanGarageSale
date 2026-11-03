@@ -11,7 +11,7 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
-    isDocId, isRole, escapeHtml, rejectionEmailHtml, editRefusedEmailHtml, listingPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
+    isDocId, isRole, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
     isUnpaidListing, isExpiredDraft, refundablePayments,
 } = require('./lib/helpers');
 
@@ -318,18 +318,11 @@ exports.sendApprovalEmail = callable(['SENDGRID_API_KEY'], async (request) => {
         throw new HttpsError('not-found', 'Seller has no email address');
     }
 
-    const safeTitle = escapeHtml(title || 'your listing');
     const sent = await sendEmail({
         to: userEmail,
         from: FROM_EMAIL,
         subject: 'Your garage sale listing has been approved',
-        html: `
-            <h2>Your listing has been approved!</h2>
-            <p>Great news! Your garage sale listing "<strong>${safeTitle}</strong>" is now live on Urban Garage Sale.</p>
-            <p>You can view and manage it from your profile on Urban Garage Sale.</p>
-            <hr>
-            <p><small>You received this email because you listed a garage sale on Urban Garage Sale.<br>${BUSINESS_FOOTER}</small></p>
-        `,
+        html: approvalEmailHtml({ title, footer: BUSINESS_FOOTER }),
     });
     if (!sent) {
         logger.warn(`Email not sent (SendGrid not configured). Approval for listing ${saleId}`);
@@ -488,21 +481,7 @@ exports.sendContactResponseEmail = callable(['SENDGRID_API_KEY'], async (request
         to: userEmail,
         from: FROM_EMAIL,
         subject: 'Re: Your Urban Garage Sale enquiry',
-        html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <p>Hi ${escapeHtml(userName || 'there')},</p>
-                <p>Thank you for contacting Urban Garage Sale. Our team has responded to your message.</p>
-                <div style="background:#f5f1e8;padding:15px;border-left:4px solid #FF9500;margin:20px 0;">
-                    <p style="margin:0 0 8px 0;"><strong>Your message:</strong></p>
-                    <p style="margin:0;white-space:pre-wrap;">${escapeHtml(originalMessage)}</p>
-                </div>
-                <div style="background:#e8f4f8;padding:15px;border-left:4px solid #1e3a5f;margin:20px 0;">
-                    <p style="margin:0 0 8px 0;"><strong>Our response:</strong></p>
-                    <p style="margin:0;white-space:pre-wrap;">${escapeHtml(responseMessage)}</p>
-                </div>
-                <p style="font-size:12px;color:#666;">${BUSINESS_FOOTER}</p>
-            </div>
-        `,
+        html: contactResponseEmailHtml({ userName, originalMessage, responseMessage, footer: BUSINESS_FOOTER }),
     });
     return { success: true, message: sent ? 'Response email sent' : 'Email service not configured' };
 });

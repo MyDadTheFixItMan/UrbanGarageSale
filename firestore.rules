@@ -66,11 +66,12 @@ service cloud.firestore {
       return !keys.hasAny([field]) || d[field] is bool;
     }
 
-    // At most 10 Firebase download URLs from the seller's own Storage folder, so a listing can't
-    // show or claim anyone else's files. A thumbnail is null when one couldn't be made.
+    // At most 5 Firebase download URLs (the website's limit, MAX_PHOTOS) from the seller's own
+    // Storage folder, so a listing can't show or claim anyone else's files. A thumbnail is null
+    // when one couldn't be made.
     function isPhotoList(d, keys, field) {
       return !keys.hasAny([field]) ||
-             (d[field] is list && d[field].size() <= 10 &&
+             (d[field] is list && d[field].size() <= 5 &&
               d[field].removeAll([null]).join(' ').matches(
                 '(https://firebasestorage[.]googleapis[.]com/v0/b/[^/ ]+/o/listings%2F' + request.auth.uid + '%2F[^ ]+ ?)*'));
     }

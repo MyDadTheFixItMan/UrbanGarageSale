@@ -3,6 +3,7 @@ import { LISTING_STATUS, PAYMENT_STATUS, isPaid, isPaidOrApproved } from '@/lib/
 
 export { isPaid, isPaidOrApproved };
 
+// Must match isPhotoList in firestore.rules, which refuses more.
 export const MAX_PHOTOS = 5;
 export const MAX_SALE_DAYS = 3;
 // Before compression: uploadPhoto shrinks each photo to at most 2560×1920 before it's stored.

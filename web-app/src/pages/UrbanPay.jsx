@@ -294,7 +294,7 @@ export default function UrbanPay() {
                                             </Button>
                                         )}
                                     >
-                                        Process card payments using your phone with Tap to Pay. A card fee of {describeCardFee(CARD_FEES.tap_to_pay)} per sale comes out of your payout.
+                                        Process card payments using your phone with Tap to Pay. A card fee of {describeCardFee(CARD_FEES.tap_to_pay)} (incl. GST) per sale comes out of your payout.
                                     </PaymentOptionCard>
                                 ) : (
                                     <PaymentOptionCard

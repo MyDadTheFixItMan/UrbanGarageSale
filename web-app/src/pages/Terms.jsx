@@ -157,7 +157,7 @@ export default function Terms() {
 
                             <div>
                                 <h3 className="font-bold text-[#001f3f] mt-6 mb-2">12. Governing Law</h3>
-                                <p>These Terms are governed by the laws in force in Australia. You and Urban Garage Sale submit to the non-exclusive jurisdiction of the Australian courts.</p>
+                                <p>These Terms are governed by the laws in force in Victoria, Australia. You and Urban Garage Sale submit to the non-exclusive jurisdiction of the courts of Victoria and the courts that can hear appeals from them.</p>
                             </div>
                         </div>
                     </div>

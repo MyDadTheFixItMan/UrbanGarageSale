@@ -25,7 +25,7 @@ import { httpsCallable } from 'firebase/functions';
 import { geohashQueryBounds } from 'geofire-common';
 import { ref, deleteObject } from 'firebase/storage';
 import { auth, db, functions, storage } from './app';
-import { LISTING_STATUS, PAYMENT_STATUS } from '@/lib/listings';
+import { LISTING_STATUS, PAYMENT_STATUS, photosNoLongerUsed } from '@/lib/listings';
 import { AppError } from '@/lib/appError';
 import {
   MAX_LISTINGS_PER_CELL,
@@ -35,6 +35,9 @@ import {
   radiusKm,
   refineListingResults
 } from './listingSearch';
+
+// Best effort: a photo that can't be deleted must not stop what's being saved or deleted.
+const deletePhotos = (urls) => Promise.all(urls.map((url) => deleteObject(ref(storage, url)).catch(() => null)));
 
 const toRecords = (snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
@@ -155,10 +158,12 @@ export const firebaseEntities = {
     // that can't be deleted must not stop the listing being deleted.
     delete: async (id) => {
       const snap = await getDoc(doc(db, 'garageSales', id));
-      if (snap.exists()) {
-        const { photos = [], thumbnails = [] } = snap.data();
-        await Promise.all([...photos, ...thumbnails].map((url) => deleteObject(ref(storage, url)).catch(() => null)));
-      }
+      const edit = await getDoc(doc(db, 'listingEdits', id)).catch(() => null);
+      const unused = photosNoLongerUsed({
+        photos: [...(snap.data()?.photos ?? []), ...(edit?.data()?.photos ?? [])],
+        thumbnails: [...(snap.data()?.thumbnails ?? []), ...(edit?.data()?.thumbnails ?? [])],
+      });
+      await deletePhotos(unused);
       await deleteDoc(doc(db, 'listingEdits', id)).catch(() => null);
       await deleteDoc(doc(db, 'garageSales', id));
       return { id, deleted: true };
@@ -178,15 +183,23 @@ export const firebaseEntities = {
       return toRecords(await getDocs(query(collection(db, 'listingEdits'), where('user_id', '==', user.uid))));
     },
 
-    // Replaces any earlier edit, including one that was refused.
+    // Replaces any earlier edit, including one that was refused, and deletes the photos only the
+    // earlier one used.
     submit: async (saleId, changes) => {
       const user = requireUser();
+      const [earlier, listing] = await Promise.all([
+        getDoc(doc(db, 'listingEdits', saleId)),
+        getDoc(doc(db, 'garageSales', saleId)),
+      ]);
       await setDoc(doc(db, 'listingEdits', saleId), {
         ...changes,
         user_id: user.uid,
         status: 'pending',
         submitted_at: serverTimestamp()
       });
+      if (earlier.exists()) {
+        await deletePhotos(photosNoLongerUsed(earlier.data(), changes, listing.data()));
+      }
     },
 
     // Admin: one page of edits waiting for approval.
@@ -196,12 +209,9 @@ export const firebaseEntities = {
       orderBy(documentId())
     ], cursor),
 
-    // Admin: puts the changes live on the listing.
-    approve: async ({ id, title, description, sale_type, photos, thumbnails }) => {
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'garageSales', id), { title, description, sale_type, photos, thumbnails });
-      batch.delete(doc(db, 'listingEdits', id));
-      await batch.commit();
+    // Admin: puts the changes live on the listing and deletes the photos they replaced (Cloud Function).
+    approve: async ({ id }) => {
+      await httpsCallable(functions, 'approveListingEdit')({ saleId: id });
     },
 
     // Admin: keeps the listing as it is and tells the seller why (Cloud Function).

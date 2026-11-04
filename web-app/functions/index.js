@@ -11,7 +11,7 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
-    isDocId, isRole, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
+    isDocId, isRole, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, unusedPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
     isUnpaidListing, isExpiredDraft, refundablePayments,
 } = require('./lib/helpers');
 
@@ -397,6 +397,47 @@ exports.rejectListing = callable(['STRIPE_SECRET_KEY', 'SENDGRID_API_KEY'], asyn
 
 // Refuse a seller's changes to their live listing and tell them why (admin only). The listing
 // stays live as it was approved, so no refund is due.
+// Put a seller's changes live on their listing (admin only), then delete the photos the change
+// left unused. The admin's browser can't delete a seller's photos (storage.rules), so this runs here.
+exports.approveListingEdit = callable([], async (request) => {
+    const adminUid = requireAdmin(request);
+    await rateLimit(adminUid, 'approveListingEdit', 60);
+
+    const saleId = requireDocId(request.data?.saleId, 'sale ID');
+    const editRef = db.collection('listingEdits').doc(saleId);
+    const listingRef = db.collection('garageSales').doc(saleId);
+
+    const { before, after } = await db.runTransaction(async (tx) => {
+        const [edit, listing] = await Promise.all([tx.get(editRef), tx.get(listingRef)]);
+        if (!edit.exists || edit.data().status !== 'pending') {
+            throw new HttpsError('failed-precondition', 'Only changes awaiting approval can be approved');
+        }
+        if (!listing.exists || listing.data().status !== 'active') {
+            throw new HttpsError('failed-precondition', 'The listing is no longer live');
+        }
+        const proposed = edit.data();
+        const changes = {
+            title: proposed.title,
+            description: proposed.description ?? '',
+            sale_type: proposed.sale_type ?? listing.data().sale_type,
+            photos: proposed.photos ?? [],
+            thumbnails: proposed.thumbnails ?? [],
+        };
+        tx.update(listingRef, changes);
+        tx.delete(editRef);
+        return { before: listing.data(), after: { ...listing.data(), ...changes } };
+    });
+    await audit('approveListingEdit', adminUid, { saleId });
+
+    // The changes are live either way; a photo that can't be deleted only wastes space.
+    try {
+        await deleteStorageFiles(unusedPhotoPaths(before, after));
+    } catch (error) {
+        logger.warn(`Unused photos not deleted for listing ${saleId}: ${error.message}`);
+    }
+    return { success: true };
+});
+
 exports.refuseListingEdit = callable(['SENDGRID_API_KEY'], async (request) => {
     const adminUid = requireAdmin(request);
     await rateLimit(adminUid, 'refuseListingEdit', 30);
@@ -693,6 +734,7 @@ exports.expireListings = onSchedule({ schedule: 'every day 00:15', timeZone: TIM
     for (;;) {
         const snap = await query.limit(200).get();
         if (snap.empty) break;
+        const edits = await db.getAll(...snap.docs.map((doc) => db.collection('listingEdits').doc(doc.id)));
         const batch = db.batch();
         snap.docs.forEach((doc) => {
             batch.update(doc.ref, { status: 'completed' });
@@ -701,6 +743,11 @@ exports.expireListings = onSchedule({ schedule: 'every day 00:15', timeZone: TIM
         });
         await batch.commit();
         expired += snap.size;
+
+        // Photos only a dropped edit used are no longer needed.
+        const unused = edits.filter((edit) => edit.exists).flatMap((edit) =>
+            unusedPhotoPaths(edit.data(), snap.docs.find((doc) => doc.id === edit.id).data()));
+        await deleteStorageFiles(unused).catch((error) => logger.warn(`Unused edit photos not deleted: ${error.message}`));
     }
     logger.info(`Marked ${expired} ended listing(s) completed`);
 });

@@ -215,7 +215,7 @@ exports.createStripeCheckout = callable(['STRIPE_SECRET_KEY'], async (request) =
                         currency: 'aud',
                         product_data: {
                             name: `Garage sale listing: ${(listingData.title || 'Untitled').slice(0, 80)}`,
-                            description: 'Publish your garage sale on Urban Garage Sale',
+                            description: 'Publish your garage sale on Urban Garage Sale. Price includes GST.',
                         },
                         unit_amount: LISTING_FEE_CENTS,
                     },

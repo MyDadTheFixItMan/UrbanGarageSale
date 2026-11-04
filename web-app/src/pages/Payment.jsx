@@ -264,7 +264,7 @@ export default function Payment() {
                         <div className="bg-slate-100 rounded-lg p-4 text-center">
                             <p className="text-sm text-slate-600 mb-2">Listing Fee</p>
                             <p className="text-3xl font-bold text-[#1e3a5f]">{formatAud(LISTING_FEE_AUD, { withCode: true })}</p>
-                            <p className="text-xs text-slate-500 mt-2">One-time fee to list your garage sale</p>
+                            <p className="text-xs text-slate-500 mt-2">One-time fee to list your garage sale, including GST</p>
                         </div>
 
                         <div className="flex flex-col gap-3">

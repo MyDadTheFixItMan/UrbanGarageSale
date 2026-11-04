@@ -4,6 +4,7 @@ import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { formatAud } from '@/lib/format';
+import { CARD_FEES, describeCardFee } from '@/lib/pricing';
 import { Smartphone, RefreshCw, CreditCard, DollarSign, FileText } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -293,7 +294,7 @@ export default function UrbanPay() {
                                             </Button>
                                         )}
                                     >
-                                        Process card payments using your phone with Tap to Pay.
+                                        Process card payments using your phone with Tap to Pay. A card fee of {describeCardFee(CARD_FEES.tap_to_pay)} (incl. GST) per sale comes out of your payout.
                                     </PaymentOptionCard>
                                 ) : (
                                     <PaymentOptionCard

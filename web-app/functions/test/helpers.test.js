@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-    isDocId, isRole, escapeHtml, storagePathFromUrl, listingPhotoPaths, isUnpaidListing, isExpiredDraft, refundablePayments,
+    isDocId, isRole, escapeHtml, storagePathFromUrl, listingPhotoPaths, unusedPhotoPaths, isUnpaidListing, isExpiredDraft, refundablePayments,
     approvalEmailHtml,
     rejectionEmailHtml,
     editRefusedEmailHtml,
@@ -49,6 +49,20 @@ test('listingPhotoPaths covers photos and thumbnails without duplicates', () => 
     };
     assert.deepEqual(listingPhotoPaths(listing).sort(), ['listings/u1/a.jpg', 'listings/u1/b.jpg', 'listings/u1/thumb_a.jpg']);
     assert.deepEqual(listingPhotoPaths({}), []);
+});
+
+test('unusedPhotoPaths keeps any photo something else still uses', () => {
+    const listing = { user_id: 'u1', photos: [photoUrl('listings/u1/old.jpg'), photoUrl('listings/u1/kept.jpg')], thumbnails: [] };
+    const approved = { user_id: 'u1', photos: [photoUrl('listings/u1/kept.jpg'), photoUrl('listings/u1/new.jpg')], thumbnails: [] };
+    assert.deepEqual(unusedPhotoPaths(listing, approved), ['listings/u1/old.jpg']);
+    assert.deepEqual(unusedPhotoPaths(approved, listing), ['listings/u1/new.jpg']);
+    assert.deepEqual(unusedPhotoPaths(listing, listing), []);
+    assert.deepEqual(unusedPhotoPaths(listing), ['listings/u1/old.jpg', 'listings/u1/kept.jpg']);
+});
+
+test("unusedPhotoPaths never offers another seller's files for deletion", () => {
+    const edit = { user_id: 'u1', photos: [photoUrl('listings/victim/a.jpg')], thumbnails: [] };
+    assert.deepEqual(unusedPhotoPaths(edit, { user_id: 'u1', photos: [] }), []);
 });
 
 test("listingPhotoPaths never returns another seller's files", () => {

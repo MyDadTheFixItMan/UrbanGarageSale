@@ -1,4 +1,4 @@
-import { canBeSaved } from '@/lib/listings';
+import { canBeSaved, photosNoLongerUsed } from '@/lib/listings';
 
 const today = '2026-11-07';
 
@@ -14,5 +14,25 @@ describe('canBeSaved', () => {
 
   it('refuses an active listing that has finished but is not yet marked completed', () => {
     expect(canBeSaved({ status: 'active', end_date: '2026-11-06' }, today)).toBe(false);
+  });
+});
+
+describe('photosNoLongerUsed', () => {
+  it('lists the photos and thumbnails only the earlier version used', () => {
+    const earlier = { photos: ['old.jpg', 'kept.jpg'], thumbnails: ['old-t.jpg', 'kept-t.jpg'] };
+    const now = { photos: ['kept.jpg', 'new.jpg'], thumbnails: ['kept-t.jpg', 'new-t.jpg'] };
+
+    expect(photosNoLongerUsed(earlier, now)).toEqual(['old.jpg', 'old-t.jpg']);
+  });
+
+  it('keeps a photo any of the other versions still uses', () => {
+    const earlier = { photos: ['live.jpg', 'edit.jpg'], thumbnails: [] };
+
+    expect(photosNoLongerUsed(earlier, { photos: [] }, { photos: ['live.jpg'] })).toEqual(['edit.jpg']);
+  });
+
+  it('copes with missing photo lists and empty thumbnail slots', () => {
+    expect(photosNoLongerUsed({ photos: ['a.jpg'], thumbnails: [null] }, undefined)).toEqual(['a.jpg']);
+    expect(photosNoLongerUsed(undefined, { photos: ['a.jpg'] })).toEqual([]);
   });
 });

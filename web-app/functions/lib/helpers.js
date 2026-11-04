@@ -145,6 +145,13 @@ function listingPhotoPaths(listing) {
     return [...new Set(urls.map(storagePathFromUrl).filter((path) => path?.startsWith(ownFolder)))];
 }
 
+// The Storage paths `before` used that none of `stillUsed` do: what's safe to delete once a listing
+// or an edit to one stops using them. Like listingPhotoPaths, only the seller's own folder counts.
+function unusedPhotoPaths(before, ...stillUsed) {
+    const keep = new Set(stillUsed.flatMap(listingPhotoPaths));
+    return listingPhotoPaths(before).filter((path) => !keep.has(path));
+}
+
 // Calendar date (YYYY-MM-DD) in Melbourne, the format listings store start_date/end_date in.
 function melbourneDate(date = new Date()) {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne' }).format(date);
@@ -185,6 +192,7 @@ module.exports = {
     escapeHtml,
     storagePathFromUrl,
     listingPhotoPaths,
+    unusedPhotoPaths,
     melbourneDate,
     UNPAID_STATUSES,
     DRAFT_LIFETIME_MS,

@@ -257,6 +257,11 @@ test('edits to a live listing wait privately, and only an admin can put them liv
   const seller = as.seller('alice');
   const edit = doc(seller, 'listingEdits/live');
 
+  // The edit page checks for a waiting edit before there is one; that must not be refused.
+  const noEdit = await assertSucceeds(getDoc(doc(seller, 'listingEdits/live')));
+  assert.equal(noEdit.exists(), false);
+  await assertFails(getDoc(doc(as.anon(), 'listingEdits/live')));
+
   // Only the owner of a live listing, and only the allowed fields.
   await assertFails(setDoc(doc(seller, 'listingEdits/draft'), change));
   await assertFails(setDoc(doc(seller, 'listingEdits/missing'), change));

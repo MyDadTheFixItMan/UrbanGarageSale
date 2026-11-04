@@ -175,7 +175,8 @@ test('listing fields are schema checked', async () => {
   await assertFails(setDoc(doc(db, 'garageSales/c'), listing({ postcode: 'ABCD' })));
   await assertFails(setDoc(doc(db, 'garageSales/d'), listing({ latitude: 'north' })));
   await assertFails(setDoc(doc(db, 'garageSales/e'), listing({ start_date: '7 Nov 2026' })));
-  await assertFails(setDoc(doc(db, 'garageSales/f'), listing({ photos: Array(11).fill(photo('alice')) })));
+  await assertFails(setDoc(doc(db, 'garageSales/f'), listing({ photos: Array(6).fill(photo('alice')) })));
+  await assertSucceeds(setDoc(doc(db, 'garageSales/f5'), listing({ photos: Array(5).fill(photo('alice')) })));
   await assertFails(setDoc(doc(db, 'garageSales/g'), listing({ is_featured: true })));
   await assertSucceeds(setDoc(doc(db, 'garageSales/h'), listing()));
 });

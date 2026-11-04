@@ -17,6 +17,7 @@ import SaleMap from '../components/map/SaleMap';
 import { printAfterDialogCloses, paperSizes } from '../utils/printGarageSaleSign';
 import { AU_WEEKDAY_DATE } from '@/lib/format';
 import { useToggleSaved } from '@/lib/useToggleSaved';
+import { directionsUrl, saleLocation } from '@/lib/route';
 import {
     Dialog,
     DialogContent,
@@ -92,14 +93,10 @@ export default function ListingDetails() {
     const isSaved = savedListings.some(s => s.garage_sale_id === saleId);
     const saveMutation = useToggleSaved();
 
+    // Same links as Route to All: Apple Maps on Apple devices, Google Maps elsewhere.
     const handleGetDirections = () => {
-        if (sale?.latitude && sale?.longitude) {
-            const url = `https://www.google.com/maps/dir/?api=1&destination=${sale.latitude},${sale.longitude}`;
-            window.open(url, '_blank');
-        } else if (sale?.address) {
-            const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(sale.address)}`;
-            window.open(url, '_blank');
-        }
+        const location = saleLocation(sale);
+        if (location) window.open(directionsUrl(undefined, [location]), '_blank');
     };
 
     const handleShare = async () => {

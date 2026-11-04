@@ -251,7 +251,9 @@ service cloud.firestore {
         return sale.get('user_id', '') == request.auth.uid && sale.get('status', '') == 'active';
       }
 
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == resource.data.user_id);
+      // A seller's edit page asks whether an edit is waiting, so "there isn't one" must be an
+      // answer rather than a refusal. A missing edit reveals nothing.
+      allow read: if isAdmin() || (signedIn() && (resource == null || request.auth.uid == resource.data.user_id));
       allow create, update: if signedIn() && request.auth.uid == request.resource.data.user_id &&
                                sellerOfLiveListing() && validListingEdit();
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == resource.data.user_id);

@@ -25,7 +25,7 @@ export default async (req, res) => {
 
   try {
     const { uid } = requireSecondFactor(await requireUser(req));
-    await rateLimit(uid, 'createPaymentIntent', 10);
+    await rateLimit(uid, 'createPaymentIntent', 2);
     const body = await readJsonBody(req);
 
     const amount = parseAudAmount(body.amount, { max: MAX_CARD_AUD_AMOUNT });

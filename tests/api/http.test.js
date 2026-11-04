@@ -20,8 +20,8 @@ test('parseAudAmount accepts numbers and numeric strings, rounded to cents', () 
 });
 
 test('card charges stop at the lower card limit', () => {
-  assert.equal(parseAudAmount(2000, { max: MAX_CARD_AUD_AMOUNT }), 2000);
-  assert.throws(() => parseAudAmount(2000.01, { max: MAX_CARD_AUD_AMOUNT }), (e) => e instanceof HttpError && e.status === 400);
+  assert.equal(parseAudAmount(500, { max: MAX_CARD_AUD_AMOUNT }), 500);
+  assert.throws(() => parseAudAmount(500.01, { max: MAX_CARD_AUD_AMOUNT }), (e) => e instanceof HttpError && e.status === 400);
 });
 
 test('parseAudAmount rejects NaN, negatives and out-of-range values', () => {

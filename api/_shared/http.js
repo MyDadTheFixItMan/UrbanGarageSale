@@ -85,7 +85,7 @@ export function requireSecondFactor(decoded) {
 export const MIN_AUD_AMOUNT = 0.5;
 export const MAX_AUD_AMOUNT = 10000;
 // Card charges carry the fraud risk, so they stop well below the limit on recorded cash sales.
-export const MAX_CARD_AUD_AMOUNT = 2000;
+export const MAX_CARD_AUD_AMOUNT = 500;
 
 // Parses a dollar amount and returns it rounded to cents. Rejects NaN, negatives and out-of-range values.
 export function parseAudAmount(value, { min = MIN_AUD_AMOUNT, max = MAX_AUD_AMOUNT } = {}) {

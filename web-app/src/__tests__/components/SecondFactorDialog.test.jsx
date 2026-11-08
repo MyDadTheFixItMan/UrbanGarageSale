@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
@@ -13,7 +13,7 @@ jest.mock('@/api/firebaseClient', () => ({
 }));
 
 import { firebase } from '@/api/firebaseClient';
-import SecondFactorDialog, { RECAPTCHA_CONTAINER_ID } from '@/pages/login/SecondFactorDialog';
+import SecondFactorDialog, { RECAPTCHA_CONTAINER_ID, RESEND_COOLDOWN_SECONDS } from '@/pages/login/SecondFactorDialog';
 
 const renderDialog = (props = {}) => {
   const onVerified = jest.fn();
@@ -73,6 +73,59 @@ describe('SecondFactorDialog', () => {
     renderDialog();
     await userEvent.click(screen.getByRole('button', { name: 'Resend code' }));
     expect(firebase.auth.sendMfaSignInCode).toHaveBeenCalledWith(RECAPTCHA_CONTAINER_ID);
+  });
+
+  it('says the code is on its way, and offers no resend, until the first code has gone', () => {
+    renderDialog({ sending: true });
+    expect(screen.getByText('Sending a 6-digit code to your phone:')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sending code...' })).toBeDisabled();
+  });
+
+  describe('resend wait', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    // The countdown ticks once a second, each tick scheduling the next.
+    const waitOutCooldown = () => {
+      for (let i = 0; i < RESEND_COOLDOWN_SECONDS; i += 1) {
+        act(() => { jest.advanceTimersByTime(1000); });
+      }
+    };
+
+    const renderSent = (props = {}) => {
+      const view = render(
+        <SecondFactorDialog phoneHint="+61 ••• ••• 156" sending error="" onVerified={jest.fn()} onCancel={jest.fn()} {...props} />
+      );
+      view.rerender(
+        <SecondFactorDialog phoneHint="+61 ••• ••• 156" sending={false} error="" onVerified={jest.fn()} onCancel={jest.fn()} {...props} />
+      );
+      return view;
+    };
+
+    it('makes the user wait a minute after the first code before asking for another', () => {
+      renderSent();
+      expect(screen.getByText('We sent a 6-digit code to your phone:')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: `Resend code in ${RESEND_COOLDOWN_SECONDS}s` })).toBeDisabled();
+
+      waitOutCooldown();
+      expect(screen.getByRole('button', { name: 'Resend code' })).toBeEnabled();
+    });
+
+    it('waits again after a resend', async () => {
+      firebase.auth.sendMfaSignInCode.mockResolvedValue();
+      renderSent();
+      waitOutCooldown();
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Resend code' })); });
+      expect(firebase.auth.sendMfaSignInCode).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: `Resend code in ${RESEND_COOLDOWN_SECONDS}s` })).toBeDisabled();
+    });
+  });
+
+  it('lets the user resend straight away when the first code failed, and clears that error once one is sent', async () => {
+    firebase.auth.sendMfaSignInCode.mockResolvedValue();
+    renderDialog({ error: 'Could not send the SMS code.' });
+    await userEvent.click(screen.getByRole('button', { name: 'Resend code' }));
+    await waitFor(() => expect(screen.queryByText('Could not send the SMS code.')).not.toBeInTheDocument());
   });
 
   it.each([

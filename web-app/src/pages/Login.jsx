@@ -39,7 +39,7 @@ export default function Login() {
   const [signInError, setSignInError] = useState('');
   const [signInLoading, setSignInLoading] = useState(false);
 
-  // The SMS step: null, or { phoneHint, error } while it is showing.
+  // The SMS step: null, or { phoneHint, sending, error } while it is showing.
   const [secondFactor, setSecondFactor] = useState(null);
 
   const { data: allPromotions = [] } = useQuery({
@@ -70,15 +70,18 @@ export default function Login() {
   };
 
   // Firebase refuses to finish signing in a 2FA account until the SMS code is confirmed,
-  // so there is no session to use until completeMfaSignIn() succeeds.
+  // so there is no session to use until completeMfaSignIn() succeeds. Callers don't wait for
+  // the code to be sent: the dialog shows that, and the sign-in buttons must not stay busy
+  // behind it (they would stay stuck if the user went back before it was sent).
   const startSecondFactor = async (mfaError) => {
     setActiveTab('signin');
-    setSecondFactor({ phoneHint: mfaError.phoneHint || 'your mobile', error: '' });
+    setSecondFactor({ phoneHint: mfaError.phoneHint || 'your mobile', error: '', sending: true });
     try {
       await firebase.auth.sendMfaSignInCode(RECAPTCHA_CONTAINER_ID);
+      setSecondFactor((prev) => prev && { ...prev, sending: false });
       toast.success('Verification code sent to your phone');
     } catch (smsError) {
-      setSecondFactor((prev) => prev && { ...prev, error: smsError.message });
+      setSecondFactor((prev) => prev && { ...prev, sending: false, error: smsError.message });
       toast.error(smsError.message);
     }
   };
@@ -98,7 +101,7 @@ export default function Login() {
       await finishSignIn();
     } catch (err) {
       if (err.mfaRequired) {
-        await startSecondFactor(err);
+        startSecondFactor(err);
         return;
       }
       setSignInError(err.message || 'Sign in failed');
@@ -117,7 +120,7 @@ export default function Login() {
       navigate(createPageUrl('Home'));
     } catch (err) {
       if (err.mfaRequired) {
-        await startSecondFactor(err);
+        startSecondFactor(err);
         return;
       }
       console.error(`${provider} OAuth error:`, err);
@@ -260,6 +263,7 @@ export default function Login() {
       {secondFactor && (
         <SecondFactorDialog
           phoneHint={secondFactor.phoneHint}
+          sending={secondFactor.sending}
           error={secondFactor.error}
           onVerified={async () => {
             setSecondFactor(null);

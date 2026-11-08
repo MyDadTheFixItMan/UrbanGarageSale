@@ -131,7 +131,7 @@ export default function AdminDashboard() {
                 }
             `}</style>
             <img
-                src="/Logo Webpage.png"
+                src="/logo-web.webp"
                 alt=""
                 className="fixed left-0 pointer-events-none watermark-page"
                 style={{

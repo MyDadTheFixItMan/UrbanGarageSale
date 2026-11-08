@@ -92,8 +92,8 @@ export default function Payment() {
                     }
                 }
 
-                // If returning from Stripe checkout with session_id
-                if (sessionId) {
+                // If returning from Stripe checkout with session_id (the server needs both)
+                if (sessionId && saleId) {
                     setProcessingPayment(true);
                     try {
                         // Verify payment
@@ -108,9 +108,7 @@ export default function Payment() {
                             setPaymentSuccess(true);
                             // Invalidate queries to refresh data in admin dashboard
                             await queryClient.invalidateQueries({ queryKey: ['admin'] });
-                            if (userData?.email) {
-                                await queryClient.invalidateQueries({ queryKey: ['userListings', userData.email] });
-                            }
+                            await queryClient.invalidateQueries({ queryKey: ['userListings'] });
                             toast.success('Payment successful! Your listing is pending approval.');
                         } else {
                             toast.error('Payment verification failed: ' + (result?.message || 'Unknown error'));
@@ -156,8 +154,8 @@ export default function Payment() {
                     }
                 `}</style>
                 <img
-                    src="/Logo Webpage.png"
-                    alt="watermark"
+                    src="/logo-web.webp"
+                    alt=""
                     className="fixed left-0 top-0 z-5 opacity-35 watermark-page"
                     style={{
                         width: '1200px',
@@ -227,8 +225,8 @@ export default function Payment() {
                 }
             `}</style>
             <img
-                src="/Logo Webpage.png"
-                alt="watermark"
+                src="/logo-web.webp"
+                alt=""
                 className="fixed left-0 top-0 z-5 opacity-35 watermark-page"
                 style={{
                     width: '1200px',
@@ -254,10 +252,12 @@ export default function Payment() {
                         <CardTitle>Listing Fee Payment</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <Alert>
+                        <Alert variant={sale ? 'default' : 'destructive'}>
                             <AlertCircle className="w-4 h-4" />
                             <AlertDescription>
-                                Complete payment for your listing to get it approved.
+                                {sale
+                                    ? 'Complete payment for your listing to get it approved.'
+                                    : "We couldn't find this listing. Go back to My Listings and press Pay on the listing."}
                             </AlertDescription>
                         </Alert>
 
@@ -268,14 +268,16 @@ export default function Payment() {
                         </div>
 
                         <div className="flex flex-col gap-3">
-                            <Button 
-                                onClick={handleCheckout} 
-                                disabled={processingPayment}
-                                className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
-                            >
-                                {processingPayment && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                {processingPayment ? 'Processing...' : `Pay ${formatAud(LISTING_FEE_AUD, { withCode: true })} with Stripe`}
-                            </Button>
+                            {sale && (
+                                <Button
+                                    onClick={handleCheckout}
+                                    disabled={processingPayment}
+                                    className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
+                                >
+                                    {processingPayment && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                    {processingPayment ? 'Processing...' : `Pay ${formatAud(LISTING_FEE_AUD, { withCode: true })} with Stripe`}
+                                </Button>
+                            )}
                             <Link to={createPageUrl('Profile')}>
                                 <Button variant="outline" className="w-full">
                                     <ArrowLeft className="w-4 h-4 mr-2" />

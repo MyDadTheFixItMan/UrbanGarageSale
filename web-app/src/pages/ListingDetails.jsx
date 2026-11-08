@@ -167,7 +167,7 @@ export default function ListingDetails() {
     const durationDays = differenceInDays(endDate, startDate) + 1;
 
     return (
-        <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen overflow-hidden pb-24 md:pb-8">
+        <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen overflow-clip pb-4 md:pb-8">
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -177,8 +177,8 @@ export default function ListingDetails() {
                 }
             `}</style>
             <img
-                src="/Logo Webpage.png"
-                alt="watermark"
+                src="/logo-web.webp"
+                alt=""
                 className="fixed left-0 top-0 z-5 opacity-35 watermark-page"
                 style={{
                     width: '1200px',
@@ -351,8 +351,8 @@ export default function ListingDetails() {
                 </div>
             </div>
 
-            {/* Fixed Bottom Actions */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 md:static md:mt-8 md:bg-transparent md:border-0 md:p-0 md:max-w-7xl md:mx-auto md:px-4 md:pb-8">
+            {/* Bottom Actions: on mobile they stick just above the bottom nav. Needs the page's overflow-clip, not overflow-hidden. */}
+            <div className="sticky bottom-20 z-30 bg-white border-t p-4 md:static md:mt-8 md:bg-transparent md:border-0 md:p-0 md:max-w-7xl md:mx-auto md:px-4 md:pb-8">
                 <div className="flex gap-3 max-w-7xl mx-auto">
                     <Button
                         variant="outline"

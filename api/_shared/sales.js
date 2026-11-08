@@ -57,7 +57,20 @@ export async function getLiveGarageSale(sellerId, garageSaleId) {
   return listing;
 }
 
-// Confirms the garage sale exists and belongs to the seller (when one is supplied).
+// Statuses of a listing that was paid for (or free) and so can have sales recorded against it.
+const PAID_LISTING_STATUSES = ['active', 'pending_approval', 'completed'];
+
+// Throws unless `listing` (undefined if missing) is the seller's and was paid for.
+export function assertSaleCanBeRecordedAgainst(listing, sellerId) {
+  if (!listing || listing.user_id !== sellerId) {
+    throw new HttpError(403, 'That garage sale does not belong to you');
+  }
+  if (!PAID_LISTING_STATUSES.includes(listing.status)) {
+    throw new HttpError(409, 'Sales can only be recorded against a listing that has been paid for.');
+  }
+}
+
+// Confirms the garage sale exists, belongs to the seller and was paid for (when one is supplied).
 export async function assertOwnsGarageSale(sellerId, garageSaleId) {
   if (!garageSaleId) return;
   if (!isDocId(garageSaleId)) {
@@ -65,7 +78,5 @@ export async function assertOwnsGarageSale(sellerId, garageSaleId) {
   }
   const db = getFirebaseAdmin().firestore();
   const snap = await db.collection('garageSales').doc(garageSaleId).get();
-  if (!snap.exists || snap.data().user_id !== sellerId) {
-    throw new HttpError(403, 'That garage sale does not belong to you');
-  }
+  assertSaleCanBeRecordedAgainst(snap.data(), sellerId);
 }

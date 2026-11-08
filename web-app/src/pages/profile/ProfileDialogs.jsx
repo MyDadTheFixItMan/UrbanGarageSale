@@ -20,6 +20,7 @@ import { addressDetails, displayAddress } from '@/lib/addressDetails';
 import { MIN_PASSWORD_LENGTH } from '@/lib/password';
 import { paperSizes } from '../../utils/printGarageSaleSign';
 import { changePasswordProblem } from './profileListings';
+import { normalizePhone } from '../login/loginForms';
 
 const profileForm = (user) => ({
     email: user?.email || '',
@@ -35,10 +36,12 @@ export function EditProfileDialog({ user, onSaved }) {
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(() => profileForm(user));
     const set = (field) => (value) => setForm((prev) => ({ ...prev, [field]: value }));
+    // Set while saving, so a double click saves once (isPending only changes on the next render).
+    const saving = useRef(false);
 
     const saveMutation = useMutation({
         mutationFn: async (data) => {
-            const saved = { ...data, ...await addressDetails(data.address, data) };
+            const saved = { ...data, ...await addressDetails(data.address, data), full_name: data.full_name.trim() };
             await firebase.auth.updateProfile(saved);
             return saved;
         },
@@ -48,7 +51,29 @@ export function EditProfileDialog({ user, onSaved }) {
             toast.success('Profile updated successfully');
         },
         onError: (error) => toast.error('Failed to update profile: ' + error.message),
+        onSettled: () => { saving.current = false; },
     });
+
+    // The name can't be cleared, nor a phone number once there is one (accounts made with Google,
+    // Facebook or Apple may start without one).
+    const save = () => {
+        if (saving.current) return;
+        if (!form.full_name.trim()) {
+            toast.error('Please enter your name');
+            return;
+        }
+        let { phone } = form;
+        if (phone.trim() || user?.phone) {
+            const result = normalizePhone(phone);
+            if (result.problem) {
+                toast.error(result.problem);
+                return;
+            }
+            phone = result.phone;
+        }
+        saving.current = true;
+        saveMutation.mutate({ ...form, phone });
+    };
 
     const handleOpenChange = (next) => {
         if (next) setForm(profileForm(user));
@@ -101,7 +126,7 @@ export function EditProfileDialog({ user, onSaved }) {
                         <Input id="profile-email" type="email" value={form.email} onChange={(e) => set('email')(e.target.value)} className="mt-1.5" />
                     </div>
                     <Button
-                        onClick={() => saveMutation.mutate(form)}
+                        onClick={save}
                         disabled={saveMutation.isPending}
                         className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
                     >

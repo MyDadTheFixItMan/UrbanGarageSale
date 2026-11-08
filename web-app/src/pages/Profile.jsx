@@ -108,7 +108,8 @@ export default function Profile() {
 
     const { data: userListings = [], isLoading: listingsLoading } = useQuery({
         queryKey: ['userListings', user?.id],
-        queryFn: () => firebase.entities.GarageSale.filter({ user_id: user.id }),
+        // includePast: ended sales belong in the Past tab, and past-dated drafts in Drafts.
+        queryFn: () => firebase.entities.GarageSale.filter({ user_id: user.id, includePast: true }),
         enabled: !!user?.id,
     });
     const listings = useMemo(() => groupProfileListings(userListings), [userListings]);
@@ -171,7 +172,7 @@ export default function Profile() {
                 }
             `}</style>
             <img
-                src="/Logo Webpage.png"
+                src="/logo-web.webp"
                 alt=""
                 className="fixed left-0 pointer-events-none watermark-page"
                 style={{

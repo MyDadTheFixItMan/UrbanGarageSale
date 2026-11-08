@@ -33,6 +33,7 @@ import {
 import { AppError, toAppError } from '@/lib/appError';
 
 const notSignedIn = () => new AppError('Please sign in and try again.', { code: 'auth/no-current-user' });
+export const BROKEN_RESET_LINK = 'This password reset link has expired or has already been used. Please request a new one.';
 const sessionExpired = () => new AppError('Your sign-in session expired. Please sign in again.', { code: 'auth/mfa-session-expired' });
 
 // In-progress multi-factor sign-in / enrolment (kept in memory only, never persisted).
@@ -245,6 +246,17 @@ export const firebaseAuth = {
     }
   },
 
+  // Checks a reset link before the new password is typed. Resolves to true if it can still be used.
+  isPasswordResetCodeValid: async (code) => {
+    try {
+      await verifyPasswordResetCode(auth, code);
+      return true;
+    } catch (error) {
+      if (error.code === 'auth/invalid-action-code' || error.code === 'auth/expired-action-code') return false;
+      throw toAppError(error, 'Could not check the reset link. Please try again.');
+    }
+  },
+
   // Verify password reset code and confirm new password
   confirmPasswordResetCode: async (code, newPassword) => {
     try {
@@ -254,7 +266,7 @@ export const firebaseAuth = {
       return email;
     } catch (error) {
       if (error.code === 'auth/invalid-action-code' || error.code === 'auth/expired-action-code') {
-        throw new AppError('Your password reset link has expired. Please request a new one.', { code: error.code, cause: error });
+        throw new AppError(BROKEN_RESET_LINK, { code: error.code, cause: error });
       }
       throw error.code === 'auth/password-does-not-meet-requirements' || error.code === 'auth/weak-password'
         ? new AppError(signUpErrorMessage(error), { code: error.code, cause: error })

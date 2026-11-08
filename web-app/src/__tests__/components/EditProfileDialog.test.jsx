@@ -4,9 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { geocode } from '@/lib/geocode';
+import { toast } from 'sonner';
 import { EditProfileDialog } from '@/pages/profile/ProfileDialogs';
 
 jest.mock('@/api/firebaseClient', () => ({ firebase: { auth: { updateProfile: jest.fn() } } }));
+jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
 jest.mock('@/lib/geocode', () => ({ geocode: jest.fn() }));
 jest.mock('@/utils/printGarageSaleSign', () => ({ paperSizes: {} }));
 jest.mock('@/components/GooglePlacesAutocomplete', () => function MockAutocomplete({ value, onChange, id }) {
@@ -21,13 +23,20 @@ const located = (postcode, state, suburb = 'Ocean Grove') => ({
   ],
 });
 
-async function saveProfile(user, newAddress) {
+const NAMED = { full_name: 'Sam Lee', phone: '+61412345678' };
+
+function openDialog(user) {
   const onSaved = jest.fn();
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <EditProfileDialog user={user} onSaved={onSaved} />
+      <EditProfileDialog user={{ ...NAMED, ...user }} onSaved={onSaved} />
     </QueryClientProvider>
   );
+  return onSaved;
+}
+
+async function saveProfile(user, newAddress) {
+  const onSaved = openDialog(user);
   await userEvent.click(screen.getByRole('button', { name: /edit profile/i }));
   if (newAddress) {
     const address = screen.getByLabelText('Address');
@@ -66,5 +75,30 @@ describe('EditProfileDialog', () => {
     await saveProfile({ address: '26 Seawind Place', suburb: 'Ocean Grove', postcode: '3226', state: 'VIC' });
 
     expect(geocode).not.toHaveBeenCalled();
+  });
+
+  it('refuses to clear the name or the phone number', async () => {
+    openDialog({ address: '26 Seawind Place', suburb: 'Ocean Grove', postcode: '3226', state: 'VIC' });
+    await userEvent.click(screen.getByRole('button', { name: /edit profile/i }));
+    await userEvent.clear(screen.getByLabelText('Name'));
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    expect(toast.error).toHaveBeenLastCalledWith('Please enter your name');
+
+    await userEvent.type(screen.getByLabelText('Name'), 'Sam');
+    await userEvent.clear(screen.getByLabelText('Phone Number'));
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    expect(toast.error).toHaveBeenLastCalledWith(expect.stringMatching(/complete phone number/));
+    expect(firebase.auth.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it('saves a local mobile number in +61 form', async () => {
+    const onSaved = openDialog({ address: '26 Seawind Place', suburb: 'Ocean Grove', postcode: '3226', state: 'VIC' });
+    await userEvent.click(screen.getByRole('button', { name: /edit profile/i }));
+    const phone = screen.getByLabelText('Phone Number');
+    await userEvent.clear(phone);
+    await userEvent.type(phone, '0491 570 156');
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(firebase.auth.updateProfile).toHaveBeenCalledWith(expect.objectContaining({ phone: '+61491570156' }));
   });
 });

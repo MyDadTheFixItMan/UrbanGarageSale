@@ -44,6 +44,10 @@ jest.mock('firebase/functions', () => {
   const call = jest.fn(async () => ({ data: {} }));
   return { __call: call, httpsCallable: jest.fn(() => call) };
 });
+jest.mock('firebase/storage', () => ({
+  ref: (_storage, url) => url,
+  deleteObject: jest.fn(async () => {}),
+}));
 jest.mock('@/api/firebase/app', () => ({
   auth: { currentUser: null },
   db: {},
@@ -52,6 +56,7 @@ jest.mock('@/api/firebase/app', () => ({
 
 import * as firestore from 'firebase/firestore';
 import * as functionsSdk from 'firebase/functions';
+import * as storageSdk from 'firebase/storage';
 import { auth } from '@/api/firebase/app';
 import { firebaseEntities } from '@/api/firebase/entities';
 
@@ -174,6 +179,32 @@ describe('ContactMessage.create', () => {
   it('explains the per-minute limit when Firestore rejects the write', async () => {
     store.commit = () => { throw Object.assign(new Error('denied'), { code: 'permission-denied' }); };
     await expect(firebaseEntities.ContactMessage.create({ message: 'again' })).rejects.toThrow('Please wait a minute');
+  });
+});
+
+describe('GarageSale.delete', () => {
+  const deletedPhotos = () => storageSdk.deleteObject.mock.calls.map(([url]) => url);
+  const listingDoc = (path) => path[0] === 'garageSales'
+    ? docSnap({ id: 'sale-1', user_id: 'user-1', photos: ['p-shared', 'p-own'], thumbnails: ['t-shared'] })
+    : docSnap(null);
+
+  it("keeps photos another of the seller's listings still uses", async () => {
+    store.getDoc.mockImplementation(async (ref) => listingDoc(ref.path));
+    store.getDocs.mockImplementation(async (q) => snapshot(q.collection === 'garageSales'
+      ? [{ id: 'sale-1', photos: ['p-shared', 'p-own'] }, { id: 'sale-2', photos: ['p-shared'], thumbnails: ['t-shared'] }]
+      : []));
+    await firebaseEntities.GarageSale.delete('sale-1');
+    expect(store.queries.map(wheres)).toEqual([['user_id==user-1'], ['user_id==user-1']]);
+    expect(deletedPhotos()).toEqual(['p-own']);
+    expect(firestore.deleteDoc).toHaveBeenCalled();
+  });
+
+  it("deletes no photos when the seller's other listings can't be read", async () => {
+    store.getDoc.mockImplementation(async (ref) => listingDoc(ref.path));
+    store.getDocs.mockRejectedValue(new Error('permission-denied'));
+    await firebaseEntities.GarageSale.delete('sale-1');
+    expect(deletedPhotos()).toEqual([]);
+    expect(firestore.deleteDoc).toHaveBeenCalled();
   });
 });
 

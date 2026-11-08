@@ -1,5 +1,5 @@
 import {
-  EMPTY_FORM, formFromListing, isPaidOrApproved, listingFormProblem,
+  EMPTY_FORM, formFromListing, isPaidOrApproved, listingFormProblem as checkForm,
   isInFreePeriod, buildSaleData, liveEditData, photoProblem,
 } from '@/pages/createListing/listingForm';
 
@@ -16,6 +16,9 @@ const form = (overrides = {}) => ({
 });
 
 describe('listingFormProblem', () => {
+  const TODAY = new Date(2026, 10, 5);
+  const listingFormProblem = (f, options) => checkForm(f, { today: TODAY, ...options });
+
   it('accepts a complete form', () => {
     expect(listingFormProblem(form())).toBeNull();
   });
@@ -34,6 +37,18 @@ describe('listingFormProblem', () => {
 
   it('refuses an end date before the start date', () => {
     expect(listingFormProblem(form({ end_date: '2026-11-06' }))).toBe('End date must be after start date');
+  });
+
+  it('refuses a start date before today, but not on a listing whose dates are locked', () => {
+    expect(listingFormProblem(form({ start_date: '2026-11-05', end_date: '2026-11-05' }))).toBeNull();
+    expect(listingFormProblem(form({ start_date: '2026-11-04', end_date: '2026-11-05' }))).toBe("The start date can't be in the past");
+    expect(listingFormProblem(form({ start_date: '2025-01-10', end_date: '2025-01-11' }), { datesLocked: true })).toBeNull();
+  });
+
+  it('refuses a daily end time at or before the start time', () => {
+    expect(listingFormProblem(form({ start_time: '15:00', end_time: '08:00' }))).toBe('The daily end time must be after the start time');
+    expect(listingFormProblem(form({ start_time: '09:00', end_time: '09:00' }))).toBe('The daily end time must be after the start time');
+    expect(listingFormProblem(form({ start_time: '07:30', end_time: '13:00' }))).toBeNull();
   });
 });
 

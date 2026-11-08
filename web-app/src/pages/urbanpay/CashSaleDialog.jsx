@@ -105,7 +105,7 @@ export default function CashSaleDialog({ open, onOpenChange, garageSales, garage
                             ))}
                         </select>
                         {garageSales.length === 0 && (
-                            <p className="text-xs text-amber-600 mt-1">No garage sales found. Create one first.</p>
+                            <p className="text-xs text-amber-600 mt-1">No live garage sales. Sales can be recorded once a listing is paid for and approved.</p>
                         )}
                     </div>
                     <div>

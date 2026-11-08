@@ -93,7 +93,8 @@ export async function getSuburbCoordinates(suburbOrPostcode) {
 
   try {
     const result = await geocode(suburbOrPostcode.trim(), { country: 'AU' });
-    if (!result) return null;
+    // Text Google can't place comes back as just "Australia", which is not a place to search around.
+    if (!result || result.components.every((c) => c.types.includes('country'))) return null;
 
     const locality = [...result.components].reverse().find((c) => c.types.includes('locality'));
     return {

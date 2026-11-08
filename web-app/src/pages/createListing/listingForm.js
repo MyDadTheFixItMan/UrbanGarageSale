@@ -71,8 +71,15 @@ export function formFromListing(listing) {
     return form;
 }
 
-// Returns the first problem with the form, or null if it can be submitted.
-export function listingFormProblem(form) {
+// Local calendar date as YYYY-MM-DD, the format start_date is stored in.
+function localIsoDate(date) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// Returns the first problem with the form, or null if it can be submitted. `datesLocked` is set
+// for a paid or approved listing, whose dates and times can no longer change.
+export function listingFormProblem(form, { today = new Date(), datesLocked = false } = {}) {
     if (!form.title.trim()) return 'Please enter a title';
     if (!form.address.trim()) return 'Please enter an address';
     if (!form.start_date) return 'Please select a start date';
@@ -83,6 +90,13 @@ export function listingFormProblem(form) {
     if (end < start) return 'End date must be after start date';
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     if (days > MAX_SALE_DAYS) return `Sales can only run for a maximum of ${MAX_SALE_DAYS} consecutive days`;
+    if (datesLocked) return null;
+    // Typed dates skip the date picker's minimum, so it is checked here too.
+    if (form.start_date < localIsoDate(today)) return "The start date can't be in the past";
+    // Times are HH:MM, so comparing them as text compares them as times.
+    if (form.start_time && form.end_time && form.end_time <= form.start_time) {
+        return 'The daily end time must be after the start time';
+    }
     return null;
 }
 

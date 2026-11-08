@@ -39,8 +39,8 @@ export default function Terms() {
                 }
             `}</style>
             <img
-                src="/Logo Webpage.png"
-                alt="watermark"
+                src="/logo-web.webp"
+                alt=""
                 className="fixed left-0 pointer-events-none watermark-page"
                 style={{
                     width: '1200px',

@@ -419,7 +419,7 @@ exports.approveListingEdit = callable([], async (request) => {
         const changes = {
             title: proposed.title,
             description: proposed.description ?? '',
-            sale_type: proposed.sale_type ?? listing.data().sale_type,
+            sale_type: proposed.sale_type ?? listing.data().sale_type ?? 'garage_sale',
             photos: proposed.photos ?? [],
             thumbnails: proposed.thumbnails ?? [],
         };

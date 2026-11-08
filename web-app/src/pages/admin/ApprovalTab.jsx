@@ -12,6 +12,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
+import { formatAud } from '@/lib/format';
 import { LISTING_STATUS } from '@/lib/listings';
 import ListingEditRow from './ListingEditRow';
 import ListingRow from './ListingRow';
@@ -114,7 +115,7 @@ export default function ApprovalTab() {
         onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: [ADMIN_KEY] });
             toast.success(result?.refunded
-                ? `Listing rejected and A${result.refunded.toFixed(2)} refunded`
+                ? `Listing rejected and ${formatAud(result.refunded, { withCode: true })} refunded`
                 : 'Listing rejected');
             if (!result?.emailed) {
                 toast.warning("The seller couldn't be emailed. They can still see the reason on their profile.");

@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { firebase } from '@/api/firebaseClient';
 import { geocode } from '@/lib/geocode';
 import { toast } from 'sonner';
@@ -58,7 +59,9 @@ async function openEditor(sale) {
   window.history.pushState({}, '', '/CreateListing?edit=sale-1');
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <CreateListing />
+      <MemoryRouter>
+        <CreateListing />
+      </MemoryRouter>
     </QueryClientProvider>
   );
   await screen.findByLabelText('Title *');
@@ -167,5 +170,16 @@ describe('editing a draft', () => {
     expect(screen.getByLabelText('Start Date *')).toBeEnabled();
     expect(screen.getByLabelText('Street Address *')).toBeEnabled();
     expect(screen.getByRole('button', { name: /save as draft/i })).toBeInTheDocument();
+  });
+
+  it('saves once when Save as Draft is double-clicked', async () => {
+    await openEditor(listing({
+      status: 'draft', payment_status: 'pending', suburb: 'Ocean Grove', postcode: '3226', latitude: -38.26, longitude: 144.52,
+    }));
+
+    await userEvent.dblClick(screen.getByRole('button', { name: /save as draft/i }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Draft saved successfully'));
+    expect(firebase.entities.GarageSale.update).toHaveBeenCalledTimes(1);
   });
 });

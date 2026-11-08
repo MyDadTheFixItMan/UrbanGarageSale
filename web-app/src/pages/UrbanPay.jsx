@@ -4,6 +4,7 @@ import { firebase } from '@/api/firebaseClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { formatAud } from '@/lib/format';
+import { LISTING_STATUS } from '@/lib/listings';
 import { CARD_FEES, describeCardFee } from '@/lib/pricing';
 import { Smartphone, RefreshCw, CreditCard, DollarSign, FileText } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -135,7 +136,9 @@ export default function UrbanPay() {
         if (!user?.id) return;
         setIsLoadingGarageSales(true);
         try {
-            const sales = await firebase.firestore.collection('garageSales').queryDocs('user_id', '==', user.id);
+            // Only live listings, as in the mobile app: drafts and unpaid listings can't take sales.
+            const sales = (await firebase.firestore.collection('garageSales').queryDocs('user_id', '==', user.id))
+                .filter((sale) => sale.status === LISTING_STATUS.ACTIVE);
             setGarageSales(sales);
             // Auto-select the first garage sale
             setSelectedGarageSaleId((current) => current || sales[0]?.id || '');
@@ -192,7 +195,7 @@ export default function UrbanPay() {
                 }
             `}</style>
             <img
-                src="/Logo Webpage.png"
+                src="/logo-web.webp"
                 alt=""
                 className="fixed left-0 pointer-events-none watermark-page"
                 style={{

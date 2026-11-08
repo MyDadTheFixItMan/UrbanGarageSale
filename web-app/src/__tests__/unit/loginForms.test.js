@@ -17,8 +17,13 @@ describe('normalizePhone', () => {
     expect(normalizePhone('+61 412').problem).toMatch(/complete phone number/);
   });
 
-  it('refuses a number without a country code', () => {
-    expect(normalizePhone('0412 345 678').problem).toMatch(/with country code/);
+  it('accepts a local Australian number typed without +61', () => {
+    expect(normalizePhone('0491 570 156')).toEqual({ phone: '+61491570156' });
+    expect(normalizePhone('(03) 9123 4567')).toEqual({ phone: '+61391234567' });
+  });
+
+  it('refuses any other number without a country code', () => {
+    expect(normalizePhone('1412 345 678').problem).toMatch(/with country code/);
   });
 });
 

@@ -38,7 +38,7 @@ export default function Layout({ children, currentPageName }) {
     ];
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col">
+        <div className="min-h-screen bg-slate-50 flex flex-col pb-20 md:pb-0">
             <style>{`
                 :root {
                     --primary: #1e3a5f;
@@ -55,7 +55,7 @@ export default function Layout({ children, currentPageName }) {
                         {/* Logo */}
                         <Link to={createPageUrl('Home')} className="absolute -left-20 flex items-center flex-shrink-0">
                             <img 
-                                src="/Logo Webpage.png" 
+                                src="/logo-web.webp" 
                                 alt="Urban Garage Sale" 
                                 className="h-36 w-auto"
                                 style={{ minWidth: '324px', objectFit: 'contain' }}
@@ -136,12 +136,12 @@ export default function Layout({ children, currentPageName }) {
             </header>
 
             {/* Main Content */}
-            <main className="pt-20 md:pb-0 flex-1">
+            <main className="pt-20 flex-1">
                 {children}
             </main>
 
-            {/* Footer Ribbon - Desktop Only */}
-            <footer className="bg-[#001f3f] text-white hidden md:block">
+            {/* Footer Ribbon */}
+            <footer className="bg-[#001f3f] text-white">
                 <div className="w-full px-4 py-4 md:py-6">
                     <div className="flex items-center justify-center md:justify-center">
                         <nav className="flex items-center gap-4 md:gap-6 flex-wrap justify-center">

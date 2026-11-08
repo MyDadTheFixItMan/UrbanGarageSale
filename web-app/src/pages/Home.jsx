@@ -162,8 +162,9 @@ export default function Home() {
         
         if (!filters.postcode && !location) {
             // Request geolocation when user clicks search without entering a postcode
-            toast.loading('Requesting your location...');
+            const asking = toast.loading('Requesting your location...');
             location = await requestGeolocation();
+            toast.dismiss(asking);
         }
         
         if (!filters.postcode && !location) {
@@ -187,6 +188,8 @@ export default function Home() {
                 // Try to get coordinates from suburb/postcode input
                 let searchLatitude = location?.latitude;
                 let searchLongitude = location?.longitude;
+                // Set when typed text is neither a known suburb nor a postcode.
+                let placeUnknown = false;
 
                 if (filters.postcode) {
                     // Use the suburb lookup function (which now supports async geocoding)
@@ -199,6 +202,7 @@ export default function Home() {
                         } else {
                             console.log(`✗ Suburb "${filters.postcode}" not found in lookup, using user location or defaulting to search by postcode`);
                             searchFilters.postcode = filters.postcode;
+                            placeUnknown = !/^\d{4}$/.test(filters.postcode.trim());
                         }
                     } catch (error) {
                         console.warn(`⚠️  Error looking up suburb "${filters.postcode}":`, error.message);
@@ -219,7 +223,9 @@ export default function Home() {
                 // Defer state update to prevent blocking the UI
                 startTransition(() => {
                     if (!quiet) {
-                        if (results.length === 0) {
+                        if (results.length === 0 && placeUnknown) {
+                            toast.info(`We couldn't find "${filters.postcode}". Try a suburb name or a 4-digit postcode.`);
+                        } else if (results.length === 0) {
                             toast.info('No listings found in your search area');
                         } else {
                             toast.success(`Found ${results.length} listing${results.length !== 1 ? 's' : ''}`);
@@ -250,7 +256,7 @@ export default function Home() {
                 }
             `}</style>
             <img 
-                src="/Logo Webpage.png" 
+                src="/logo-web.webp" 
                 alt="" 
                 className="fixed left-0 pointer-events-none watermark-home"
                 style={{

@@ -9,6 +9,8 @@ export const PHONE_PLACEHOLDER = '+61 412 345 678';
 // Returns { phone } or { problem }.
 export function normalizePhone(raw) {
     let phone = String(raw || '').replace(/[\s\-()]/g, '');
+    // A local Australian number typed without +61, as the 2FA dialog also accepts: 0412... -> +61412...
+    if (/^0[1-9]\d{8}$/.test(phone)) phone = '+61' + phone.slice(1);
     if (phone === '+61' || phone.length < 10) {
         return { problem: 'Please enter a complete phone number (minimum 10 digits)' };
     }

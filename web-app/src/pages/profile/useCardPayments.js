@@ -51,14 +51,20 @@ async function verifiedCardPayments() {
     }
 }
 
-// Opens a centred popup and resolves when the user closes it.
-function openPopupAndWait(url, name) {
+// Opens an empty centred popup. It must open during the click itself: browsers (Safari above
+// all) block popups opened after waiting for the server.
+function openBlankPopup(name) {
     const width = 800;
     const height = 600;
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
-    const popup = window.open(url, name, `width=${width},height=${height},left=${left},top=${top},popup=true`);
+    const popup = window.open('about:blank', name, `width=${width},height=${height},left=${left},top=${top},popup=true`);
     if (!popup) throw new Error('Popup blocked - please allow popups');
+    return popup;
+}
+
+// Resolves when the user closes the popup.
+function waitForClose(popup) {
     return new Promise((resolve) => {
         const timer = setInterval(() => {
             if (popup.closed) {
@@ -69,7 +75,7 @@ function openPopupAndWait(url, name) {
     });
 }
 
-// Stripe returns to this page inside the popup. Closing it hands back to openPopupAndWait in the
+// Stripe returns to this page inside the popup. Closing it hands back to waitForClose in the
 // main window, which refreshes the status. Does nothing in a normal tab.
 function closeIfStripePopup() {
     if (window.opener || STRIPE_POPUP_NAMES.includes(window.name)) window.close();
@@ -150,17 +156,21 @@ export function useCardPayments(user, setUser) {
     const runPopupFlow = async ({ setBusy, loadingText, request, urlOf, popupName, successText, pendingText, failurePrefix, onOpened }) => {
         setBusy(true);
         const toastId = toast.loading(loadingText);
+        let popup = null;
         try {
+            popup = openBlankPopup(popupName);
             const data = await request();
             const url = urlOf(data);
             if (!url) throw new Error('No Stripe URL received from server');
             toast.success('Opening Stripe...', { id: toastId });
             onOpened();
-            await openPopupAndWait(url, popupName);
+            popup.location.href = url;
+            await waitForClose(popup);
             const nowEnabled = await refresh();
             if (nowEnabled) toast.success(successText);
             else toast.info(pendingText);
         } catch (error) {
+            if (popup && !popup.closed) popup.close();
             toast.error(`${failurePrefix}: ${error.message}`, { id: toastId });
         } finally {
             setBusy(false);

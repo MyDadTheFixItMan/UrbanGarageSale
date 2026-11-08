@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { passwordProblem, MIN_PASSWORD_LENGTH } from '@/lib/password';
+import { BROKEN_RESET_LINK } from '@/api/firebase/auth';
 
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();
@@ -22,6 +23,20 @@ export default function ResetPassword() {
     const [loading, setLoading] = useState(false);
     const [promoIndex, setPromoIndex] = useState(0);
     const isConfirmingReset = mode === 'resetPassword' && !!oobCode;
+    // False once the link is known to be expired or used, so the form isn't offered for it.
+    const [linkUsable, setLinkUsable] = useState(true);
+
+    useEffect(() => {
+        if (!isConfirmingReset) return;
+        firebase.auth.isPasswordResetCodeValid(oobCode)
+            .then((valid) => {
+                if (valid) return;
+                setLinkUsable(false);
+                setError(BROKEN_RESET_LINK);
+            })
+            // Couldn't check (e.g. offline): leave the form, which reports problems when submitted.
+            .catch((err) => console.warn('Could not check the reset link:', err.message));
+    }, [isConfirmingReset, oobCode]);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -118,7 +133,7 @@ export default function ResetPassword() {
                 }
             `}</style>
             <img 
-                src="/Logo Webpage.png" 
+                src="/logo-web.webp" 
                 alt="" 
                 className="fixed left-0 pointer-events-none watermark-page"
                 style={{
@@ -228,6 +243,11 @@ export default function ResetPassword() {
                                     </div>
                                 )}
 
+                                {!linkUsable ? (
+                                    <Link to={createPageUrl('ResetPassword')} className="text-sm font-medium text-[#1e3a5f] underline">
+                                        Request a new reset link
+                                    </Link>
+                                ) : (
                                 <form onSubmit={handleConfirmPasswordReset} className="space-y-4">
                                     <div>
                                         <Label htmlFor="newPassword">New Password</Label>
@@ -269,6 +289,7 @@ export default function ResetPassword() {
                                         )}
                                     </Button>
                                 </form>
+                                )}
                             </>
                         )}
                     </div>

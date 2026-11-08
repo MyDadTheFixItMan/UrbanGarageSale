@@ -95,6 +95,14 @@ function localIsoDate(date = new Date()) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+// The seller's listings and waiting edits other than listing `exceptId`.
+async function sellersOtherListings(userId, exceptId) {
+  if (!userId) return [];
+  const [sales, edits] = await Promise.all(['garageSales', 'listingEdits'].map((name) =>
+    getDocs(query(collection(db, name), where('user_id', '==', userId)))));
+  return [...toRecords(sales), ...toRecords(edits)].filter((record) => record.id !== exceptId);
+}
+
 // Firestore entity management
 export const firebaseEntities = {
   GarageSale: {
@@ -154,16 +162,20 @@ export const firebaseEntities = {
       return result.data;
     },
 
-    // Removes the listing's photos from Storage too. Photo deletion is best effort: a photo
-    // that can't be deleted must not stop the listing being deleted.
+    // Removes the listing's photos from Storage too, except ones another of the seller's listings
+    // (or its waiting edit) still shows. Photo deletion is best effort: a photo that can't be
+    // deleted must not stop the listing being deleted, and if the other listings can't be read
+    // no photos are deleted.
     delete: async (id) => {
       const snap = await getDoc(doc(db, 'garageSales', id));
       const edit = await getDoc(doc(db, 'listingEdits', id)).catch(() => null);
-      const unused = photosNoLongerUsed({
-        photos: [...(snap.data()?.photos ?? []), ...(edit?.data()?.photos ?? [])],
-        thumbnails: [...(snap.data()?.thumbnails ?? []), ...(edit?.data()?.thumbnails ?? [])],
-      });
-      await deletePhotos(unused);
+      const stillUsed = await sellersOtherListings(snap.data()?.user_id, id).catch(() => null);
+      if (stillUsed) {
+        await deletePhotos(photosNoLongerUsed({
+          photos: [...(snap.data()?.photos ?? []), ...(edit?.data()?.photos ?? [])],
+          thumbnails: [...(snap.data()?.thumbnails ?? []), ...(edit?.data()?.thumbnails ?? [])],
+        }, ...stillUsed));
+      }
       await deleteDoc(doc(db, 'listingEdits', id)).catch(() => null);
       await deleteDoc(doc(db, 'garageSales', id));
       return { id, deleted: true };

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { firebase } from '@/api/firebaseClient';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { usePromotions } from '@/lib/usePromotions';
@@ -17,8 +18,6 @@ import {
     EMPTY_FORM, formFromListing, isPaidOrApproved, listingFormProblem, isInFreePeriod, buildSaleData, liveEditData,
 } from './createListing/listingForm';
 
-const goToProfile = () => { window.location.href = createPageUrl('Profile'); };
-
 async function coordinatesFor(form) {
     if (form.latitude && form.longitude) return { lat: form.latitude, lng: form.longitude };
     try {
@@ -30,26 +29,36 @@ async function coordinatesFor(form) {
     throw new Error('Failed to geocode address. Please check the address and try again.');
 }
 
-// Sends the seller to Stripe Checkout for the listing fee.
+// Sends the seller to Stripe Checkout for the listing fee. Resolves to false if it couldn't.
 async function startCheckout(saleId) {
     if (window.self !== window.top) {
         toast.error('Checkout only works from published apps. Please open this app in a new tab.');
-        return;
+        return false;
     }
     try {
         toast.success('Redirecting to payment...');
         const result = await firebase.functions.invoke('createStripeCheckout', { saleId });
         if (!result.url) throw new Error('No checkout URL returned');
         window.location.href = result.url;
+        return true;
     } catch (error) {
         console.error('Payment error:', error);
-        toast.error('Failed to start payment. Please try again.');
+        toast.error('Failed to start payment. Your listing is saved: press Pay on it in My Listings to try again.');
+        return false;
     }
 }
 
 export default function CreateListing() {
     const editId = new URLSearchParams(window.location.search).get('edit');
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
+    // Set from the first click until a save fails, so a double click can't save the listing twice
+    // (the button's disabled state only arrives with the next render). A save that works leaves the page.
+    const saving = useRef(false);
+    // Set once the listing is saved, so leaving the page no longer warns about unsaved changes.
+    const saved = useRef(false);
+    // An in-app move keeps the toasts that a full page load would wipe.
+    const goToProfile = () => navigate(createPageUrl('Profile'));
 
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -135,6 +144,19 @@ export default function CreateListing() {
         init();
     }, [editId]);
 
+    // Warns before a refresh, closing the tab or leaving the site would lose typed changes.
+    const unsaved = !loading && JSON.stringify(formData) !== JSON.stringify(openedForm);
+    useEffect(() => {
+        if (!unsaved) return;
+        const warn = (event) => {
+            if (saved.current) return;
+            event.preventDefault();
+            event.returnValue = '';
+        };
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [unsaved]);
+
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
@@ -173,7 +195,8 @@ export default function CreateListing() {
             return { id: result.id, asDraft, isFree };
         },
         onSuccess: async ({ id, asDraft, isFree, liveEdit: liveEditResult }) => {
-            queryClient.invalidateQueries({ queryKey: ['userListings', user?.email] });
+            saved.current = true;
+            queryClient.invalidateQueries({ queryKey: ['userListings'] });
 
             if (liveEditResult) {
                 toast.success({
@@ -204,7 +227,8 @@ export default function CreateListing() {
                     toast.error(`Error finalizing free listing: ${error.message}`);
                 }
             } else {
-                await startCheckout(id);
+                // Retrying here would save the listing a second time, so a failed start goes to the profile.
+                if (!(await startCheckout(id))) goToProfile();
             }
         },
         onError: (error) => {
@@ -216,12 +240,16 @@ export default function CreateListing() {
     const freePeriod = !isActiveEdit && isInFreePeriod(appSettings, formData.start_date);
 
     const handleSubmit = (asDraft) => {
-        const problem = listingFormProblem(formData);
+        if (saving.current) return;
+        const problem = listingFormProblem(formData, { datesLocked: isActiveEdit });
         if (problem) {
             toast.error(problem);
             return;
         }
-        createMutation.mutate({ asDraft, isFree: !asDraft && freePeriod });
+        saving.current = true;
+        createMutation.mutate({ asDraft, isFree: !asDraft && freePeriod }, {
+            onError: () => { saving.current = false; },
+        });
     };
 
     if (loading) {
@@ -243,7 +271,7 @@ export default function CreateListing() {
                 }
             `}</style>
             <img
-                src="/Logo Webpage.png"
+                src="/logo-web.webp"
                 alt=""
                 className="fixed left-0 pointer-events-none watermark-page"
                 style={{

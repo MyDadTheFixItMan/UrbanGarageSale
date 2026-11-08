@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+// Google bills each lookup, so wait until the seller pauses typing before asking for suggestions.
+const LOOKUP_DELAY_MS = 300;
+
 export default function GooglePlacesAutocomplete({
   value,
   onChange,
@@ -15,10 +18,25 @@ export default function GooglePlacesAutocomplete({
   const autocompleteServiceRef = useRef(null);
   const placesServiceRef = useRef(null);
   const mapRef = useRef(null);
+  // One session token covers the suggestions for an address and the details lookup that ends it,
+  // so Google bills them together as one session instead of per keystroke.
+  const sessionTokenRef = useRef(null);
+  const lookupTimerRef = useRef(null);
+  const latestInputRef = useRef('');
 
   useEffect(() => {
     initializeAutocomplete();
+    return () => clearTimeout(lookupTimerRef.current);
   }, []);
+
+  const getSessionToken = () => {
+    // @ts-ignore
+    if (!sessionTokenRef.current && window.google?.maps?.places?.AutocompleteSessionToken) {
+      // @ts-ignore
+      sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
+    }
+    return sessionTokenRef.current || undefined;
+  };
 
   // Show the saved address (e.g. when editing a listing). The input stays uncontrolled so
   // Google Places can write to it directly.
@@ -56,15 +74,21 @@ export default function GooglePlacesAutocomplete({
     }
   };
 
-  const handleInputChange = async (e) => {
+  const handleInputChange = (e) => {
     const value = e.target.value;
     onChange?.(value);
+    latestInputRef.current = value;
+    clearTimeout(lookupTimerRef.current);
 
     if (!value || value.length < 2) {
       setPredictions([]);
       return;
     }
 
+    lookupTimerRef.current = setTimeout(() => fetchPredictions(value), LOOKUP_DELAY_MS);
+  };
+
+  const fetchPredictions = async (value) => {
     if (!autocompleteServiceRef.current) return;
 
     try {
@@ -73,9 +97,13 @@ export default function GooglePlacesAutocomplete({
         input: value,
         componentRestrictions: { country: ['AU', 'NZ'] },
         types: ['address'],
+        sessionToken: getSessionToken(),
       });
 
-      setPredictions(result.predictions || []);
+      // Ignore an answer that arrives after the seller has typed something else.
+      if (value === latestInputRef.current) {
+        setPredictions(result.predictions || []);
+      }
     } catch (error) {
       console.error('Error getting predictions:', error);
     }
@@ -89,8 +117,11 @@ export default function GooglePlacesAutocomplete({
       {
         placeId: prediction.place_id,
         fields: ['address_components', 'formatted_address', 'geometry', 'place_id'],
+        sessionToken: getSessionToken(),
       },
       (place, status) => {
+        // The details lookup ends the session; the next address starts a new one.
+        sessionTokenRef.current = null;
         // @ts-ignore
         if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
           handlePlaceSelected(place);
@@ -141,10 +172,10 @@ export default function GooglePlacesAutocomplete({
     if ((!state || !postcode) && place.formatted_address) {
       const formatted = place.formatted_address;
       
-      // Try to extract state (2 letter code) and postcode (4 digits) using one pattern
+      // Try to extract state (2-3 letter code) and postcode (4 digits) using one pattern
       // Looks for "STATE POSTCODE" pattern like "VIC 3226"
       if (!state || !postcode) {
-        const statePostcodeMatch = formatted.match(/\b([A-Z]{2})\s+(\d{4})\b/);
+        const statePostcodeMatch = formatted.match(/\b([A-Z]{2,3})\s+(\d{4})\b/);
         if (statePostcodeMatch) {
           state = statePostcodeMatch[1];
           postcode = statePostcodeMatch[2];

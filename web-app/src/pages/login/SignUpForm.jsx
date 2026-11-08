@@ -111,7 +111,7 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
             toast.success(`Account created with ${provider}!`);
         } catch (err) {
             if (err.mfaRequired) {
-                await onSecondFactor(err);
+                onSecondFactor(err);
                 return;
             }
             console.error(`${provider} OAuth error:`, err);

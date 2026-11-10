@@ -14,6 +14,11 @@ import {
 
 const RECAPTCHA_ID = 'recaptcha-container-2fa';
 
+// Loads reCAPTCHA as soon as the dialog's element is on the page, so Send code is quicker.
+const prepareRecaptcha = (element) => {
+    if (element) firebase.auth.prepareRecaptcha(RECAPTCHA_ID);
+};
+
 // Enrols the user's mobile as a Firebase multi-factor (SMS) second factor.
 // After this, Firebase requires the SMS code at every sign-in.
 export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone = '', onEnabled }) {
@@ -127,7 +132,7 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
                 </DialogHeader>
 
                 {/* Invisible reCAPTCHA used by Firebase when sending the SMS */}
-                <div id={RECAPTCHA_ID}></div>
+                <div id={RECAPTCHA_ID} ref={prepareRecaptcha}></div>
 
                 {error && (
                     <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">{error}</div>

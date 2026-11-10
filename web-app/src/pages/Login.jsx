@@ -64,6 +64,11 @@ export default function Login() {
     return () => clearInterval(interval);
   }, [allPromotions.length]);
 
+  // Load reCAPTCHA now, so a 2FA account's code goes out sooner after the password.
+  useEffect(() => {
+    firebase.auth.prepareRecaptcha(RECAPTCHA_CONTAINER_ID);
+  }, []);
+
   const finishSignIn = async () => {
     await checkAppState();
     navigate(createPageUrl('Home'));

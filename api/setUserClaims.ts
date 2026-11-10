@@ -23,7 +23,6 @@ const setUserClaimsHandler = async (req: any, res: any) => {
 
   try {
     const { uid } = await requireUser(req);
-    await rateLimit(uid, 'setUserClaims', 10);
     const { action } = await readJsonBody(req);
 
     if (action !== 'enable' && action !== 'disable') {
@@ -31,7 +30,11 @@ const setUserClaimsHandler = async (req: any, res: any) => {
     }
 
     const admin = getFirebaseAdmin();
-    const userRecord = await admin.auth().getUser(uid);
+    // Fetching the account only reads, so it can run alongside the rate-limit check.
+    const [, userRecord] = await Promise.all([
+      rateLimit(uid, 'setUserClaims', 10),
+      admin.auth().getUser(uid),
+    ]);
     const enable = action === 'enable';
 
     // The claim mirrors Firebase's own MFA enrolment, which Firebase enforces at every sign-in.
@@ -43,19 +46,21 @@ const setUserClaimsHandler = async (req: any, res: any) => {
       throw new HttpError(409, 'Remove the enrolled second factor before turning 2FA off.');
     }
 
-    // Merge so other custom claims on the account are preserved.
-    await admin.auth().setCustomUserClaims(uid, {
-      ...(userRecord.customClaims || {}),
-      two_fa_enabled: enable,
-    });
-
+    // The claim and the profile field are independent writes, so make them together.
     const now = new Date().toISOString();
-    await admin.firestore().collection('users').doc(uid).set(
-      enable
-        ? { two_fa_enabled: true, two_fa_enabled_date: now, phone_verified: true }
-        : { two_fa_enabled: false, two_fa_disabled_date: now },
-      { merge: true },
-    );
+    await Promise.all([
+      // Merge so other custom claims on the account are preserved.
+      admin.auth().setCustomUserClaims(uid, {
+        ...(userRecord.customClaims || {}),
+        two_fa_enabled: enable,
+      }),
+      admin.firestore().collection('users').doc(uid).set(
+        enable
+          ? { two_fa_enabled: true, two_fa_enabled_date: now, phone_verified: true }
+          : { two_fa_enabled: false, two_fa_disabled_date: now },
+        { merge: true },
+      ),
+    ]);
 
     return res.status(200).json({
       success: true,

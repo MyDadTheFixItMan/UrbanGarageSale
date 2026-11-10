@@ -22,7 +22,7 @@ jest.mock('firebase/auth', () => {
     GoogleAuthProvider: provider(),
     FacebookAuthProvider: provider(),
     OAuthProvider: provider(),
-    RecaptchaVerifier: jest.fn().mockImplementation(() => ({ clear: jest.fn() })),
+    RecaptchaVerifier: jest.fn().mockImplementation(() => ({ clear: jest.fn(), render: jest.fn().mockResolvedValue(0) })),
     getMultiFactorResolver: jest.fn(),
     multiFactor: jest.fn(),
     PhoneMultiFactorGenerator: { FACTOR_ID: 'phone', assertion: jest.fn((credential) => ({ credential })) },
@@ -108,6 +108,41 @@ describe('password sign-in', () => {
     expect(first).not.toBe(container);
     expect(container.contains(second)).toBe(true);
     expect(sdk.RecaptchaVerifier.mock.results[0].value.clear).toHaveBeenCalled();
+  });
+
+  it('uses the reCAPTCHA loaded ahead for the first send, and a fresh one after that', async () => {
+    const resolver = { hints: [{ factorId: 'phone' }], session: 's' };
+    sdk.signInWithEmailAndPassword.mockRejectedValue(authError('auth/multi-factor-auth-required'));
+    sdk.getMultiFactorResolver.mockReturnValue(resolver);
+    sdk.PhoneAuthProvider.verifyPhoneNumber.mockResolvedValue('verification-id');
+
+    await firebaseAuth.prepareRecaptcha('recaptcha-container');
+    const prepared = sdk.RecaptchaVerifier.mock.results[0].value;
+    expect(prepared.render).toHaveBeenCalled();
+
+    await firebaseAuth.login('a@b.c', 'pw').catch(() => {});
+    await firebaseAuth.sendMfaSignInCode('recaptcha-container');
+    expect(sdk.RecaptchaVerifier).toHaveBeenCalledTimes(1);
+    expect(sdk.PhoneAuthProvider.verifyPhoneNumber.mock.calls[0][1]).toBe(prepared);
+
+    await firebaseAuth.sendMfaSignInCode('recaptcha-container');
+    expect(sdk.RecaptchaVerifier).toHaveBeenCalledTimes(2);
+    expect(sdk.PhoneAuthProvider.verifyPhoneNumber.mock.calls[1][1]).not.toBe(prepared);
+  });
+
+  it('ignores a reCAPTCHA loaded ahead once its element has left the page', async () => {
+    await firebaseAuth.prepareRecaptcha('recaptcha-container');
+    // The dialog closed and opened again: same id, new element.
+    document.body.innerHTML = '<div id="recaptcha-container"></div>';
+    const resolver = { hints: [{ factorId: 'phone' }], session: 's' };
+    sdk.signInWithEmailAndPassword.mockRejectedValue(authError('auth/multi-factor-auth-required'));
+    sdk.getMultiFactorResolver.mockReturnValue(resolver);
+    sdk.PhoneAuthProvider.verifyPhoneNumber.mockResolvedValue('verification-id');
+    await firebaseAuth.login('a@b.c', 'pw').catch(() => {});
+
+    await firebaseAuth.sendMfaSignInCode('recaptcha-container');
+    expect(sdk.RecaptchaVerifier).toHaveBeenCalledTimes(2);
+    expect(document.getElementById('recaptcha-container').contains(sdk.RecaptchaVerifier.mock.calls[1][1])).toBe(true);
   });
 
   it('explains a wrong SMS code', async () => {

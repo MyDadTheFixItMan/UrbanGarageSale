@@ -13,6 +13,7 @@ jest.mock('@/api/firebaseClient', () => ({
     auth: {
       login: jest.fn(),
       sendMfaSignInCode: jest.fn(),
+      prepareRecaptcha: jest.fn(),
       completeMfaSignIn: jest.fn(),
     },
   },

@@ -20,7 +20,7 @@ import { addressDetails, displayAddress } from '@/lib/addressDetails';
 import { MIN_PASSWORD_LENGTH } from '@/lib/password';
 import { paperSizes } from '../../utils/printGarageSaleSign';
 import { changePasswordProblem } from './profileListings';
-import { normalizePhone } from '../login/loginForms';
+import { PHONE_PLACEHOLDER, normalizePhone, profileProblem } from '../login/loginForms';
 
 const profileForm = (user) => ({
     email: user?.email || '',
@@ -32,51 +32,96 @@ const profileForm = (user) => ({
     phone: user?.phone || '',
 });
 
-export function EditProfileDialog({ user, onSaved }) {
-    const [open, setOpen] = useState(false);
+// The form behind Edit Profile and Complete Profile. Every field is needed, including for
+// accounts made with Google, Facebook or Apple, which start without an address or phone number.
+// The address's suburb, postcode and state are checked once it's been looked up.
+function useProfileForm(user, onSaved, successMessage) {
     const [form, setForm] = useState(() => profileForm(user));
-    const set = (field) => (value) => setForm((prev) => ({ ...prev, [field]: value }));
     // Set while saving, so a double click saves once (isPending only changes on the next render).
     const saving = useRef(false);
 
     const saveMutation = useMutation({
         mutationFn: async (data) => {
             const saved = { ...data, ...await addressDetails(data.address, data), full_name: data.full_name.trim() };
+            const missing = profileProblem(saved);
+            if (missing) throw new Error(missing);
             await firebase.auth.updateProfile(saved);
             return saved;
         },
         onSuccess: (saved) => {
             onSaved(saved);
-            setOpen(false);
-            toast.success('Profile updated successfully');
+            toast.success(successMessage);
         },
         onError: (error) => toast.error('Failed to update profile: ' + error.message),
         onSettled: () => { saving.current = false; },
     });
 
-    // The name can't be cleared, nor a phone number once there is one (accounts made with Google,
-    // Facebook or Apple may start without one).
     const save = () => {
         if (saving.current) return;
-        if (!form.full_name.trim()) {
-            toast.error('Please enter your name');
+        const missing = profileProblem(form, { addressLookedUp: false });
+        if (missing) {
+            toast.error(missing);
             return;
         }
-        let { phone } = form;
-        if (phone.trim() || user?.phone) {
-            const result = normalizePhone(phone);
-            if (result.problem) {
-                toast.error(result.problem);
-                return;
-            }
-            phone = result.phone;
+        const result = normalizePhone(form.phone);
+        if (result.problem) {
+            toast.error(result.problem);
+            return;
         }
         saving.current = true;
-        saveMutation.mutate({ ...form, phone });
+        saveMutation.mutate({ ...form, phone: result.phone });
     };
 
+    return { form, setForm, save, isSaving: saveMutation.isPending, reset: () => setForm(profileForm(user)) };
+}
+
+function ProfileFields({ form, setForm, savedAddress = undefined }) {
+    const set = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    return (
+        <>
+            <div>
+                <Label htmlFor="profile-name">Name</Label>
+                <Input id="profile-name" value={form.full_name} onChange={set('full_name')} className="mt-1.5" />
+            </div>
+            <div>
+                <Label htmlFor="profile-address">Address</Label>
+                {savedAddress !== undefined && (
+                    <div className="text-sm text-slate-600 mb-2 p-2 bg-slate-50 rounded border border-slate-200">
+                        Saved: {savedAddress || 'Not set'}
+                    </div>
+                )}
+                <GooglePlacesAutocomplete
+                    id="profile-address"
+                    value={form.address}
+                    onChange={(address) => setForm((prev) => ({ ...prev, address, suburb: '', postcode: '', state: '' }))}
+                    onSelect={(place) => {
+                        if (place.address) {
+                            setForm((prev) => ({ ...prev, address: place.address, suburb: place.suburb || '', postcode: place.postcode || '', state: place.state || '' }));
+                        }
+                    }}
+                    placeholder="Start typing, then pick your address"
+                    className="mt-1.5"
+                />
+                <AddressParts suburb={form.suburb} state={form.state} postcode={form.postcode} />
+            </div>
+            <div>
+                <Label htmlFor="profile-phone">Phone Number</Label>
+                <Input id="profile-phone" type="tel" value={form.phone} onChange={set('phone')}
+                    placeholder={PHONE_PLACEHOLDER} className="mt-1.5" />
+            </div>
+        </>
+    );
+}
+
+export function EditProfileDialog({ user, onSaved }) {
+    const [open, setOpen] = useState(false);
+    const profile = useProfileForm(user, (saved) => {
+        onSaved(saved);
+        setOpen(false);
+    }, 'Profile updated successfully');
+
     const handleOpenChange = (next) => {
-        if (next) setForm(profileForm(user));
+        if (next) profile.reset();
         setOpen(next);
     };
 
@@ -94,43 +139,52 @@ export function EditProfileDialog({ user, onSaved }) {
                     <DialogDescription>Update your profile information below</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
-                    <div>
-                        <Label htmlFor="profile-name">Name</Label>
-                        <Input id="profile-name" value={form.full_name} onChange={(e) => set('full_name')(e.target.value)} className="mt-1.5" />
-                    </div>
-                    <div>
-                        <Label htmlFor="profile-address">Address</Label>
-                        <div className="text-sm text-slate-600 mb-2 p-2 bg-slate-50 rounded border border-slate-200">
-                            Saved: {displayAddress(user) || 'Not set'}
-                        </div>
-                        <GooglePlacesAutocomplete
-                            id="profile-address"
-                            value={form.address}
-                            onChange={(address) => setForm((prev) => ({ ...prev, address, suburb: '', postcode: '', state: '' }))}
-                            onSelect={(place) => {
-                                if (place.address) {
-                                    setForm((prev) => ({ ...prev, address: place.address, suburb: place.suburb || '', postcode: place.postcode || '', state: place.state || '' }));
-                                }
-                            }}
-                            placeholder="Start typing, then pick your address"
-                            className="mt-1.5"
-                        />
-                        <AddressParts suburb={form.suburb} state={form.state} postcode={form.postcode} />
-                    </div>
-                    <div>
-                        <Label htmlFor="profile-phone">Phone Number</Label>
-                        <Input id="profile-phone" value={form.phone} onChange={(e) => set('phone')(e.target.value)} className="mt-1.5" />
-                    </div>
+                    <ProfileFields form={profile.form} setForm={profile.setForm} savedAddress={displayAddress(user)} />
                     <div>
                         <Label htmlFor="profile-email">Email Address</Label>
-                        <Input id="profile-email" type="email" value={form.email} onChange={(e) => set('email')(e.target.value)} className="mt-1.5" />
+                        <Input id="profile-email" type="email" value={profile.form.email}
+                            onChange={(e) => profile.setForm((prev) => ({ ...prev, email: e.target.value }))} className="mt-1.5" />
                     </div>
                     <Button
-                        onClick={save}
-                        disabled={saveMutation.isPending}
+                        onClick={profile.save}
+                        disabled={profile.isSaving}
                         className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
                     >
-                        {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+                        {profile.isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// Shown over every page (see Layout.jsx) to someone signed in whose profile is missing details,
+// such as a new Google, Facebook or Apple account. It can't be closed, only completed or left by
+// signing out.
+export function CompleteProfileDialog({ user, onSaved, onSignOut }) {
+    const profile = useProfileForm(user, onSaved, 'Thanks, your profile is complete');
+    const keepOpen = (e) => e.preventDefault();
+
+    return (
+        <Dialog open>
+            <DialogContent hideClose onEscapeKeyDown={keepOpen} onInteractOutside={keepOpen}>
+                <DialogHeader>
+                    <DialogTitle>Complete your profile</DialogTitle>
+                    <DialogDescription>
+                        Before you continue, please add your name, phone number and address.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                    <ProfileFields form={profile.form} setForm={profile.setForm} />
+                    <Button
+                        onClick={profile.save}
+                        disabled={profile.isSaving}
+                        className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
+                    >
+                        {profile.isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save and Continue'}
+                    </Button>
+                    <Button variant="ghost" onClick={onSignOut} className="w-full">
+                        Sign out
                     </Button>
                 </div>
             </DialogContent>

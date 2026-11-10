@@ -47,7 +47,7 @@ const listing = (overrides = {}) => ({
   end_date: '2099-01-02',
   start_time: '08:00',
   end_time: '15:00',
-  photos: ['https://example.test/1.jpg'],
+  photos: ['https://example.test/1.jpg', 'https://example.test/2.jpg'],
   thumbnails: ['https://example.test/1-thumb.jpg'],
   status: 'active',
   payment_status: 'paid',
@@ -70,7 +70,10 @@ async function openEditor(sale) {
 beforeEach(() => {
   jest.clearAllMocks();
   firebase.auth.isAuthenticated.mockResolvedValue(true);
-  firebase.auth.me.mockResolvedValue({ id: 'seller', email: 'a@b.test' });
+  firebase.auth.me.mockResolvedValue({
+    id: 'seller', email: 'a@b.test', full_name: 'Sam Lee', phone: '+61412345678',
+    address: '1 Main St', suburb: 'Carlton', postcode: '3053', state: 'VIC',
+  });
   firebase.auth.is2FAEnabled.mockResolvedValue(true);
   firebase.auth.hasSecondFactorSession.mockResolvedValue(true);
   firebase.entities.AppSettings.get.mockResolvedValue({ is_active: true, free_listing_start: '2099-01-01', free_listing_end: '2099-12-31' });
@@ -85,12 +88,12 @@ describe('editing a live listing', () => {
 
     expect(screen.getByRole('heading', { name: 'Edit Listing' })).toBeInTheDocument();
     expect(screen.getByLabelText('Title *')).toBeEnabled();
-    expect(screen.getByLabelText('Description')).toBeEnabled();
+    expect(screen.getByLabelText('Description *')).toBeEnabled();
     expect(screen.getByLabelText('Select sale type')).toBeEnabled();
-    for (const label of ['Street Address *', 'State', 'Start Date *', 'End Date *', 'Daily Start Time', 'Daily End Time']) {
+    for (const label of ['Street Address *', 'State *', 'Start Date *', 'End Date *', 'Daily Start Time *', 'Daily End Time *']) {
       expect(screen.getByLabelText(label)).toBeDisabled();
     }
-    expect(screen.getByLabelText('Suburb & Postcode')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('Suburb & Postcode *')).toHaveAttribute('readonly');
   });
 
   it('says the listing stays live and offers one button, with no draft, publish or pricing options', async () => {
@@ -115,8 +118,8 @@ describe('editing a live listing', () => {
       title: 'Big sale today',
       description: 'Lots of tools',
       sale_type: 'garage_sale',
-      photos: ['https://example.test/1.jpg'],
-      thumbnails: ['https://example.test/1-thumb.jpg'],
+      photos: ['https://example.test/1.jpg', 'https://example.test/2.jpg'],
+      thumbnails: ['https://example.test/1-thumb.jpg', null],
     });
     expect(geocode).not.toHaveBeenCalled();
   });

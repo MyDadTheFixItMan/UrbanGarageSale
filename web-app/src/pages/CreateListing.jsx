@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { geocode } from '@/lib/geocode';
+import { profileProblem } from './login/loginForms';
 import { BasicInfoSection, LocationSection, DateTimeSection } from './createListing/ListingSections';
 import PhotosSection from './createListing/PhotosSection';
 import {
@@ -123,6 +124,13 @@ export default function CreateListing() {
                 toast.error('Please sign in again with your password and SMS code to continue.');
                 await firebase.auth.logout();
                 window.location.href = '/login';
+                return;
+            }
+            // Accounts made with Google, Facebook or Apple start without an address or phone number.
+            const missing = profileProblem(userData);
+            if (missing) {
+                toast.error(`Please complete your profile before creating a listing. ${missing}`);
+                goToProfile();
                 return;
             }
 
@@ -241,7 +249,7 @@ export default function CreateListing() {
 
     const handleSubmit = (asDraft) => {
         if (saving.current) return;
-        const problem = listingFormProblem(formData, { datesLocked: isActiveEdit });
+        const problem = listingFormProblem(formData, { datesLocked: isActiveEdit, asDraft });
         if (problem) {
             toast.error(problem);
             return;

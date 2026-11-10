@@ -6,12 +6,14 @@ import {
 const form = (overrides = {}) => ({
   ...EMPTY_FORM,
   title: 'Moving sale',
+  description: 'Furniture, books and kitchenware.',
   address: '1 Main St, Carlton VIC 3053',
   suburb: 'Carlton',
   postcode: '3053',
   state: 'VIC',
   start_date: '2026-11-07',
   end_date: '2026-11-08',
+  photos: ['https://example.com/1.jpg', 'https://example.com/2.jpg'],
   ...overrides,
 });
 
@@ -28,6 +30,27 @@ describe('listingFormProblem', () => {
     expect(listingFormProblem(form({ address: '' }))).toBe('Please enter an address');
     expect(listingFormProblem(form({ start_date: '' }))).toBe('Please select a start date');
     expect(listingFormProblem(form({ end_date: '' }))).toBe('Please select an end date');
+  });
+
+  it('needs every field and at least two photos to publish', () => {
+    expect(listingFormProblem(form({ description: ' ' }))).toBe('Please enter a description');
+    expect(listingFormProblem(form({ sale_type: '' }))).toBe('Please select a sale type');
+    expect(listingFormProblem(form({ suburb: '' }))).toMatch(/pick your address from the suggestions/);
+    expect(listingFormProblem(form({ start_time: '' }))).toBe('Please enter the daily start and end times');
+    expect(listingFormProblem(form({ photos: ['https://example.com/1.jpg'] }))).toBe('Please add at least 2 photos of the items for sale');
+    expect(listingFormProblem(form({ photos: [] }))).toBe('Please add at least 2 photos of the items for sale');
+  });
+
+  it('saves a draft with only a title, address and dates', () => {
+    const draft = form({ description: '', suburb: '', postcode: '', state: '', photos: [] });
+    expect(listingFormProblem(draft, { asDraft: true })).toBeNull();
+    expect(listingFormProblem(form({ title: '' }), { asDraft: true })).toBe('Please enter a title');
+  });
+
+  it('still needs two photos for changes to a live listing, whose address is locked', () => {
+    const live = { datesLocked: true };
+    expect(listingFormProblem(form({ suburb: '', photos: ['a', 'b'] }), live)).toBeNull();
+    expect(listingFormProblem(form({ photos: ['a'] }), live)).toBe('Please add at least 2 photos of the items for sale');
   });
 
   it('allows up to three consecutive days', () => {

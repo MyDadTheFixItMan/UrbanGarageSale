@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 import { geocode } from '@/lib/geocode';
 import { toast } from 'sonner';
-import { EditProfileDialog } from '@/pages/profile/ProfileDialogs';
+import { EditProfileDialog, CompleteProfileDialog } from '@/pages/profile/ProfileDialogs';
 
 jest.mock('@/api/firebaseClient', () => ({ firebase: { auth: { updateProfile: jest.fn() } } }));
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
@@ -87,7 +87,7 @@ describe('EditProfileDialog', () => {
     await userEvent.type(screen.getByLabelText('Name'), 'Sam');
     await userEvent.clear(screen.getByLabelText('Phone Number'));
     await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
-    expect(toast.error).toHaveBeenLastCalledWith(expect.stringMatching(/complete phone number/));
+    expect(toast.error).toHaveBeenLastCalledWith('Please enter your phone number');
     expect(firebase.auth.updateProfile).not.toHaveBeenCalled();
   });
 
@@ -100,5 +100,69 @@ describe('EditProfileDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(firebase.auth.updateProfile).toHaveBeenCalledWith(expect.objectContaining({ phone: '+61491570156' }));
+  });
+});
+
+describe('CompleteProfileDialog', () => {
+  // A new Google, Facebook or Apple account: a name and email, but no phone or address.
+  const OAUTH_USER = { full_name: 'Sam Lee', email: 'sam@example.com' };
+
+  function openRequired(user = OAUTH_USER) {
+    const onSaved = jest.fn();
+    const onSignOut = jest.fn();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <CompleteProfileDialog user={user} onSaved={onSaved} onSignOut={onSignOut} />
+      </QueryClientProvider>
+    );
+    return { onSaved, onSignOut };
+  }
+
+  it("is open straight away and can't be closed", async () => {
+    openRequired();
+    expect(screen.getByRole('dialog', { name: 'Complete your profile' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('dialog', { name: 'Complete your profile' })).toBeVisible();
+  });
+
+  it('needs a phone number and an address before saving', async () => {
+    openRequired();
+    await userEvent.click(screen.getByRole('button', { name: 'Save and Continue' }));
+    expect(toast.error).toHaveBeenLastCalledWith('Please enter your phone number');
+
+    await userEvent.type(screen.getByLabelText('Phone Number'), '0412 345 678');
+    await userEvent.click(screen.getByRole('button', { name: 'Save and Continue' }));
+    expect(toast.error).toHaveBeenLastCalledWith('Please enter your address');
+    expect(firebase.auth.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("refuses an address whose suburb, postcode and state can't be found", async () => {
+    geocode.mockRejectedValue(new Error('no match'));
+    openRequired();
+    await userEvent.type(screen.getByLabelText('Phone Number'), '0412 345 678');
+    await userEvent.type(screen.getByLabelText('Address'), 'somewhere');
+    await userEvent.click(screen.getByRole('button', { name: 'Save and Continue' }));
+    await waitFor(() => expect(toast.error).toHaveBeenLastCalledWith(expect.stringMatching(/pick it from the suggestions/)));
+    expect(firebase.auth.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it('saves the completed profile', async () => {
+    geocode.mockResolvedValue(located('3226', 'VIC'));
+    const { onSaved } = openRequired();
+    await userEvent.type(screen.getByLabelText('Phone Number'), '0412 345 678');
+    await userEvent.type(screen.getByLabelText('Address'), '26 Seawind Place Ocean Grove');
+    await userEvent.click(screen.getByRole('button', { name: 'Save and Continue' }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(firebase.auth.updateProfile).toHaveBeenCalledWith(expect.objectContaining({
+      full_name: 'Sam Lee', phone: '+61412345678', suburb: 'Ocean Grove', postcode: '3226', state: 'VIC',
+    }));
+  });
+
+  it('lets them sign out instead', async () => {
+    const { onSignOut } = openRequired();
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(onSignOut).toHaveBeenCalled();
   });
 });

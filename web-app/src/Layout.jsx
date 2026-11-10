@@ -1,10 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { firebase } from '@/api/firebaseClient';
 import { Plus, Heart, User, Home, Shield, LogOut, Smartphone } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { BUSINESS_NAME, BUSINESS_ABN } from '@/lib/business';
+import { profileProblem } from '@/pages/login/loginForms';
+
+// Loaded only for someone who needs it, so the address lookup isn't in every page's download.
+const CompleteProfileDialog = lazy(() => import('@/pages/profile/ProfileDialogs')
+    .then((module) => ({ default: module.CompleteProfileDialog })));
+
+// Pages someone with an unfinished profile can still use: signing in and up (a new account's
+// details are saved just after it's created), resetting a password, and reading the Terms and
+// Privacy Policy.
+const PROFILE_OPTIONAL_PAGES = ['Login', 'ResetPassword', 'Terms', 'Privacy'];
 
 export default function Layout({ children, currentPageName }) {
     const [user, setUser] = useState(null);
@@ -15,6 +25,15 @@ export default function Layout({ children, currentPageName }) {
         setIsAuthenticated(!!authUser);
         setUser(authUser ? await firebase.auth.me() : null);
     }), []);
+
+    // Read again on each page: sign-up saves the profile after the sign-in event above.
+    useEffect(() => {
+        if (!firebase.auth.getCurrentUser()) return;
+        firebase.auth.me().then(setUser).catch(() => {});
+    }, [currentPageName]);
+
+    const needsProfile = Boolean(user) && !user.profile_unavailable &&
+        !PROFILE_OPTIONAL_PAGES.includes(currentPageName) && Boolean(profileProblem(user));
 
     const handleLogout = async () => {
         try {
@@ -188,6 +207,16 @@ export default function Layout({ children, currentPageName }) {
                     })}
                 </div>
             </nav>
+
+            {needsProfile && (
+                <Suspense fallback={null}>
+                    <CompleteProfileDialog
+                        user={user}
+                        onSaved={(saved) => setUser((prev) => ({ ...prev, ...saved }))}
+                        onSignOut={handleLogout}
+                    />
+                </Suspense>
+            )}
         </div>
     );
 }

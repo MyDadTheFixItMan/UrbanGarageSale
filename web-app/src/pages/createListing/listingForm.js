@@ -5,6 +5,9 @@ export { isPaid, isPaidOrApproved };
 
 // Must match isPhotoList in firestore.rules, which refuses more.
 export const MAX_PHOTOS = 5;
+// A listing must have this many to be published (the listing rules on the Terms page; the
+// automatic check in functions/lib/listingReview.js sends one with fewer to the admin).
+export const MIN_PHOTOS = 2;
 export const MAX_SALE_DAYS = 3;
 // Before compression: uploadPhoto shrinks each photo to at most 2560×1920 before it's stored.
 export const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
@@ -78,26 +81,40 @@ function localIsoDate(date) {
 }
 
 // Returns the first problem with the form, or null if it can be submitted. `datesLocked` is set
-// for a paid or approved listing, whose dates and times can no longer change.
-export function listingFormProblem(form, { today = new Date(), datesLocked = false } = {}) {
+// for a paid or approved listing, whose dates and times can no longer change. A draft needs only
+// a title, address and dates; publishing (or sending changes to a live listing) needs every field
+// and at least MIN_PHOTOS photos.
+export function listingFormProblem(form, { today = new Date(), datesLocked = false, asDraft = false } = {}) {
     if (!form.title.trim()) return 'Please enter a title';
+    if (!asDraft && !form.description?.trim()) return 'Please enter a description';
+    if (!asDraft && !form.sale_type) return 'Please select a sale type';
     if (!form.address.trim()) return 'Please enter an address';
+    // A live listing's address can't change, so it isn't checked again.
+    if (!asDraft && !datesLocked && (!form.suburb || !form.postcode || !form.state)) {
+        return 'Please pick your address from the suggestions so the suburb, postcode and state fill in';
+    }
     if (!form.start_date) return 'Please select a start date';
     if (!form.end_date) return 'Please select an end date';
+    if (!asDraft && (!form.start_time || !form.end_time)) return 'Please enter the daily start and end times';
 
     const start = new Date(form.start_date);
     const end = new Date(form.end_date);
     if (end < start) return 'End date must be after start date';
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     if (days > MAX_SALE_DAYS) return `Sales can only run for a maximum of ${MAX_SALE_DAYS} consecutive days`;
-    if (datesLocked) return null;
+    if (datesLocked) return photoCountProblem(form, asDraft);
     // Typed dates skip the date picker's minimum, so it is checked here too.
     if (form.start_date < localIsoDate(today)) return "The start date can't be in the past";
     // Times are HH:MM, so comparing them as text compares them as times.
     if (form.start_time && form.end_time && form.end_time <= form.start_time) {
         return 'The daily end time must be after the start time';
     }
-    return null;
+    return photoCountProblem(form, asDraft);
+}
+
+function photoCountProblem(form, asDraft) {
+    if (asDraft || (form.photos?.length ?? 0) >= MIN_PHOTOS) return null;
+    return `Please add at least ${MIN_PHOTOS} photos of the items for sale`;
 }
 
 // Free-period dates may be stored as YYYY-MM-DD strings or Firestore Timestamps.

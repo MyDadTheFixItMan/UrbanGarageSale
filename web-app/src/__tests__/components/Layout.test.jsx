@@ -5,12 +5,21 @@ import { firebase } from '@/api/firebaseClient';
 import Layout from '@/Layout';
 
 jest.mock('@/api/firebaseClient', () => ({
-  firebase: { auth: { onAuthStateChanged: jest.fn(), me: jest.fn(), logout: jest.fn() } },
+  firebase: { auth: { onAuthStateChanged: jest.fn(), me: jest.fn(), logout: jest.fn(), getCurrentUser: jest.fn() } },
 }));
+jest.mock('@/pages/profile/ProfileDialogs', () => ({
+  CompleteProfileDialog: () => <div role="dialog" aria-label="Complete your profile" />,
+}));
+
+const COMPLETE = {
+  email: 'a@b.test', role: 'user', full_name: 'Sam Lee', phone: '+61412345678',
+  address: '1 Main St', suburb: 'Carlton', postcode: '3053', state: 'VIC',
+};
+const completeProfileDialog = () => screen.queryByRole('dialog', { name: 'Complete your profile' });
 
 let authChanged;
 const unsubscribe = jest.fn();
-const renderLayout = () => render(<MemoryRouter><Layout>page</Layout></MemoryRouter>);
+const renderLayout = (page = 'Home') => render(<MemoryRouter><Layout currentPageName={page}>page</Layout></MemoryRouter>);
 const logOutButton = () => screen.queryAllByRole('button', { name: /log out/i });
 
 beforeEach(() => {
@@ -19,7 +28,8 @@ beforeEach(() => {
     authChanged = callback;
     return unsubscribe;
   });
-  firebase.auth.me.mockResolvedValue({ email: 'a@b.test', role: 'user' });
+  firebase.auth.me.mockResolvedValue(COMPLETE);
+  firebase.auth.getCurrentUser.mockReturnValue(null);
 });
 
 describe('Layout', () => {
@@ -35,7 +45,7 @@ describe('Layout', () => {
   });
 
   it('shows Admin once an admin is signed in', async () => {
-    firebase.auth.me.mockResolvedValue({ email: 'a@b.test', role: 'admin' });
+    firebase.auth.me.mockResolvedValue({ ...COMPLETE, role: 'admin' });
     renderLayout();
 
     await act(() => authChanged({ uid: 'admin' }));
@@ -50,6 +60,35 @@ describe('Layout', () => {
     await act(() => authChanged(null));
 
     expect(logOutButton()).toHaveLength(0);
+  });
+
+  it('asks someone signed in with missing profile details to complete them', async () => {
+    firebase.auth.me.mockResolvedValue({ email: 'a@b.test', role: 'user', full_name: 'Sam Lee' });
+    renderLayout();
+    await act(() => authChanged({ uid: 'oauth-user' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Complete your profile' })).toBeInTheDocument();
+  });
+
+  it("doesn't ask on sign-in, Terms or Privacy, when the profile is complete, or when it didn't load", async () => {
+    firebase.auth.me.mockResolvedValue({ email: 'a@b.test', full_name: 'Sam Lee' });
+    for (const page of ['Login', 'Terms', 'Privacy']) {
+      const { unmount } = renderLayout(page);
+      await act(() => authChanged({ uid: 'oauth-user' }));
+      expect(completeProfileDialog()).not.toBeInTheDocument();
+      unmount();
+    }
+
+    firebase.auth.me.mockResolvedValue({ email: 'a@b.test', full_name: 'Sam Lee', profile_unavailable: true });
+    const { unmount } = renderLayout();
+    await act(() => authChanged({ uid: 'oauth-user' }));
+    expect(completeProfileDialog()).not.toBeInTheDocument();
+    unmount();
+
+    firebase.auth.me.mockResolvedValue(COMPLETE);
+    renderLayout();
+    await act(() => authChanged({ uid: 'user' }));
+    expect(completeProfileDialog()).not.toBeInTheDocument();
   });
 
   it('stops listening when it is removed', () => {

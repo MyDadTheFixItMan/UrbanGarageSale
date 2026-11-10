@@ -61,6 +61,17 @@ describe('TwoFactorSetupDialog', () => {
     expect(await screen.findByText(/verification email sent/i)).toBeInTheDocument();
   });
 
+  it('goes back to the number when a resend fails, rather than saying the code was sent', async () => {
+    firebase.auth.isEmailVerified.mockResolvedValue(true);
+    firebase.auth.startMfaEnrollment.mockResolvedValueOnce().mockRejectedValueOnce(new Error('Could not send the SMS code'));
+    renderDialog();
+    await userEvent.click(await screen.findByRole('button', { name: 'Send code' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Resend code' }));
+    expect(await screen.findByText('Could not send the SMS code')).toBeInTheDocument();
+    expect(screen.queryByText(/code sent to/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Mobile number')).toBeInTheDocument();
+  });
+
   it('shows the reason when the verification email cannot be sent', async () => {
     firebase.auth.isEmailVerified.mockResolvedValue(false);
     firebase.auth.sendVerificationEmail.mockRejectedValue(new Error('Please wait a few minutes'));

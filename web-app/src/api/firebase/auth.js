@@ -306,8 +306,15 @@ export const firebaseAuth = {
         return;
       }
 
-      clearRecaptchaElement(element);
       clearRecaptchaVerifier();
+      clearRecaptchaElement(element);
+
+      // Google's reCAPTCHA remembers every element it has rendered into, even after it's
+      // emptied, and refuses a second render there ("reCAPTCHA has already been rendered in
+      // this element"). So each verifier gets a brand-new child element, or every send after
+      // the first on a page (Resend, a second sign-in) would fail.
+      const host = document.createElement('div');
+      element.appendChild(host);
 
       // Wait for DOM to update before creating new verifier
       setTimeout(() => {
@@ -315,7 +322,7 @@ export const firebaseAuth = {
           // Firebase's invisible reCAPTCHA for phone/SMS auth needs no site key of our own.
           // In development with appVerificationDisabledForTesting=true, Firebase skips reCAPTCHA
           // validation but the verifier object is still required.
-          const verifier = new RecaptchaVerifier(auth, elementId, {
+          const verifier = new RecaptchaVerifier(auth, host, {
             size: 'invisible',
             'expired-callback': () => {
               console.log('⚠️ reCAPTCHA expired');

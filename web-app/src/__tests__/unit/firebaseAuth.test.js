@@ -90,6 +90,26 @@ describe('password sign-in', () => {
     await expect(firebaseAuth.completeMfaSignIn('123456')).rejects.toThrow('sign-in session expired');
   });
 
+  it('gives each SMS send its own reCAPTCHA element, so Resend works', async () => {
+    // Real reCAPTCHA refuses to render twice into the same element, even once it's emptied.
+    const resolver = { hints: [{ factorId: 'phone' }], session: 's' };
+    sdk.signInWithEmailAndPassword.mockRejectedValue(authError('auth/multi-factor-auth-required'));
+    sdk.getMultiFactorResolver.mockReturnValue(resolver);
+    sdk.PhoneAuthProvider.verifyPhoneNumber.mockResolvedValue('verification-id');
+    await firebaseAuth.login('a@b.c', 'pw').catch(() => {});
+
+    await firebaseAuth.sendMfaSignInCode('recaptcha-container');
+    await firebaseAuth.sendMfaSignInCode('recaptcha-container');
+
+    const [first, second] = sdk.RecaptchaVerifier.mock.calls.map((call) => call[1]);
+    const container = document.getElementById('recaptcha-container');
+    expect(first).toBeInstanceOf(HTMLElement);
+    expect(second).not.toBe(first);
+    expect(first).not.toBe(container);
+    expect(container.contains(second)).toBe(true);
+    expect(sdk.RecaptchaVerifier.mock.results[0].value.clear).toHaveBeenCalled();
+  });
+
   it('explains a wrong SMS code', async () => {
     const resolver = { hints: [{ factorId: 'phone' }], session: 's', resolveSignIn: jest.fn().mockRejectedValue(authError('auth/invalid-verification-code')) };
     sdk.signInWithEmailAndPassword.mockRejectedValue(authError('auth/multi-factor-auth-required'));

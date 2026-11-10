@@ -127,12 +127,6 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
 
     return (
         <>
-            {error && (
-                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-700 text-sm">{error}</p>
-                </div>
-            )}
-
             <form onSubmit={handleSubmit} className="space-y-4">
                 <Field id="signup-name" label="Full Name">
                     <input id="signup-name" type="text" value={fields.fullName} onChange={set('fullName')}
@@ -174,6 +168,13 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
                     <input id="signup-confirm" type="password" value={fields.confirmPassword} onChange={set('confirmPassword')}
                         placeholder="••••••••" className={INPUT_CLASS} />
                 </Field>
+
+                {/* Next to the button, not above the long form, where it would be out of view */}
+                {error && (
+                    <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-red-700 text-sm">{error}</p>
+                    </div>
+                )}
 
                 <Button
                     type="submit"

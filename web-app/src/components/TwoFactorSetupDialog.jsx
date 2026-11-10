@@ -58,6 +58,8 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
             if (err.emailNotVerified) {
                 setStep('verify-email');
             } else {
+                // Back to the number, so a failed Resend doesn't still say "Code sent to ..."
+                setStep('phone');
                 setError(err.message);
             }
         } finally {

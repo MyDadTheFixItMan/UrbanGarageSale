@@ -13,7 +13,7 @@ import { SALE_TYPES, STATES, MAX_SALE_DAYS } from './listingForm';
 export function FormSection({ title, icon: Icon, children, className = 'mb-6' }) {
     return (
         <section className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-            <h2 className={`text-lg font-semibold text-[#1e3a5f] ${className} flex items-center gap-2`}>
+            <h2 className={`text-lg font-semibold text-navy ${className} flex items-center gap-2`}>
                 {Icon && <Icon className="w-5 h-5" />}
                 {title}
             </h2>

@@ -82,7 +82,7 @@ export default function PromotionsCard({ promotions }) {
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#1e3a5f] text-white text-xs font-bold">
+                                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-navy text-white text-xs font-bold">
                                                 {index + 1}
                                             </span>
                                             <p className="text-sm text-slate-600">{promo.message}</p>
@@ -166,7 +166,7 @@ export default function PromotionsCard({ promotions }) {
                             <Button
                                 onClick={() => saveMutation.mutate(draft)}
                                 disabled={saveMutation.isPending || !draft.trim()}
-                                className="bg-[#1e3a5f] hover:bg-[#152a45]"
+                                className="bg-navy hover:bg-navy-dark"
                             >
                                 {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                                 {editingId ? 'Update' : 'Add'} Message
@@ -177,7 +177,7 @@ export default function PromotionsCard({ promotions }) {
                         </div>
                     </div>
                 ) : (
-                    <Button onClick={() => startEditing(null)} className="bg-[#1e3a5f] hover:bg-[#152a45] w-full">
+                    <Button onClick={() => startEditing(null)} className="bg-navy hover:bg-navy-dark w-full">
                         + Add Promotional Message
                     </Button>
                 )}

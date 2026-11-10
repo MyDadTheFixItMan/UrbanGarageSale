@@ -17,7 +17,7 @@ import ProfileListingCard from './profile/ProfileListingCard';
 import { EditProfileDialog, ChangePasswordDialog, PrintSignDialog, StripeSetupDialog } from './profile/ProfileDialogs';
 
 const DONE_BUTTON = 'bg-green-100 border border-green-300 text-green-700 hover:bg-green-100 cursor-not-allowed opacity-75';
-const ACTION_BUTTON = 'bg-[#1e3a5f] text-white hover:bg-[#152a45]';
+const ACTION_BUTTON = 'bg-navy text-white hover:bg-navy-dark';
 
 function usePromoRotation(count) {
     const [index, setIndex] = useState(0);
@@ -37,7 +37,7 @@ function DetailItem({ icon: Icon, label, value }) {
             </div>
             <div>
                 <p className="text-xs text-slate-500">{label}</p>
-                <p className="text-sm font-medium text-[#1e3a5f]">{value}</p>
+                <p className="text-sm font-medium text-navy">{value}</p>
             </div>
         </div>
     );
@@ -47,7 +47,7 @@ function ListingGrid({ loading, listings, edits = [], empty, onDelete, onPrint }
     if (loading) {
         return (
             <div className="flex justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-[#1e3a5f]" />
+                <Loader2 className="w-6 h-6 animate-spin text-navy" />
             </div>
         );
     }
@@ -151,7 +151,7 @@ export default function Profile() {
     if (!user) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-[#1e3a5f]" />
+                <Loader2 className="w-8 h-8 animate-spin text-navy" />
             </div>
         );
     }
@@ -160,7 +160,7 @@ export default function Profile() {
     const closeStripeDialog = () => setStripeDialogOpen(false);
 
     return (
-        <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
+        <div className="min-h-screen bg-brand-cream overflow-hidden pb-24 md:pb-0">
             <PrintSignDialog listing={printingListing} onClose={() => setPrintingListing(null)} onPrint={handlePrint} />
 
             {/* Watermark */}
@@ -188,21 +188,21 @@ export default function Profile() {
 
             {/* Advertising Ribbon */}
             {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">
                         {allPromotions[promoIndex]?.message}
                     </p>
                 </div>
             )}
 
-            <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+            <section className="relative bg-brand-cream py-16 px-4 sm:px-6 overflow-hidden">
                 <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
                     <div className="flex items-center gap-3 mb-8">
-                        <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-xl bg-navy flex items-center justify-center">
                             <Pencil className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-bold text-[#1e3a5f]">My Profile</h2>
+                            <h2 className="text-2xl font-bold text-navy">My Profile</h2>
                             <p className="text-slate-500">Manage your account information and listings</p>
                         </div>
                     </div>
@@ -210,11 +210,11 @@ export default function Profile() {
                     <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-6 mb-8 shadow-sm">
                         <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:justify-between">
                             <div className="flex items-center gap-4 flex-1">
-                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#1e3a5f] to-[#2d4a6f] flex items-center justify-center text-white text-2xl font-semibold">
+                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-navy to-navy-light flex items-center justify-center text-white text-2xl font-semibold">
                                     {user.full_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase()}
                                 </div>
                                 <div>
-                                    <h1 className="text-xl font-bold text-[#1e3a5f]">{user.full_name || 'User'}</h1>
+                                    <h1 className="text-xl font-bold text-navy">{user.full_name || 'User'}</h1>
                                     <p className="text-slate-500">{user.email}</p>
                                 </div>
                             </div>
@@ -272,12 +272,12 @@ export default function Profile() {
                 </div>
             </section>
 
-            <section className="relative bg-[#f5f1e8] -mt-16">
+            <section className="relative bg-brand-cream -mt-16">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 pt-0 pb-8">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-semibold text-[#1e3a5f]">My Listings</h2>
+                        <h2 className="text-xl font-semibold text-navy">My Listings</h2>
                         <Link to={createPageUrl('CreateListing')}>
-                            <Button className="bg-[#1e3a5f] hover:bg-[#152a45] gap-2">
+                            <Button className="bg-navy hover:bg-navy-dark gap-2">
                                 <Plus className="w-4 h-4" />
                                 New Listing
                             </Button>
@@ -313,7 +313,7 @@ export default function Profile() {
                                         <Tag className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                                         <p className="text-slate-500 mb-4">No active listings</p>
                                         <Link to={createPageUrl('CreateListing')}>
-                                            <Button className="bg-[#1e3a5f] hover:bg-[#152a45]">Create Your First Listing</Button>
+                                            <Button className="bg-navy hover:bg-navy-dark">Create Your First Listing</Button>
                                         </Link>
                                     </>
                                 )}

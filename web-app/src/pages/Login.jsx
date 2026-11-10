@@ -12,7 +12,7 @@ import SecondFactorDialog, { RECAPTCHA_CONTAINER_ID } from './login/SecondFactor
 import SignUpForm from './login/SignUpForm';
 import { oauthErrorMessage } from './login/loginForms';
 
-const INPUT_CLASS = 'w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent';
+const INPUT_CLASS = 'w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent';
 
 function TabButton({ active, onClick, children }) {
   return (
@@ -20,7 +20,7 @@ function TabButton({ active, onClick, children }) {
       type="button"
       onClick={onClick}
       className={`flex-1 py-2 px-4 font-medium text-center transition-colors ${
-        active ? 'text-[#1e3a5f] border-b-2 border-[#1e3a5f]' : 'text-slate-500 hover:text-slate-700'
+        active ? 'text-navy border-b-2 border-navy' : 'text-slate-500 hover:text-slate-700'
       }`}
     >
       {children}
@@ -143,7 +143,7 @@ export default function Login() {
   };
 
   return (
-    <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen flex flex-col overflow-x-hidden pb-32 md:pb-8">
+    <div className="bg-brand-cream min-h-screen flex flex-col overflow-x-hidden pb-32 md:pb-8">
       {/* Watermark */}
       <style>{`
           @media (min-width: 768px) {
@@ -169,22 +169,22 @@ export default function Login() {
 
       {/* Advertising Ribbon */}
       {allPromotions.length > 0 && (
-        <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+        <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
           <p className="text-sm sm:text-base font-semibold">
             {allPromotions[promoIndex]?.message}
           </p>
         </div>
       )}
 
-      <section className="relative bg-[#f5f1e8] py-0 sm:py-8 md:py-16 px-4 sm:px-6 overflow-hidden -mt-2">
+      <section className="relative bg-brand-cream py-0 sm:py-8 md:py-16 px-4 sm:px-6 overflow-hidden -mt-2">
         <div className="max-w-md mx-auto pt-24 sm:pt-2 md:pt-4 relative z-10">
           {/* Page Header */}
           <div className="flex items-center gap-3 mb-12 sm:mb-8">
-            <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-navy flex items-center justify-center">
               <Mail className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-[#1e3a5f]">Account</h2>
+              <h2 className="text-2xl font-bold text-navy">Account</h2>
               <p className="text-slate-500">Log in or create an account</p>
             </div>
           </div>
@@ -241,7 +241,7 @@ export default function Login() {
                   <Button
                     type="submit"
                     disabled={signInLoading}
-                    className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2 rounded-lg"
+                    className="w-full bg-navy hover:bg-navy-dark text-white font-semibold py-2 rounded-lg"
                   >
                     {signInLoading ? 'Signing in...' : 'Sign In'}
                   </Button>
@@ -249,7 +249,7 @@ export default function Login() {
 
                 <Link
                   to={createPageUrl('ResetPassword')}
-                  className="block w-full mt-4 text-[#1e3a5f] hover:text-[#152a45] text-sm font-medium text-center"
+                  className="block w-full mt-4 text-navy hover:text-navy-dark text-sm font-medium text-center"
                 >
                   Forgot password?
                 </Link>

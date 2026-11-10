@@ -53,3 +53,14 @@ export const isPaidOrApproved = (listing) => isLiveStatus(listing) || isPaid(lis
 // The image to show for a listing in lists and on the map: the cover photo's thumbnail when
 // there is one, otherwise the full-size cover photo.
 export const coverImage = (listing) => listing?.thumbnails?.[0] || listing?.photos?.[0] || null;
+
+export const SALE_TYPE_LABELS = Object.freeze({
+    garage_sale: 'Garage Sale',
+    yard_sale: 'Yard Sale',
+    estate_sale: 'Estate Sale',
+    moving_sale: 'Moving Sale',
+    multi_family: 'Multi-Family',
+    clearing_sale: 'Clearing Sale',
+    auction: 'Auction',
+    street_sale: 'Street Sale',
+});

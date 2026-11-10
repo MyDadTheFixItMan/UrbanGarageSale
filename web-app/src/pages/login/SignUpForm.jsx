@@ -13,7 +13,7 @@ import { PHONE_PREFIX, PHONE_PLACEHOLDER, normalizePhone, signUpProblem, oauthEr
 
 // Editing the address means these may no longer match it; saving looks them up again.
 const NO_ADDRESS_PARTS = { suburb: '', postcode: '', state: '' };
-const INPUT_CLASS = 'w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent';
+const INPUT_CLASS = 'w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent';
 
 function Field({ id, label, hint, children }) {
     return (
@@ -179,7 +179,7 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
                 <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2 rounded-lg"
+                    className="w-full bg-navy hover:bg-navy-dark text-white font-semibold py-2 rounded-lg"
                 >
                     {loading ? 'Creating account...' : 'Create Account'}
                 </Button>

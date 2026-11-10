@@ -18,14 +18,14 @@ import PromotionsCard from './admin/PromotionsCard';
 import FreeListingCard from './admin/FreeListingCard';
 import MessagesTab from './admin/MessagesTab';
 
-function StatCard({ title, value, icon: Icon, color = "bg-[#102a43]" }) {
+function StatCard({ title, value, icon: Icon, color = "bg-navy" }) {
     return (
         <Card className="relative overflow-hidden">
             <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                     <div>
                         <p className="text-sm font-medium text-slate-500">{title}</p>
-                        <p className="text-3xl font-bold text-[#1e3a5f] mt-2">{value}</p>
+                        <p className="text-3xl font-bold text-navy mt-2">{value}</p>
                     </div>
                     <div className={`w-12 h-12 rounded-xl ${color} bg-opacity-10 flex items-center justify-center`}>
                         <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-')}`} />
@@ -115,13 +115,13 @@ export default function AdminDashboard() {
     if (!user) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-[#1e3a5f]" />
+                <Loader2 className="w-8 h-8 animate-spin text-navy" />
             </div>
         );
     }
 
     return (
-        <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen overflow-hidden pb-24 md:pb-0">
+        <div className="bg-brand-cream min-h-screen overflow-hidden pb-24 md:pb-0">
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -147,21 +147,21 @@ export default function AdminDashboard() {
 
             {/* Advertising Ribbon */}
             {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">
                         {allPromotions[promoIndex]?.message}
                     </p>
                 </div>
             )}
 
-            <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+            <section className="relative bg-brand-cream py-16 px-4 sm:px-6 overflow-hidden">
                 <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
                     <div className="flex items-center gap-3 mb-8">
-                        <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-xl bg-navy flex items-center justify-center">
                             <Shield className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-[#1e3a5f]">Admin Dashboard</h1>
+                            <h1 className="text-2xl font-bold text-navy">Admin Dashboard</h1>
                             <p className="text-slate-500">Manage listings and view analytics</p>
                         </div>
                     </div>
@@ -169,13 +169,13 @@ export default function AdminDashboard() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 -mb-16">
                         <StatCard title="Active Listings" value={statValue(stats?.activeListings)} icon={Tag} color="bg-green-500" />
                         <StatCard title="Pending Approval" value={statValue(pendingCount)} icon={Clock} color="bg-yellow-500" />
-                        <StatCard title="Monthly Revenue" value={statValue(stats?.monthlyRevenue, formatAud)} icon={DollarSign} color="bg-[#1e3a5f]" />
+                        <StatCard title="Monthly Revenue" value={statValue(stats?.monthlyRevenue, formatAud)} icon={DollarSign} color="bg-navy" />
                         <StatCard title="Total Revenue" value={statValue(stats?.totalRevenue, formatAud)} icon={TrendingUp} color="bg-purple-500" />
                     </div>
                 </div>
             </section>
 
-            <section className="relative bg-[#f5f1e8]">
+            <section className="relative bg-brand-cream">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10 py-8 mt-4 sm:mt-2">
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                         <TabsList className="bg-white border border-slate-200 rounded-lg p-1 w-full justify-start overflow-x-auto md:overflow-visible md:flex-wrap">

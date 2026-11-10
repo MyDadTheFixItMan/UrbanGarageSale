@@ -11,7 +11,7 @@ import { ADMIN_KEY } from './usePagedQuery';
 function SummaryStat({ value, label }) {
     return (
         <div className="text-center p-4 bg-slate-50 rounded-xl">
-            <p className="text-2xl font-bold text-[#1e3a5f]">{value ?? '–'}</p>
+            <p className="text-2xl font-bold text-navy">{value ?? '–'}</p>
             <p className="text-sm text-slate-500">{label}</p>
         </div>
     );

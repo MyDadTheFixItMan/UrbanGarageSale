@@ -4,13 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import {
-    Heart, Loader2, MapPin, Clock, Tag, Route
+    Heart, Loader2, MapPin, Clock, Route
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format, parseISO, isToday, isTomorrow } from 'date-fns';
 import { coverImage } from '@/lib/listings';
+import { formatTimeAU } from '@/lib/format';
+import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
 import { geocode } from '@/lib/geocode';
 import { directionsUrl, fullHomeAddress, orderStopsFrom, saleLocation } from '@/lib/route';
 import {
@@ -139,13 +141,13 @@ export default function SavedListings() {
     if (loading || savedLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-[#1e3a5f]" />
+                <Loader2 className="w-8 h-8 animate-spin text-navy" />
             </div>
         );
     }
 
     return (
-        <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen overflow-hidden pb-24 md:pb-0">
+        <div className="bg-brand-cream min-h-screen overflow-hidden pb-24 md:pb-0">
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -171,23 +173,23 @@ export default function SavedListings() {
 
             {/* Advertising Ribbon */}
             {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">
                         {allPromotions[promoIndex]?.message}
                     </p>
                 </div>
             )}
 
-            <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+            <section className="relative bg-brand-cream py-16 px-4 sm:px-6 overflow-hidden">
             <div className="max-w-4xl mx-auto pt-2 md:pt-4 relative z-10">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center flex-shrink-0">
+                        <div className="w-12 h-12 rounded-xl bg-navy flex items-center justify-center flex-shrink-0">
                             <Heart className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-[#1e3a5f]">Favourite Listings</h1>
+                            <h1 className="text-2xl font-bold text-navy">Favourite Listings</h1>
                             <p className="text-slate-500">
                                 {savedSales.length} {savedSales.length === 1 ? 'sale' : 'sales'} saved
                             </p>
@@ -198,7 +200,7 @@ export default function SavedListings() {
                         <Button
                             onClick={handleRouteAll}
                             disabled={homeLoading}
-                            className="bg-[#1e3a5f] hover:bg-[#152a45] gap-2"
+                            className="bg-navy hover:bg-navy-dark gap-2"
                         >
                             <Route className="w-4 h-4" />
                             Route to All
@@ -211,14 +213,14 @@ export default function SavedListings() {
                         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
                             <Heart className="w-10 h-10 text-slate-300" />
                         </div>
-                        <h2 className="text-xl font-semibold text-[#1e3a5f] mb-2">
+                        <h2 className="text-xl font-semibold text-navy mb-2">
                             No Favourite Listings
                         </h2>
                         <p className="text-slate-500 mb-6 max-w-md mx-auto">
                             Save garage sales to your favourites to easily find them later and plan your route.
                         </p>
                         <Link to={createPageUrl('Home')}>
-                            <Button className="bg-[#1e3a5f] hover:bg-[#152a45]">
+                            <Button className="bg-navy hover:bg-navy-dark">
                                 Browse Sales
                             </Button>
                         </Link>
@@ -246,9 +248,7 @@ export default function SavedListings() {
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center">
-                                                    <Tag className="w-12 h-12 text-slate-300" />
-                                                </div>
+                                                <ListingPlaceholder saleType={sale.sale_type} />
                                             )}
                                         </Link>
 
@@ -256,11 +256,11 @@ export default function SavedListings() {
                                         <div className="flex-1 p-6">
                                             <div className="flex items-start justify-between mb-3">
                                                 <div>
-                                                    <Badge className="bg-[#1e3a5f]/10 text-[#1e3a5f] mb-2">
+                                                    <Badge className="bg-navy/10 text-navy mb-2">
                                                         {getDateLabel(sale)}
                                                     </Badge>
                                                     <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)}>
-                                                        <h3 className="text-lg font-semibold text-[#1e3a5f] hover:text-[#2d4a6f] transition-colors">
+                                                        <h3 className="text-lg font-semibold text-navy hover:text-navy-light transition-colors">
                                                             {sale.title}
                                                         </h3>
                                                     </Link>
@@ -303,7 +303,7 @@ export default function SavedListings() {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Clock className="w-4 h-4 text-slate-400" />
-                                                    <span>{sale.start_time} - {sale.end_time}</span>
+                                                    <span>{formatTimeAU(sale.start_time)}–{formatTimeAU(sale.end_time)}</span>
                                                 </div>
                                             </div>
 
@@ -316,7 +316,7 @@ export default function SavedListings() {
                                                 <Button
                                                     size="sm"
                                                     onClick={() => handleGetDirections(sale)}
-                                                    className="bg-[#1e3a5f] hover:bg-[#152a45] gap-2"
+                                                    className="bg-navy hover:bg-navy-dark gap-2"
                                                 >
                                                     <Route className="w-4 h-4" />
                                                     Route

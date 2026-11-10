@@ -11,7 +11,7 @@ function Change({ label, from, to }) {
         <div className="text-sm">
             <p className="font-medium text-slate-700">{label}</p>
             <p className="text-slate-500 line-through whitespace-pre-line break-words">{from || 'None'}</p>
-            <p className="text-[#1e3a5f] whitespace-pre-line break-words">{to || 'None'}</p>
+            <p className="text-navy whitespace-pre-line break-words">{to || 'None'}</p>
         </div>
     );
 }
@@ -38,7 +38,7 @@ export default function ListingEditRow({ listing, edit, onApprove, onRefuse, pen
         <div className="bg-white rounded-xl border p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <h4 className="font-medium text-[#1e3a5f] break-words">{listing.title}</h4>
+                    <h4 className="font-medium text-navy break-words">{listing.title}</h4>
                     <p className="text-sm text-slate-500 break-words">
                         📍 {listing.address} • {listing.suburb} {listing.postcode} {listing.state}
                     </p>

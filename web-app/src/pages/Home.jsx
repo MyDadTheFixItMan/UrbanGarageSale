@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useTransition } from 'react';
 import { firebase, getSuburbCoordinates } from '@/api/firebaseClient';
-import { Map, List, Tag, Search, Loader2, Heart } from 'lucide-react';
+import { Map, List, Tag, Search, Loader2, Heart, MapPin, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Link } from 'react-router-dom';
@@ -8,8 +8,10 @@ import { createPageUrl } from '../utils';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import SaleMap from '../components/map/SaleMap';
-import { formatDateAU } from '@/lib/format';
-import { coverImage } from '@/lib/listings';
+import { saleWhenLabel, formatDistanceKm } from '@/lib/format';
+import { coverImage, SALE_TYPE_LABELS } from '@/lib/listings';
+import { calculateDistance } from '@/api/firebase/listingSearch';
+import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
 import { useToggleSaved } from '@/lib/useToggleSaved';
 
 export default function Home() {
@@ -19,6 +21,8 @@ export default function Home() {
     const [user, setUser] = useState(null);
     const [isSearching, setIsSearching] = useState(false);
     const [searchResults, setSearchResults] = useState([]);
+    // Where the last search measured from, so cards can show how far away each sale is.
+    const [searchOrigin, setSearchOrigin] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
     const [promoIndex, setPromoIndex] = useState(0);
     const [saleTypeIndex, setSaleTypeIndex] = useState(0);
@@ -233,6 +237,9 @@ export default function Home() {
                     }
 
                     setSearchResults(results);
+                    setSearchOrigin(searchFilters.userLatitude !== undefined
+                        ? { latitude: searchFilters.userLatitude, longitude: searchFilters.userLongitude }
+                        : null);
                 });
             } catch (error) {
                 console.error('Search error:', error);
@@ -246,7 +253,7 @@ export default function Home() {
     const handleSearch = () => runSearch(filters);
 
     return (
-        <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
+        <div className="min-h-screen bg-brand-cream overflow-hidden pb-24 md:pb-0">
             {/* Watermark U Shape */}
             <style>{`
                 @media (min-width: 768px) {
@@ -272,7 +279,7 @@ export default function Home() {
 
             {/* Advertising Ribbon - Rotates every 5 seconds */}
             {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">
                         {allPromotions[promoIndex]?.message}
                     </p>
@@ -280,11 +287,21 @@ export default function Home() {
             )}
 
             {/* Hero Section */}
-            <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+            {/* Extra top space when the fixed promo strip is showing, so a two-line message on a phone doesn't cover the heading. */}
+            <section className={`relative bg-brand-cream pb-16 px-4 sm:px-6 overflow-hidden ${allPromotions.length > 0 ? 'pt-24' : 'pt-16'}`}>
                 <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
                     <div className="text-center mb-8">
-                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#001f3f] mb-4">
-                            Discover Local <span className="inline-block w-24 sm:w-40 md:w-44 text-[#FF9500] mr-2">{saleTypeLabels[saleTypeIndex]}</span> Sales
+                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-navy-dark mb-4">
+                            Discover Local{' '}
+                            {/* Every label sits in the same grid cell, so the space is always as wide as the longest and the line doesn't shift. */}
+                            <span className="inline-grid text-center text-brand-orange-dark">
+                                {saleTypeLabels.map((label, index) => (
+                                    <span key={label} className={`col-start-1 row-start-1 ${index === saleTypeIndex ? '' : 'invisible'}`}>
+                                        {label}
+                                    </span>
+                                ))}
+                            </span>{' '}
+                            Sales
                         </h1>
                         <p className="text-lg text-slate-700 max-w-2xl mx-auto">
                             Find unique treasures in your neighbourhood.
@@ -303,7 +320,7 @@ export default function Home() {
                                         placeholder="Start typing..."
                                         className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-800"
                                         value={filters.postcode}
-                                        onChange={(e) => startTransition(() => setFilters({ ...filters, postcode: e.target.value }))}
+                                        onChange={(e) => setFilters({ ...filters, postcode: e.target.value })}
                                     />
                                 </div>
 
@@ -347,7 +364,7 @@ export default function Home() {
                                 <Button 
                                     onClick={handleSearch}
                                     disabled={isSearching}
-                                    className="bg-[#f97316] text-white hover:bg-[#ea580c] gap-2 font-semibold px-8 h-11 rounded-xl disabled:opacity-50"
+                                    className="bg-brand-orange-dark text-white hover:bg-brand-orange-darker gap-2 font-semibold px-8 h-11 rounded-xl disabled:opacity-50"
                                 >
                                     {isSearching ? (
                                         <Loader2 className="w-5 h-5 animate-spin" />
@@ -367,7 +384,7 @@ export default function Home() {
                 {/* View Toggle */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h2 className="text-2xl font-bold text-[#1e3a5f]">Popular This Weekend</h2>
+                        <h2 className="text-2xl font-bold text-navy">Popular This Weekend</h2>
                         <p className="text-sm text-slate-600">Browse listings in your area</p>
                     </div>
                     
@@ -376,8 +393,8 @@ export default function Home() {
                             onClick={() => setViewMode('list')}
                             className={`font-medium flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                                 viewMode === 'list'
-                                    ? 'bg-[#1e3a5f] text-white'
-                                    : 'text-[#1e3a5f] hover:bg-slate-100'
+                                    ? 'bg-navy text-white'
+                                    : 'text-navy hover:bg-slate-100'
                             }`}
                         >
                             <List className="w-4 h-4" />
@@ -387,8 +404,8 @@ export default function Home() {
                             onClick={() => setViewMode('map')}
                             className={`font-medium flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                                 viewMode === 'map'
-                                    ? 'bg-[#1e3a5f] text-white'
-                                    : 'text-[#1e3a5f] hover:bg-slate-100'
+                                    ? 'bg-navy text-white'
+                                    : 'text-navy hover:bg-slate-100'
                             }`}
                         >
                             <Map className="w-4 h-4" />
@@ -403,7 +420,7 @@ export default function Home() {
                         <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Tag className="w-10 h-10 text-slate-400" />
                         </div>
-                        <h3 className="text-xl font-semibold text-[#1e3a5f] mb-2">
+                        <h3 className="text-xl font-semibold text-navy mb-2">
                             {searchResults.length === 0 && filters.postcode ? 'No listings found' : 'Search for listings'}
                         </h3>
                         <p className="text-slate-600">
@@ -432,33 +449,39 @@ export default function Home() {
                             })
                             .map((sale) => {
                             const isSaved = savedListings.some(s => s.garage_sale_id === sale.id);
+                            const when = saleWhenLabel(sale);
+                            const distance = searchOrigin && sale.latitude && sale.longitude
+                                ? formatDistanceKm(calculateDistance(searchOrigin.latitude, searchOrigin.longitude, sale.latitude, sale.longitude))
+                                : '';
                             return (
                                 <div key={sale.id} className="relative">
-                                    <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)}>
-                                        <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden cursor-pointer">
-                                            <div className="aspect-video bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center relative">
+                                    <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)} className="block h-full">
+                                        <div className="h-full bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow overflow-hidden cursor-pointer">
+                                            <div className="aspect-video relative">
                                                 {coverImage(sale) ? (
                                                     <img src={coverImage(sale)} alt={sale.title} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <Tag className="w-12 h-12 text-slate-400" />
+                                                    <ListingPlaceholder />
                                                 )}
+                                                <span className="absolute bottom-3 left-3 text-xs font-semibold bg-white/95 text-navy px-3 py-1 rounded-full shadow-sm">
+                                                    {SALE_TYPE_LABELS[sale.sale_type] ?? 'Sale'}
+                                                </span>
                                             </div>
                                             <div className="p-4">
-                                                <h3 className="font-semibold text-[#1e3a5f] mb-2 line-clamp-2">{sale.title}</h3>
-                                                <p className="text-sm text-slate-600 mb-3">
-                                                    <span className="font-medium">{sale.suburb}</span>
-                                                    {sale.postcode && <span>, {sale.postcode}</span>}
-                                                </p>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-xs bg-[#f97316] text-white px-3 py-1 rounded-full">
-                                                        {sale.sale_type === 'garage_sale' ? 'Garage Sale' : 'Sale'}
+                                                {when && (
+                                                    <p className="flex items-center gap-1.5 text-sm font-bold text-brand-orange-dark mb-1">
+                                                        <CalendarClock className="w-4 h-4 flex-shrink-0" />
+                                                        {when}
+                                                    </p>
+                                                )}
+                                                <h3 className="text-lg font-bold text-navy leading-snug mb-1 line-clamp-2">{sale.title}</h3>
+                                                <p className="flex items-center gap-1.5 text-sm text-slate-600">
+                                                    <MapPin className="w-4 h-4 flex-shrink-0 text-slate-400" />
+                                                    <span>
+                                                        <span className="font-semibold">{sale.suburb || sale.postcode}</span>
+                                                        {distance && <span> · {distance}</span>}
                                                     </span>
-                                                    {sale.start_date && (
-                                                        <span className="text-xs text-slate-500">
-                                                            {formatDateAU(sale.start_date)}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                </p>
                                             </div>
                                         </div>
                                     </Link>
@@ -466,7 +489,8 @@ export default function Home() {
                                         <button
                                             type="button"
                                             onClick={() => saveFavoriteMutation.mutate(sale.id)}
-                                            className="absolute top-4 right-4 bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-shadow z-40"
+                                            className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-shadow z-40"
+                                            aria-label={isSaved ? 'Remove from favourites' : 'Save to favourites'}
                                             disabled={saveFavoriteMutation.isPending}
                                         >
                                             <Heart

@@ -27,7 +27,7 @@ export default function About() {
     }, [promotions.length]);
 
     return (
-        <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
+        <div className="min-h-screen bg-brand-cream overflow-hidden pb-24 md:pb-0">
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -52,7 +52,7 @@ export default function About() {
             />
 
             {/* Advertising Ribbon */}
-            <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+            <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                 <p className="text-sm sm:text-base font-semibold">
                     {promotions[promoIndex]?.message}
                 </p>
@@ -61,7 +61,7 @@ export default function About() {
             {/* Main Content */}
             <section className="max-w-4xl mx-auto px-4 sm:px-6 pt-24 pb-12 relative z-10">
                 <div className="bg-white rounded-lg shadow-md p-8">
-                    <h1 className="text-4xl font-bold text-[#001f3f] mb-2">About Us</h1>
+                    <h1 className="text-4xl font-bold text-navy-dark mb-2">About Us</h1>
                     <p className="text-slate-600 mb-8 text-lg">Urban Garage Sale</p>
 
                     <div className="prose prose-sm max-w-none text-slate-700 space-y-6">
@@ -70,14 +70,14 @@ export default function About() {
                         </p>
 
                         <div>
-                            <h2 className="text-2xl font-bold text-[#001f3f] mb-3">Our Mission</h2>
+                            <h2 className="text-2xl font-bold text-navy-dark mb-3">Our Mission</h2>
                             <p>
                                 To bring communities together by making garage sales more accessible, visible, and easy to discover. Whether you're clearing out unwanted items, fundraising, or simply giving things a second life, Urban Garage Sale helps you reach more people with less effort.
                             </p>
                         </div>
 
                         <div>
-                            <h2 className="text-2xl font-bold text-[#001f3f] mb-3">What We Do</h2>
+                            <h2 className="text-2xl font-bold text-navy-dark mb-3">What We Do</h2>
                             <ul className="list-disc list-inside space-y-2 ml-2">
                                 <li>Provide a simple way for users to list their garage sales online.</li>
                                 <li>Help buyers discover local sales quickly and conveniently.</li>
@@ -87,14 +87,14 @@ export default function About() {
                         </div>
 
                         <div>
-                            <h2 className="text-2xl font-bold text-[#001f3f] mb-3">Why We Exist</h2>
+                            <h2 className="text-2xl font-bold text-navy-dark mb-3">Why We Exist</h2>
                             <p>
                                 Traditional garage sales rely on word of mouth, hand-drawn signs, and luck. Urban Garage Sale brings this timeless community activity into the digital world by making it easy for people to connect, declutter, and find great deals while reducing waste.
                             </p>
                         </div>
 
                         <div>
-                            <h2 className="text-2xl font-bold text-[#001f3f] mb-3">Our Values</h2>
+                            <h2 className="text-2xl font-bold text-navy-dark mb-3">Our Values</h2>
                             <ul className="list-disc list-inside space-y-2 ml-2">
                                 <li><strong>Community</strong> – We support local connections and neighbourly interaction.</li>
                                 <li><strong>Simplicity</strong> – Easy to use, easy to find, easy to share.</li>
@@ -104,7 +104,7 @@ export default function About() {
                         </div>
 
                         <div>
-                            <h2 className="text-2xl font-bold text-[#001f3f] mb-3">Who We Serve</h2>
+                            <h2 className="text-2xl font-bold text-navy-dark mb-3">Who We Serve</h2>
                             <p className="font-semibold mb-2">Urban Garage Sale is for:</p>
                             <ul className="list-disc list-inside space-y-2 ml-2">
                                 <li>Individuals hosting a garage or yard sale</li>
@@ -116,7 +116,7 @@ export default function About() {
                         </div>
 
                         <div>
-                            <h2 className="text-2xl font-bold text-[#001f3f] mb-3">Our Commitment</h2>
+                            <h2 className="text-2xl font-bold text-navy-dark mb-3">Our Commitment</h2>
                             <p>
                                 We aim to keep the platform safe, transparent, and easy to use. As we grow, we'll continue to add features that help buyers and sellers connect more efficiently and safely.
                             </p>

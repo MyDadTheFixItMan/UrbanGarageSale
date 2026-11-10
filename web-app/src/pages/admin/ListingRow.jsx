@@ -61,7 +61,7 @@ export default function ListingRow({ listing, overrideStatus = null, onApprove, 
                     )}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <h4 className="font-medium text-[#1e3a5f] break-words">{listing.title}</h4>
+                    <h4 className="font-medium text-navy break-words">{listing.title}</h4>
                     <p className="text-sm text-slate-500 break-words">
                         📍 {listing.address} • {listing.suburb} {listing.postcode} {listing.state}
                     </p>

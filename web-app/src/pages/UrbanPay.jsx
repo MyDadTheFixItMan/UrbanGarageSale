@@ -178,14 +178,14 @@ export default function UrbanPay() {
     if (loading) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-                <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-[#FF9500] rounded-full animate-spin" />
+                <div className="w-8 h-8 border-4 border-navy border-t-brand-orange rounded-full animate-spin" />
                 <p className="text-slate-600">Loading...</p>
             </div>
         );
     }
 
     return (
-        <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen overflow-hidden pb-24 md:pb-0">
+        <div className="bg-brand-cream min-h-screen overflow-hidden pb-24 md:pb-0">
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -211,21 +211,21 @@ export default function UrbanPay() {
 
             {/* Advertising Ribbon */}
             {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">
                         {allPromotions[promoIndex]?.message}
                     </p>
                 </div>
             )}
 
-            <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+            <section className="relative bg-brand-cream py-16 px-4 sm:px-6 overflow-hidden">
                 <div className="max-w-4xl mx-auto pt-2 md:pt-4 relative z-10">
                     <div className="flex items-center gap-3 mb-8">
-                        <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center flex-shrink-0">
+                        <div className="w-12 h-12 rounded-xl bg-navy flex items-center justify-center flex-shrink-0">
                             <Smartphone className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-[#1e3a5f]">Urban Pay</h1>
+                            <h1 className="text-2xl font-bold text-navy">Urban Pay</h1>
                             <p className="text-slate-500">Accept payments from buyers during your garage sale</p>
                         </div>
                     </div>
@@ -263,7 +263,7 @@ export default function UrbanPay() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
                                         <p className="text-xs text-slate-600 font-semibold">Total Earnings</p>
-                                        <p className="text-2xl font-bold text-[#1e3a5f] mt-1">{formatAud(sellerStats.totalEarnings)}</p>
+                                        <p className="text-2xl font-bold text-navy mt-1">{formatAud(sellerStats.totalEarnings)}</p>
                                     </div>
                                     <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
                                         <p className="text-xs text-slate-600 font-semibold">Total Sales</p>

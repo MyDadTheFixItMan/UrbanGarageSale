@@ -143,7 +143,7 @@ export default function UsersTab({ currentUserEmail }) {
                             <div key={u.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <p className="font-medium text-[#1e3a5f] truncate">
+                                        <p className="font-medium text-navy truncate">
                                             {u.full_name || 'No name'}
                                         </p>
                                         {u.role === 'admin' && (

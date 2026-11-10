@@ -93,7 +93,7 @@ export default function SaleMap({ sales, center, zoom = 12 }) {
                         >
                             <Popup className="sale-popup">
                                 <div className="p-2 min-w-[200px]">
-                                    <h3 className="font-semibold text-[#1e40af] text-sm mb-2">
+                                    <h3 className="font-semibold text-navy text-sm mb-2">
                                         {sale.title}
                                     </h3>
                                     <div className="space-y-1 text-xs text-slate-600 mb-3">

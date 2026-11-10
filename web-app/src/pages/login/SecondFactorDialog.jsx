@@ -121,7 +121,7 @@ export default function SecondFactorDialog({ phoneHint, sending = false, error: 
                             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                             placeholder="000000"
                             maxLength="6"
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent text-center text-2xl tracking-widest"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent text-center text-2xl tracking-widest"
                         />
                         <p className="text-xs text-slate-500 mt-1">Enter the 6-digit code</p>
                     </div>
@@ -129,7 +129,7 @@ export default function SecondFactorDialog({ phoneHint, sending = false, error: 
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2 rounded-lg"
+                        className="w-full bg-navy hover:bg-navy-dark text-white font-semibold py-2 rounded-lg"
                     >
                         {loading ? 'Verifying...' : 'Verify Code'}
                     </Button>
@@ -143,7 +143,7 @@ export default function SecondFactorDialog({ phoneHint, sending = false, error: 
                         {resendLabel}
                     </button>
 
-                    <button type="button" onClick={onCancel} disabled={loading} className="w-full text-[#1e3a5f] hover:text-[#152a45] text-sm font-medium py-2">
+                    <button type="button" onClick={onCancel} disabled={loading} className="w-full text-navy hover:text-navy-dark text-sm font-medium py-2">
                         Back to Sign In
                     </button>
                 </form>

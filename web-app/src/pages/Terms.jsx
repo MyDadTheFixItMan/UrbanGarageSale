@@ -29,7 +29,7 @@ export default function Terms() {
     }, [promotions.length]);
 
     return (
-        <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
+        <div className="min-h-screen bg-brand-cream overflow-hidden pb-24 md:pb-0">
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -54,7 +54,7 @@ export default function Terms() {
             />
 
             {/* Advertising Ribbon */}
-            <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+            <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                 <p className="text-sm sm:text-base font-semibold">
                     {promotions[promoIndex]?.message}
                 </p>
@@ -65,7 +65,7 @@ export default function Terms() {
                 <div className="bg-white rounded-lg shadow-md p-8">
                     {/* Terms and Conditions */}
                     <div className="mb-12">
-                        <h1 className="text-3xl font-bold text-[#001f3f] mb-2">Terms and Conditions</h1>
+                        <h1 className="text-3xl font-bold text-navy-dark mb-2">Terms and Conditions</h1>
                         <p className="text-slate-600 mb-6">Urban Garage Sale</p>
                         <p className="text-sm text-slate-500 mb-6">Last updated: October 2026</p>
 
@@ -73,17 +73,17 @@ export default function Terms() {
                             <p className="italic">Welcome to Urban Garage Sale. By accessing or using this platform, you agree to comply with and be bound by the following Terms and Conditions. Please read them carefully.</p>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">1. About the Platform</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">1. About the Platform</h3>
                                 <p>Urban Garage Sale provides an online space where users can list garage sales and where buyers can search for nearby events. Urban Garage Sale is not involved in the transactions, negotiations, or interactions between users.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">2. Eligibility</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">2. Eligibility</h3>
                                 <p>You must be at least 18 years old to create listings or interact with other users on the platform.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">3. User Responsibilities</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">3. User Responsibilities</h3>
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>All information in your listing must be accurate, lawful, and up to date.</li>
                                     <li>You must only post genuine garage sales that you own or have permission to promote.</li>
@@ -93,7 +93,7 @@ export default function Terms() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">4. User Generated Content</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">4. User Generated Content</h3>
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>You retain ownership of the content you submit.</li>
                                     <li>By posting a listing, you grant Urban Garage Sale a non-exclusive, worldwide, royalty-free licence to use, display, and distribute this content for the purpose of running and promoting the platform.</li>
@@ -102,7 +102,7 @@ export default function Terms() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">5. Interactions and Transactions</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">5. Interactions and Transactions</h3>
                                 <p>Urban Garage Sale does not monitor or guarantee:</p>
                                 <ul className="list-disc list-inside space-y-1 ml-4">
                                     <li>the accuracy of listings;</li>
@@ -113,7 +113,7 @@ export default function Terms() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">6. Prohibited Activities</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">6. Prohibited Activities</h3>
                                 <p>Users must not:</p>
                                 <ul className="list-disc list-inside space-y-1 ml-4">
                                     <li>list illegal goods;</li>
@@ -124,7 +124,7 @@ export default function Terms() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">7. Fees and Payments</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">7. Fees and Payments</h3>
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>Publishing a listing costs the fee shown before you pay (currently A$10.00). All prices are in Australian dollars and include GST.</li>
                                     <li>Listing fees are processed by Stripe. Listings are reviewed before going live; if we reject your listing we refund the fee automatically to the card you paid with. Refunds usually appear within 5–10 business days.</li>
@@ -135,28 +135,28 @@ export default function Terms() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">8. Platform Availability</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">8. Platform Availability</h3>
                                 <p>Urban Garage Sale may update, modify, or suspend parts of the service at any time. We do not guarantee uninterrupted or error-free operation.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">9. Liability</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">9. Liability</h3>
                                 <p>Urban Garage Sale is a listing platform and is not a party to sales between buyers and sellers. To the extent permitted by law, we are not liable for losses or disputes arising from those sales or from your use of the platform.</p>
                                 <p className="mt-2">Nothing in these Terms excludes, restricts, or modifies rights you may have under the Australian Consumer Law (including non-excludable consumer guarantees) or any other law where those rights cannot lawfully be excluded.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">10. Termination</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">10. Termination</h3>
                                 <p>Urban Garage Sale may suspend or delete accounts that violate the Terms or pose risks to others.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">11. Changes to Terms</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">11. Changes to Terms</h3>
                                 <p>We may update these Terms from time to time. We will notify you by email or on the website before any material change takes effect. If you do not agree with a change, you may stop using the platform and ask us to close your account.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">12. Governing Law</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">12. Governing Law</h3>
                                 <p>These Terms are governed by the laws in force in Victoria, Australia. You and Urban Garage Sale submit to the non-exclusive jurisdiction of the courts of Victoria and the courts that can hear appeals from them.</p>
                             </div>
                         </div>
@@ -164,12 +164,12 @@ export default function Terms() {
 
                     {/* Safety Guidelines */}
                     <div className="border-t pt-12">
-                        <h2 className="text-3xl font-bold text-[#001f3f] mb-2">Safety Guidelines</h2>
+                        <h2 className="text-3xl font-bold text-navy-dark mb-2">Safety Guidelines</h2>
                         <p className="text-slate-600 mb-6">Urban Garage Sale</p>
 
                         <div className="prose prose-sm max-w-none text-slate-700 space-y-4">
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">For Sellers</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">For Sellers</h3>
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>Provide only the details needed to locate your sale.</li>
                                     <li>Avoid posting photos with visible house numbers or personal identifiers.</li>
@@ -180,7 +180,7 @@ export default function Terms() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">For Buyers</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">For Buyers</h3>
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>Respect private property and follow signage.</li>
                                     <li>Do not request entry to areas outside the sale space.</li>
@@ -190,7 +190,7 @@ export default function Terms() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">General Safety</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">General Safety</h3>
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>Report suspicious activity or fraudulent listings to Urban Garage Sale.</li>
                                     <li>Never share financial or private information with other users.</li>

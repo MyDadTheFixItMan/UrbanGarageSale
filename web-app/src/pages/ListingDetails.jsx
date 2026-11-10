@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { firebase } from '@/api/firebaseClient';
 import { useQuery } from '@tanstack/react-query';
-import { canBeSaved } from '@/lib/listings';
+import { canBeSaved, SALE_TYPE_LABELS } from '@/lib/listings';
+import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
 import { usePromotions } from '@/lib/usePromotions';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import {
     MapPin, Clock, Calendar, Heart, Navigation, ChevronLeft,
-    Share2, Tag, Loader2, ImageIcon, Printer
+    Share2, Tag, Loader2, Printer
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 import { format, parseISO, differenceInDays } from 'date-fns';
 import SaleMap from '../components/map/SaleMap';
 import { printAfterDialogCloses, paperSizes } from '../utils/printGarageSaleSign';
-import { AU_WEEKDAY_DATE } from '@/lib/format';
+import { AU_WEEKDAY_DATE, formatTimeAU } from '@/lib/format';
 import { useToggleSaved } from '@/lib/useToggleSaved';
 import { directionsUrl, saleLocation } from '@/lib/route';
 import {
@@ -25,17 +26,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-
-const saleTypeLabels = {
-    garage_sale: 'Garage Sale',
-    yard_sale: 'Yard Sale',
-    estate_sale: 'Estate Sale',
-    moving_sale: 'Moving Sale',
-    multi_family: 'Multi-Family',
-    clearing_sale: 'Clearing Sale',
-    auction: 'Auction',
-    street_sale: 'Street Sale',
-};
 
 export default function ListingDetails() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -128,7 +118,7 @@ export default function ListingDetails() {
     if (saleLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-[#1e3a5f]" />
+                <Loader2 className="w-8 h-8 animate-spin text-navy" />
             </div>
         );
     }
@@ -137,10 +127,10 @@ export default function ListingDetails() {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-4">
                 <Tag className="w-16 h-16 text-slate-300 mb-4" />
-                <h1 className="text-2xl font-semibold text-[#1e3a5f] mb-2">Listing Not Found</h1>
+                <h1 className="text-2xl font-semibold text-navy mb-2">Listing Not Found</h1>
                 <p className="text-slate-500 mb-6">This listing may have been removed or expired.</p>
                 <Link to={createPageUrl('Home')}>
-                    <Button className="bg-[#1e3a5f] hover:bg-[#152a45]">
+                    <Button className="bg-navy hover:bg-navy-dark">
                         Back to Home
                     </Button>
                 </Link>
@@ -150,7 +140,7 @@ export default function ListingDetails() {
 
     if (!sale || !sale.start_date || !sale.end_date) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <div className="min-h-screen bg-brand-cream flex items-center justify-center">
                 <div className="text-center">
                     <h2 className="text-2xl font-bold text-slate-700 mb-2">Listing not found</h2>
                     <p className="text-slate-500 mb-4">This listing is missing required information</p>
@@ -162,12 +152,44 @@ export default function ListingDetails() {
         );
     }
 
+    // Shown under the title on wide screens, and pinned to the bottom of the screen otherwise.
+    const actionButtons = (
+        <div className="flex gap-3">
+            <Button
+                variant="outline"
+                onClick={handleShare}
+                className="flex-shrink-0 bg-white"
+                aria-label="Share this listing"
+            >
+                <Share2 className="w-5 h-5" />
+            </Button>
+
+            <Button
+                variant="outline"
+                onClick={() => setPrintDialogOpen(true)}
+                className="flex-shrink-0 bg-white"
+                aria-label="Print garage sale sign"
+                title="Print this garage sale sign"
+            >
+                <Printer className="w-5 h-5" />
+            </Button>
+
+            <Button
+                onClick={handleGetDirections}
+                className="flex-1 bg-navy hover:bg-navy-dark gap-2"
+            >
+                <Navigation className="w-5 h-5" />
+                Get Directions
+            </Button>
+        </div>
+    );
+
     const startDate = parseISO(sale.start_date);
     const endDate = parseISO(sale.end_date);
     const durationDays = differenceInDays(endDate, startDate) + 1;
 
     return (
-        <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen overflow-clip pb-4 md:pb-8">
+        <div className="bg-brand-cream min-h-screen overflow-clip pb-4 md:pb-8">
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -191,7 +213,7 @@ export default function ListingDetails() {
 
             {/* Advertising Ribbon */}
             {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">
                         {allPromotions[promoIndex]?.message}
                     </p>
@@ -202,7 +224,7 @@ export default function ListingDetails() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-56 md:pt-16 relative z-10 py-4">
                 <div className="flex items-center justify-between">
                     <Link to={createPageUrl('Home')}>
-                        <Button variant="ghost" className="gap-2 text-slate-600 hover:text-[#1e3a5f]">
+                        <Button variant="ghost" className="gap-2 text-slate-600 hover:text-navy">
                             <ChevronLeft className="w-4 h-4" />
                             Back to listings
                         </Button>
@@ -213,7 +235,7 @@ export default function ListingDetails() {
                             onClick={() => saveMutation.mutate(saleId)}
                             disabled={saveMutation.isPending}
                             variant={isSaved ? "default" : "outline"}
-                            className={`gap-2 ${isSaved ? 'bg-[#1e3a5f] hover:bg-[#152a45]' : ''}`}
+                            className={`gap-2 ${isSaved ? 'bg-navy hover:bg-navy-dark' : ''}`}
                         >
                             <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
                             {isSaved ? 'Saved to Favourites' : 'Save to Favourites'}
@@ -234,9 +256,7 @@ export default function ListingDetails() {
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-                                    <ImageIcon className="w-20 h-20 text-slate-300" />
-                                </div>
+                                <ListingPlaceholder saleType={sale.sale_type} />
                             )}
                         </div>
                         
@@ -248,7 +268,7 @@ export default function ListingDetails() {
                                         onClick={() => setSelectedImageIndex(index)}
                                         className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${
                                             selectedImageIndex === index
-                                                ? 'border-[#102a43] shadow-lg'
+                                                ? 'border-navy shadow-lg'
                                                 : 'border-transparent opacity-70 hover:opacity-100'
                                         }`}
                                     >
@@ -269,26 +289,27 @@ export default function ListingDetails() {
                         <div>
                             <div className="flex items-center gap-2 mb-3">
                                 {sale.sale_type && (
-                                    <Badge className="bg-[#1e3a5f] text-white">
-                                        {saleTypeLabels[sale.sale_type]}
+                                    <Badge className="bg-navy text-white">
+                                        {SALE_TYPE_LABELS[sale.sale_type]}
                                     </Badge>
                                 )}
                             </div>
-                            <h1 className="text-3xl font-bold text-[#1e3a5f] mb-2">
+                            <h1 className="text-3xl font-bold text-navy mb-2">
                                 {sale.title}
                             </h1>
+                            <div className="hidden lg:block mt-4">{actionButtons}</div>
                         </div>
 
                         {/* Date & Time */}
                         <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-                            <h3 className="font-semibold text-[#1e3a5f] mb-4">When</h3>
+                            <h3 className="font-semibold text-navy mb-4">When</h3>
                             <div className="space-y-3">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-[#1e3a5f]/10 flex items-center justify-center">
-                                        <Calendar className="w-5 h-5 text-[#1e3a5f]" />
+                                    <div className="w-10 h-10 rounded-xl bg-navy/10 flex items-center justify-center">
+                                        <Calendar className="w-5 h-5 text-navy" />
                                     </div>
                                     <div>
-                                        <p className="font-medium text-[#1e40af]">
+                                        <p className="font-medium text-navy">
                                             {format(startDate, AU_WEEKDAY_DATE)}
                                             {durationDays > 1 && ` - ${format(endDate, AU_WEEKDAY_DATE)}`}
                                         </p>
@@ -298,12 +319,12 @@ export default function ListingDetails() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-[#1e3a5f]/10 flex items-center justify-center">
-                                        <Clock className="w-5 h-5 text-[#1e3a5f]" />
+                                    <div className="w-10 h-10 rounded-xl bg-navy/10 flex items-center justify-center">
+                                        <Clock className="w-5 h-5 text-navy" />
                                     </div>
                                     <div>
-                                        <p className="font-medium text-[#1e40af]">
-                                            {sale.start_time} - {sale.end_time}
+                                        <p className="font-medium text-navy">
+                                            {formatTimeAU(sale.start_time)}–{formatTimeAU(sale.end_time)}
                                         </p>
                                         <p className="text-sm text-slate-500">Daily hours</p>
                                     </div>
@@ -313,13 +334,13 @@ export default function ListingDetails() {
 
                         {/* Location */}
                         <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-                            <h3 className="font-semibold text-[#1e3a5f] mb-4">Where</h3>
+                            <h3 className="font-semibold text-navy mb-4">Where</h3>
                             <div className="flex items-start gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-xl bg-[#1e3a5f]/10 flex items-center justify-center flex-shrink-0">
-                                    <MapPin className="w-5 h-5 text-[#1e3a5f]" />
+                                <div className="w-10 h-10 rounded-xl bg-navy/10 flex items-center justify-center flex-shrink-0">
+                                    <MapPin className="w-5 h-5 text-navy" />
                                 </div>
                                 <div>
-                                    <p className="font-medium text-[#1e3a5f]">{sale.address}</p>
+                                    <p className="font-medium text-navy">{sale.address}</p>
                                     {sale.suburb && (
                                         <p className="text-sm text-slate-600">{sale.suburb}</p>
                                     )}
@@ -343,7 +364,7 @@ export default function ListingDetails() {
                         {/* Description */}
                         {sale.description && (
                             <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-                                <h3 className="font-semibold text-[#1e3a5f] mb-3">About This Sale</h3>
+                                <h3 className="font-semibold text-navy mb-3">About This Sale</h3>
                                 <p className="text-slate-600 whitespace-pre-wrap">{sale.description}</p>
                             </div>
                         )}
@@ -351,36 +372,10 @@ export default function ListingDetails() {
                 </div>
             </div>
 
-            {/* Bottom Actions: on mobile they stick just above the bottom nav. Needs the page's overflow-clip, not overflow-hidden. */}
-            <div className="sticky bottom-20 z-30 bg-white border-t p-4 md:static md:mt-8 md:bg-transparent md:border-0 md:p-0 md:max-w-7xl md:mx-auto md:px-4 md:pb-8">
-                <div className="flex gap-3 max-w-7xl mx-auto">
-                    <Button
-                        variant="outline"
-                        onClick={handleShare}
-                        className="flex-shrink-0"
-                        aria-label="Share this listing"
-                    >
-                        <Share2 className="w-5 h-5" />
-                    </Button>
-
-                    <Button
-                        variant="outline"
-                        onClick={() => setPrintDialogOpen(true)}
-                        className="flex-shrink-0"
-                        aria-label="Print garage sale sign"
-                        title="Print this garage sale sign"
-                    >
-                        <Printer className="w-5 h-5" />
-                    </Button>
-                    
-                    <Button
-                        onClick={handleGetDirections}
-                        className="flex-1 bg-[#1e3a5f] hover:bg-[#152a45] gap-2"
-                    >
-                        <Navigation className="w-5 h-5" />
-                        Get Directions
-                    </Button>
-                </div>
+            {/* Bottom Actions on phones and tablets: they stick just above the mobile bottom nav, or the
+                screen edge on tablets. Needs the page's overflow-clip, not overflow-hidden. */}
+            <div className="sticky bottom-20 md:bottom-0 z-30 mt-8 bg-white border-t p-4 lg:hidden">
+                <div className="max-w-7xl mx-auto">{actionButtons}</div>
             </div>
 
             {/* Print Size Selection Dialog */}
@@ -414,7 +409,7 @@ export default function ListingDetails() {
                             Cancel
                         </Button>
                         <Button 
-                            className="bg-[#1e3a5f] hover:bg-[#152a45]"
+                            className="bg-navy hover:bg-navy-dark"
                             onClick={handlePrintSignConfirm}
                         >
                             <Printer className="w-4 h-4 mr-2" />

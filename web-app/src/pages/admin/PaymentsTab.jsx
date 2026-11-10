@@ -39,7 +39,7 @@ function PaymentCard({ payment, sale, payer }) {
         <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-purple-200 transition">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <p className="font-semibold text-[#1e3a5f]">{formatAud(payment.amount)}</p>
+                    <p className="font-semibold text-navy">{formatAud(payment.amount)}</p>
                     <p className="text-sm text-slate-600 mt-1">{sale?.title || 'Unknown Listing'}</p>
                     <p className="text-base font-medium text-slate-900 mt-2">{payer?.full_name || payment.user_email}</p>
                 </div>

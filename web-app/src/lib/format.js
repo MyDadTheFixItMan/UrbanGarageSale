@@ -64,7 +64,7 @@ export function saleDayLabel(start, end, now = new Date()) {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     // Rounded so a daylight-saving change doesn't shift the count.
     const daysAway = (date) =>
-        Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()) - today) / 86_400_000);
+        Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() - today.getTime()) / 86_400_000);
 
     const startsIn = daysAway(startDate);
     if (startsIn <= 0 && daysAway(endDate) >= 0) return 'Today';

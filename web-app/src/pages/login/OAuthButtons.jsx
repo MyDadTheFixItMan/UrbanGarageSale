@@ -43,6 +43,9 @@ const ICONS = {
 };
 
 const LABELS = { google: 'Google', facebook: 'Facebook', apple: 'Apple' };
+// The providers turned on in Firebase (Authentication > Sign-in method). Facebook and Apple are
+// off until their developer accounts are set up; add them back here once they're turned on.
+export const ENABLED_PROVIDERS = ['google'];
 
 // Google / Facebook / Apple buttons. `compact` is the smaller style used under the sign-up form.
 export default function OAuthButtons({ onSelect, disabled, label, compact = false }) {
@@ -54,7 +57,7 @@ export default function OAuthButtons({ onSelect, disabled, label, compact = fals
                 <div className="flex-1 border-t border-slate-300"></div>
             </div>
             <div className={compact ? 'space-y-2' : 'space-y-3'}>
-                {Object.keys(LABELS).map((provider) => (
+                {ENABLED_PROVIDERS.map((provider) => (
                     <button
                         key={provider}
                         type="button"

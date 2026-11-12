@@ -198,6 +198,7 @@ export const firebaseAuth = {
       throw notSignedIn();
     }
 
+    let unavailable = false;
     try {
       // Get user profile from Firestore
       const userSnap = await getDoc(doc(db, 'users', user.uid));
@@ -211,16 +212,19 @@ export const firebaseAuth = {
     } catch (error) {
       // Don't block app if Firestore is temporarily unavailable
       console.warn('⚠️ Could not fetch user profile from Firestore:', error.message);
+      unavailable = true;
     }
 
     // Return auth user data even if Firestore fails
-    // This allows the app to function while Firestore reconnects
+    // This allows the app to function while Firestore reconnects. profile_unavailable tells
+    // the header not to ask for missing profile details that may just not have loaded.
     return {
       id: user.uid,
       email: user.email,
       full_name: user.displayName || '',
       role: 'user',
-      phone_verified: false
+      phone_verified: false,
+      ...(unavailable ? { profile_unavailable: true } : {}),
     };
   },
 

@@ -9,7 +9,7 @@ import { MIN_PASSWORD_LENGTH } from '@/lib/password';
 import { createPageUrl } from '@/utils';
 import OAuthButtons, { signInWithProvider } from './OAuthButtons';
 import { addressDetails } from '@/lib/addressDetails';
-import { PHONE_PREFIX, PHONE_PLACEHOLDER, normalizePhone, signUpProblem, oauthErrorMessage } from './loginForms';
+import { PHONE_PREFIX, PHONE_PLACEHOLDER, normalizePhone, signUpProblem, profileProblem, oauthErrorMessage } from './loginForms';
 
 // Editing the address means these may no longer match it; saving looks them up again.
 const NO_ADDRESS_PARTS = { suburb: '', postcode: '', state: '' };
@@ -75,11 +75,16 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
             // Firebase emails a verification link; a verified email is needed before the mobile
             // number can be enrolled for 2FA in the Profile page.
             const location = await addressDetails(fields.address, fields);
+            const missing = profileProblem({ full_name: fields.fullName, phone: fields.phone, address: fields.address, ...location });
+            if (missing) {
+                setError(missing);
+                return;
+            }
             await firebase.auth.signUp(fields.email, fields.password);
             await firebase.auth.updateProfile({
                 phone: normalizePhone(fields.phone).phone,
                 phone_verified: false,
-                full_name: fields.fullName,
+                full_name: fields.fullName.trim(),
                 address: fields.address,
                 ...location,
                 created_date: new Date().toISOString(),

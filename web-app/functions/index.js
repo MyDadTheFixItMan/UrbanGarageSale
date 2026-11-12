@@ -3,8 +3,10 @@
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const logger = require('firebase-functions/logger');
 const Stripe = require('stripe');
+const { Anthropic } = require('@anthropic-ai/sdk');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
@@ -12,8 +14,9 @@ const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
     isDocId, isRole, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, unusedPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
-    isUnpaidListing, isExpiredDraft, refundablePayments,
+    isUnpaidListing, isExpiredDraft, refundablePayments, storagePathFromUrl,
 } = require('./lib/helpers');
+const listingReview = require('./lib/listingReview');
 
 const REGION = 'australia-southeast1';
 const TIME_ZONE = 'Australia/Melbourne';
@@ -59,6 +62,17 @@ const LISTING_FEE_CENTS = 1000;
 const APP_URL = process.env.APP_URL;
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'notification@urbangaragesales.com.au';
 const BUSINESS_FOOTER = 'Urban Garage Sale · urbangaragesales.com.au · support@urbangaragesales.com.au';
+
+// Automatic listing check by Claude, set by CLAUDE_REVIEW_MODE in functions/.env:
+//   off    - no check; the admin approves every listing as before
+//   advise - Claude checks every listing and emails its verdict to the admin, who still approves
+//   auto   - listings Claude passes go live; the rest are emailed to the admin for review
+// Claude never rejects a listing: rejecting refunds the fee, so a person decides that.
+const REVIEW_MODE = ['off', 'advise', 'auto'].includes(process.env.CLAUDE_REVIEW_MODE) ? process.env.CLAUDE_REVIEW_MODE : 'off';
+const REVIEW_MODEL = process.env.CLAUDE_REVIEW_MODEL || 'claude-opus-5-5';
+const ADMIN_REVIEW_EMAIL = process.env.ADMIN_REVIEW_EMAIL || 'admin@urbangaragesales.com.au';
+// Firestore triggers run next to the database (Melbourne), not in REGION.
+const DATABASE_REGION = 'australia-southeast2';
 
 // Per-user rate limit (fixed one-minute window counted in Firestore, so it holds across
 // instances). Counters expire through the TTL policy on rateLimits.expiresAt.
@@ -302,6 +316,22 @@ async function sellerEmail(sellerId) {
     return (await auth.getUser(sellerId).catch(() => null))?.email;
 }
 
+// Tells the seller their listing (or their changes to it) went live. Returns whether it was sent.
+async function emailApproval(saleId, listing) {
+    const to = await sellerEmail(listing.user_id);
+    if (!to) {
+        throw new HttpsError('not-found', 'Seller has no email address');
+    }
+    const sent = await sendEmail({
+        to,
+        from: FROM_EMAIL,
+        subject: 'Your garage sale listing has been approved',
+        html: approvalEmailHtml({ title: listing.title, footer: BUSINESS_FOOTER }),
+    });
+    if (!sent) logger.warn(`Email not sent (SendGrid not configured). Approval for listing ${saleId}`);
+    return sent;
+}
+
 // Send listing-approved email (admin only)
 exports.sendApprovalEmail = callable(['SENDGRID_API_KEY'], async (request) => {
     const adminUid = requireAdmin(request);
@@ -312,20 +342,8 @@ exports.sendApprovalEmail = callable(['SENDGRID_API_KEY'], async (request) => {
     if (!listing.exists || !listing.data().user_id) {
         throw new HttpsError('not-found', 'Listing not found');
     }
-    const { user_id: sellerId, title } = listing.data();
-    const userEmail = await sellerEmail(sellerId);
-    if (!userEmail) {
-        throw new HttpsError('not-found', 'Seller has no email address');
-    }
-
-    const sent = await sendEmail({
-        to: userEmail,
-        from: FROM_EMAIL,
-        subject: 'Your garage sale listing has been approved',
-        html: approvalEmailHtml({ title, footer: BUSINESS_FOOTER }),
-    });
+    const sent = await emailApproval(saleId, listing.data());
     if (!sent) {
-        logger.warn(`Email not sent (SendGrid not configured). Approval for listing ${saleId}`);
         return { success: true, message: 'Email service not configured' };
     }
     return { success: true, message: 'Approval notification sent' };
@@ -397,17 +415,25 @@ exports.rejectListing = callable(['STRIPE_SECRET_KEY', 'SENDGRID_API_KEY'], asyn
 
 // Refuse a seller's changes to their live listing and tell them why (admin only). The listing
 // stays live as it was approved, so no refund is due.
-// Put a seller's changes live on their listing (admin only), then delete the photos the change
-// left unused. The admin's browser can't delete a seller's photos (storage.rules), so this runs here.
-exports.approveListingEdit = callable([], async (request) => {
-    const adminUid = requireAdmin(request);
-    await rateLimit(adminUid, 'approveListingEdit', 60);
+// The fields an edit replaces on its live listing.
+function editChanges(edit, listing) {
+    return {
+        title: edit.title,
+        description: edit.description ?? '',
+        sale_type: edit.sale_type ?? listing.sale_type ?? 'garage_sale',
+        photos: edit.photos ?? [],
+        thumbnails: edit.thumbnails ?? [],
+    };
+}
 
-    const saleId = requireDocId(request.data?.saleId, 'sale ID');
+// Puts a seller's changes live on their listing, then deletes the photos the change left unused.
+// `accept`, if given, sees the listing as it would be after the edit and can decline (returns
+// false); the edit then stays waiting and this returns false.
+async function applyListingEdit(saleId, accept) {
     const editRef = db.collection('listingEdits').doc(saleId);
     const listingRef = db.collection('garageSales').doc(saleId);
 
-    const { before, after } = await db.runTransaction(async (tx) => {
+    const result = await db.runTransaction(async (tx) => {
         const [edit, listing] = await Promise.all([tx.get(editRef), tx.get(listingRef)]);
         if (!edit.exists || edit.data().status !== 'pending') {
             throw new HttpsError('failed-precondition', 'Only changes awaiting approval can be approved');
@@ -415,26 +441,33 @@ exports.approveListingEdit = callable([], async (request) => {
         if (!listing.exists || listing.data().status !== 'active') {
             throw new HttpsError('failed-precondition', 'The listing is no longer live');
         }
-        const proposed = edit.data();
-        const changes = {
-            title: proposed.title,
-            description: proposed.description ?? '',
-            sale_type: proposed.sale_type ?? listing.data().sale_type ?? 'garage_sale',
-            photos: proposed.photos ?? [],
-            thumbnails: proposed.thumbnails ?? [],
-        };
+        const changes = editChanges(edit.data(), listing.data());
+        const after = { ...listing.data(), ...changes };
+        if (accept && !accept(after)) return null;
         tx.update(listingRef, changes);
         tx.delete(editRef);
-        return { before: listing.data(), after: { ...listing.data(), ...changes } };
+        return { before: listing.data(), after };
     });
-    await audit('approveListingEdit', adminUid, { saleId });
+    if (!result) return false;
 
     // The changes are live either way; a photo that can't be deleted only wastes space.
     try {
-        await deleteStorageFiles(unusedPhotoPaths(before, after));
+        await deleteStorageFiles(unusedPhotoPaths(result.before, result.after));
     } catch (error) {
         logger.warn(`Unused photos not deleted for listing ${saleId}: ${error.message}`);
     }
+    return true;
+}
+
+// Put a seller's changes live on their listing (admin only). The admin's browser can't delete a
+// seller's photos (storage.rules), so this runs here.
+exports.approveListingEdit = callable([], async (request) => {
+    const adminUid = requireAdmin(request);
+    await rateLimit(adminUid, 'approveListingEdit', 60);
+
+    const saleId = requireDocId(request.data?.saleId, 'sale ID');
+    await applyListingEdit(saleId);
+    await audit('approveListingEdit', adminUid, { saleId });
     return { success: true };
 });
 
@@ -474,6 +507,187 @@ exports.refuseListingEdit = callable(['SENDGRID_API_KEY'], async (request) => {
         logger.error(`Refusal email failed for listing ${saleId}: ${error.message}`);
     }
     return { success: true, emailed };
+});
+
+// ---------------------------------------------------------------------------
+// Automatic listing check (Claude)
+// ---------------------------------------------------------------------------
+
+let anthropic = null;
+function getAnthropic() {
+    if (!anthropic) {
+        anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 240 * 1000 });
+    }
+    return anthropic;
+}
+
+const REVIEW_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+// Under the API's 5 MB per-image limit once base64 encoded. Photos are compressed to well under
+// this when uploaded.
+const MAX_REVIEW_PHOTO_BYTES = 3.5 * 1024 * 1024;
+
+// The listing's photos as image blocks for Claude, read from the seller's own Storage folder
+// (photo URLs are written by the seller, so nothing else is fetched). Throws if one can't be read.
+async function reviewPhotoBlocks(listing) {
+    const bucket = getStorage().bucket();
+    const ownFolder = `listings/${listing.user_id}/`;
+    return Promise.all((listing.photos || []).map(async (url) => {
+        const path = storagePathFromUrl(url);
+        if (!path?.startsWith(ownFolder)) throw new Error("a photo isn't stored in the seller's folder");
+        const file = bucket.file(path);
+        const [metadata] = await file.getMetadata();
+        if (!REVIEW_PHOTO_TYPES.includes(metadata.contentType)) throw new Error(`a photo is ${metadata.contentType}`);
+        if (Number(metadata.size) > MAX_REVIEW_PHOTO_BYTES) throw new Error('a photo is too large to check');
+        const [data] = await file.download();
+        return { type: 'image', source: { type: 'base64', media_type: metadata.contentType, data: data.toString('base64') } };
+    }));
+}
+
+// Claude's verdict on a listing: { decision: 'approve' | 'review', problems: [{ rule, reason }] }.
+// Never throws; anything that goes wrong sends the listing to a person.
+async function checkListing(saleId, listing) {
+    const problems = listingReview.basicProblems(listing);
+    if (problems.length) return { decision: 'review', problems };
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key || key === 'not-configured') {
+        return { decision: 'review', problems: [{ rule: 'other', reason: 'The automatic check is not set up (no Claude API key).' }] };
+    }
+    try {
+        const photos = await reviewPhotoBlocks(listing);
+        const message = await getAnthropic().messages.create({
+            model: REVIEW_MODEL,
+            max_tokens: 16000,
+            system: listingReview.SYSTEM_PROMPT,
+            output_config: {
+                effort: 'medium',
+                format: { type: 'json_schema', schema: listingReview.VERDICT_SCHEMA },
+            },
+            messages: [{
+                role: 'user',
+                content: [{ type: 'text', text: listingReview.listingText(listing, photos.length) }, ...photos],
+            }],
+        });
+        return listingReview.readVerdict(message);
+    } catch (error) {
+        logger.error(`Automatic check failed for listing ${saleId}: ${error.message}`);
+        return { decision: 'review', problems: [{ rule: 'other', reason: `The automatic check failed: ${error.message}` }] };
+    }
+}
+
+// Records that this exact version of a listing or edit is being checked. Returns false if it
+// already was, so a repeated trigger, or the write that approves it, never checks it twice.
+// listingReviews is server-only: firestore.rules has no rule for it, so clients can't read it.
+async function claimReview(reviewId, fingerprint, userId) {
+    const ref = db.collection('listingReviews').doc(reviewId);
+    return db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (snap.exists && snap.data().fingerprint === fingerprint) return false;
+        tx.set(ref, { fingerprint, user_id: userId, state: 'checking', started_at: FieldValue.serverTimestamp() });
+        return true;
+    });
+}
+
+// Saves the outcome, then emails the admin unless the listing went live (or changed while being
+// checked, in which case the new version gets its own check).
+async function finishReview({ reviewId, kind, saleId, listing, verdict, outcome }) {
+    await db.collection('listingReviews').doc(reviewId).update({
+        state: outcome,
+        decision: verdict.decision,
+        problems: verdict.problems,
+        model: REVIEW_MODEL,
+        mode: REVIEW_MODE,
+        finished_at: FieldValue.serverTimestamp(),
+    });
+    if (outcome === 'approved') {
+        await audit(kind === 'edit' ? 'claudeApproveListingEdit' : 'claudeApproveListing', 'claude', { saleId });
+        try {
+            await emailApproval(saleId, listing);
+        } catch (error) {
+            logger.error(`Approval email failed for listing ${saleId}: ${error.message}`);
+        }
+        return;
+    }
+    if (outcome !== 'waiting') return;
+    try {
+        const sent = await sendEmail({
+            to: ADMIN_REVIEW_EMAIL,
+            from: FROM_EMAIL,
+            subject: `${kind === 'edit' ? 'Listing changes' : 'Listing'} to review: ${String(listing.title || 'untitled').replace(/\s+/g, ' ').slice(0, 80)}`,
+            html: listingReview.adminReviewEmailHtml({
+                kind,
+                listing,
+                verdict,
+                adminUrl: `${APP_URL}/AdminDashboard`,
+                footer: BUSINESS_FOOTER,
+            }),
+        });
+        if (!sent) logger.warn(`Review email not sent (SendGrid not configured) for listing ${saleId}`);
+    } catch (error) {
+        logger.error(`Review email failed for listing ${saleId}: ${error.message}`);
+    }
+}
+
+const reviewTrigger = (document, handler) => onDocumentWritten({
+    document,
+    region: DATABASE_REGION,
+    secrets: ['ANTHROPIC_API_KEY', 'SENDGRID_API_KEY'],
+    timeoutSeconds: 300,
+    memory: '512MiB',
+}, handler);
+
+// Checks a listing each time it reaches, or is edited while awaiting, approval.
+exports.reviewNewListing = reviewTrigger('garageSales/{saleId}', async (event) => {
+    if (REVIEW_MODE === 'off') return;
+    const listing = event.data?.after?.data();
+    if (listing?.status !== 'pending_approval') return;
+    const { saleId } = event.params;
+    const reviewId = `listing_${saleId}`;
+    const fingerprint = listingReview.reviewFingerprint(listing);
+    if (!(await claimReview(reviewId, fingerprint, listing.user_id))) return;
+
+    const verdict = await checkListing(saleId, listing);
+    let outcome = 'waiting';
+    if (REVIEW_MODE === 'auto' && verdict.decision === 'approve') {
+        const listingRef = db.collection('garageSales').doc(saleId);
+        outcome = await db.runTransaction(async (tx) => {
+            const now = (await tx.get(listingRef)).data();
+            if (now?.status !== 'pending_approval') return 'superseded';
+            if (listingReview.reviewFingerprint(now) !== fingerprint) return 'superseded';
+            tx.update(listingRef, { status: 'active' });
+            return 'approved';
+        });
+    }
+    await finishReview({ reviewId, kind: 'listing', saleId, listing, verdict, outcome });
+});
+
+// Checks a seller's changes to their live listing, as the listing would look with them.
+exports.reviewListingEdit = reviewTrigger('listingEdits/{saleId}', async (event) => {
+    if (REVIEW_MODE === 'off') return;
+    const edit = event.data?.after?.data();
+    if (edit?.status !== 'pending') return;
+    const { saleId } = event.params;
+    const live = (await db.collection('garageSales').doc(saleId).get()).data();
+    if (live?.status !== 'active') return;
+    const listing = { ...live, ...editChanges(edit, live) };
+    const reviewId = `edit_${saleId}`;
+    const fingerprint = listingReview.reviewFingerprint(listing);
+    // The same changes sent again after a refusal are a new submission, so they're checked again.
+    const submitted = edit.submitted_at?.toMillis?.() ?? '';
+    if (!(await claimReview(reviewId, `${fingerprint}:${submitted}`, live.user_id))) return;
+
+    const verdict = await checkListing(saleId, listing);
+    let outcome = 'waiting';
+    if (REVIEW_MODE === 'auto' && verdict.decision === 'approve') {
+        try {
+            const applied = await applyListingEdit(saleId, (after) => listingReview.reviewFingerprint(after) === fingerprint);
+            outcome = applied ? 'approved' : 'superseded';
+        } catch (error) {
+            // Refused, withdrawn or no longer live while being checked.
+            logger.info(`Checked edit to listing ${saleId} no longer applies: ${error.message}`);
+            outcome = 'superseded';
+        }
+    }
+    await finishReview({ reviewId, kind: 'edit', saleId, listing, verdict, outcome });
 });
 
 // Make a user an admin or a regular user (admin only). The role is a custom claim, which
@@ -564,6 +778,7 @@ exports.deleteUser = callable([], async (request) => {
 
     await deleteQueryInBatches(db.collection('garageSales').where('user_id', '==', userId));
     await deleteQueryInBatches(db.collection('listingEdits').where('user_id', '==', userId));
+    await deleteQueryInBatches(db.collection('listingReviews').where('user_id', '==', userId));
     await deleteQueryInBatches(db.collection('savedListings').where('user_id', '==', userId));
     await deleteQueryInBatches(db.collection('sales').where('sellerId', '==', userId));
     await deleteQueryInBatches(db.collection('saleStats').where('sellerId', '==', userId));

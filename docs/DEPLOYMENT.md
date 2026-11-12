@@ -69,9 +69,20 @@ npx firebase-tools deploy --only functions --project urbangaragesale
   npx firebase-tools functions:secrets:set STRIPE_SECRET_KEY --project urbangaragesale
   npx firebase-tools functions:secrets:set STRIPE_WEBHOOK_SECRET --project urbangaragesale
   npx firebase-tools functions:secrets:set SENDGRID_API_KEY --project urbangaragesale
+  npx firebase-tools functions:secrets:set ANTHROPIC_API_KEY --project urbangaragesale
   ```
 
   Redeploy the functions afterwards.
+- Automatic listing check: `reviewNewListing` and `reviewListingEdit` run in Melbourne
+  (`australia-southeast2`, next to the database, as Firestore triggers must) and ask Claude to
+  check each listing waiting for approval against the listing rules (`functions/lib/listingReview.js`,
+  shown to sellers on the Terms page). `CLAUDE_REVIEW_MODE` in `functions/.env` sets what happens:
+  `off`, `advise` (Claude's verdict on every listing is emailed to `ADMIN_REVIEW_EMAIL`; the admin
+  still approves) or `auto` (listings Claude passes go live and the seller gets the approval email;
+  the rest are emailed to `ADMIN_REVIEW_EMAIL`). Claude never rejects. The functions need the
+  `ANTHROPIC_API_KEY` secret to deploy, even when the mode is `off`; set it to `not-configured`
+  until there is a key (an Anthropic API key from console.anthropic.com). Each check is stored in
+  the server-only `listingReviews` collection.
 - Stripe webhook endpoint:
   `https://australia-southeast1-urbangaragesale.cloudfunctions.net/stripeWebhook`
   (events `checkout.session.completed`, `checkout.session.async_payment_succeeded`).
@@ -147,7 +158,7 @@ deployments of `urban-garage-sale` are the staging API.
 | Part | Staging setup |
 |---|---|
 | Firebase | Blaze; Firestore `australia-southeast2`; Auth like production (email/password, SMS MFA, SMS region allowlist set to AU, 12+ character password policy, enumeration protection); Storage. Same rules and indexes: `npx firebase-tools deploy --only firestore,storage --project urbangaragesale-staging`. |
-| Cloud Functions | `npx firebase-tools deploy --only functions --project urbangaragesale-staging` (from `web-app`). `web-app/functions/.env.urbangaragesale-staging` overrides `.env`. Secrets: `STRIPE_SECRET_KEY` = Stripe **test** secret key; `SENDGRID_API_KEY` and `STRIPE_WEBHOOK_SECRET` = `not-configured` until needed. |
+| Cloud Functions | `npx firebase-tools deploy --only functions --project urbangaragesale-staging` (from `web-app`). `web-app/functions/.env.urbangaragesale-staging` overrides `.env`. Secrets: `STRIPE_SECRET_KEY` = Stripe **test** secret key; `SENDGRID_API_KEY`, `STRIPE_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY` = `not-configured` until needed. |
 | API (Vercel Preview env) | `FIREBASE_PROJECT_ID=urbangaragesale-staging`; `FIREBASE_SERVICE_ACCOUNT_JSON` = key of `urban-pay-api@urbangaragesale-staging` (`datastore.user`, `firebaseauth.admin`); `STRIPE_SECRET_KEY` = test key; `FRONTEND_URL`, `ALLOWED_ORIGINS` = `http://localhost:5173`; `APP_URL` = `https://urbangaragesales.com.au` (sent to Stripe as the business URL, which can't be localhost). |
 | Vercel Authentication | Stays on for previews. Test builds of the mobile app send a *Protection Bypass for Automation* secret (Project → Settings → Deployment Protection) via `--dart-define=VERCEL_PROTECTION_BYPASS=…`. |
 | Website (local) | `cd web-app && npm run dev:staging`, then open http://localhost:5173. Settings are in `web-app/.env.staging`; put `VERCEL_PROTECTION_BYPASS=…` in `web-app/.env.staging.local` (not committed). The dev server forwards `/api` to `STAGING_API_URL` and adds the bypass, so the secret never reaches the browser. For the SMS step use the test number **0491 570 156**, code **123456** (Auth → Phone numbers for testing). |

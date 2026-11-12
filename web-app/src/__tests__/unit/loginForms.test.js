@@ -1,5 +1,5 @@
 import {
-  normalizePhone, signUpProblem, postcodeAndState, oauthErrorMessage, profileFromOAuthUser,
+  normalizePhone, signUpProblem, profileProblem, postcodeAndState, oauthErrorMessage, profileFromOAuthUser,
 } from '@/pages/login/loginForms';
 
 describe('normalizePhone', () => {
@@ -39,9 +39,33 @@ describe('signUpProblem', () => {
 
   it('reports the first problem in order', () => {
     expect(signUpProblem({ ...valid, fullName: '' })).toBe('Please fill in all fields');
+    expect(signUpProblem({ ...valid, fullName: '   ' })).toBe('Please fill in all fields');
     expect(signUpProblem({ ...valid, confirmPassword: 'other-password-1' })).toBe('Passwords do not match');
     expect(signUpProblem({ ...valid, password: 'short1', confirmPassword: 'short1' })).toMatch(/at least 12 characters/);
     expect(signUpProblem({ ...valid, phone: '+61 412' })).toMatch(/complete phone number/);
+  });
+});
+
+describe('profileProblem', () => {
+  const profile = {
+    full_name: 'Sam Lee', phone: '+61412345678', address: '1 Main St', suburb: 'Carlton', postcode: '3053', state: 'VIC',
+  };
+
+  it('accepts a complete profile', () => {
+    expect(profileProblem(profile)).toBeNull();
+  });
+
+  it('needs a name, phone, address and its suburb, postcode and state', () => {
+    expect(profileProblem({ ...profile, full_name: ' ' })).toBe('Please enter your name');
+    expect(profileProblem({ ...profile, phone: undefined })).toBe('Please enter your phone number');
+    expect(profileProblem({ ...profile, phone: '+61 ' })).toBe('Please enter your phone number');
+    expect(profileProblem({ ...profile, address: '' })).toBe('Please enter your address');
+    expect(profileProblem({ ...profile, postcode: '' })).toMatch(/pick it from the suggestions/);
+    expect(profileProblem(undefined)).toBe('Please enter your name');
+  });
+
+  it('can leave the suburb, postcode and state until the address is looked up', () => {
+    expect(profileProblem({ ...profile, suburb: '', postcode: '', state: '' }, { addressLookedUp: false })).toBeNull();
   });
 });
 

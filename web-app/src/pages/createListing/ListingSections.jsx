@@ -43,7 +43,7 @@ export function BasicInfoSection({ form, onChange }) {
                 </div>
 
                 <div>
-                    <Label htmlFor="description">Description</Label>
+                    <Label htmlFor="description">Description *</Label>
                     <Textarea
                         id="description"
                         maxLength={5000}
@@ -55,7 +55,7 @@ export function BasicInfoSection({ form, onChange }) {
                 </div>
 
                 <div>
-                    <Label htmlFor="sale_type">Sale Type</Label>
+                    <Label htmlFor="sale_type">Sale Type *</Label>
                     <Select value={form.sale_type} onValueChange={(value) => onChange('sale_type', value)}>
                         <SelectTrigger className="mt-1.5" aria-label="Select sale type">
                             <SelectValue placeholder="Choose a sale type" />
@@ -101,7 +101,7 @@ export function LocationSection({ form, onChange, locked }) {
                 </div>
 
                 <div>
-                    <Label htmlFor="suburb">Suburb & Postcode</Label>
+                    <Label htmlFor="suburb">Suburb & Postcode *</Label>
                     <div className="grid grid-cols-2 gap-4 mt-1.5">
                         <Input id="suburb" value={form.suburb || ''} placeholder="Suburb (auto-filled)" readOnly />
                         <Input id="postcode" value={form.postcode || ''} placeholder="Postcode (auto-filled)" readOnly />
@@ -109,7 +109,7 @@ export function LocationSection({ form, onChange, locked }) {
                 </div>
 
                 <div className="mt-4">
-                    <Label htmlFor="state">State</Label>
+                    <Label htmlFor="state">State *</Label>
                     <select
                         id="state"
                         value={form.state || ''}
@@ -168,9 +168,9 @@ export function DateTimeSection({ form, onChange, locked }) {
                 </p>
 
                 <div className="grid grid-cols-2 gap-4">
-                    <DateTimeField id="start_time" label="Daily Start Time" type="time" value={form.start_time}
+                    <DateTimeField id="start_time" label="Daily Start Time *" type="time" value={form.start_time}
                         onChange={onChange} locked={locked} />
-                    <DateTimeField id="end_time" label="Daily End Time" type="time" value={form.end_time}
+                    <DateTimeField id="end_time" label="Daily End Time *" type="time" value={form.end_time}
                         onChange={onChange} locked={locked} />
                 </div>
             </div>

@@ -27,7 +27,7 @@ export default function Privacy() {
     }, [promotions.length]);
 
     return (
-        <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
+        <div className="min-h-screen bg-brand-cream overflow-hidden pb-24 md:pb-0">
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -52,7 +52,7 @@ export default function Privacy() {
             />
 
             {/* Advertising Ribbon */}
-            <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+            <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                 <p className="text-sm sm:text-base font-semibold">
                     {promotions[promoIndex]?.message}
                 </p>
@@ -63,7 +63,7 @@ export default function Privacy() {
                 <div className="bg-white rounded-lg shadow-md p-8">
                     {/* Privacy Policy */}
                     <div>
-                        <h1 className="text-3xl font-bold text-[#001f3f] mb-2">Privacy Policy</h1>
+                        <h1 className="text-3xl font-bold text-navy-dark mb-2">Privacy Policy</h1>
                         <p className="text-slate-600 mb-6">Urban Garage Sale</p>
                         <p className="text-sm text-slate-500 mb-6">Last updated: November 2026</p>
 
@@ -71,7 +71,7 @@ export default function Privacy() {
                             <p className="italic">Urban Garage Sale values your privacy. This policy explains how we collect, use, disclose and protect your personal information in line with the Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs).</p>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">1. Information We Collect</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">1. Information We Collect</h3>
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>Account details: name, email address, mobile phone number, residential address, suburb, postcode and state.</li>
                                     <li>Listing details: sale description, address, dates and times, and any photos you upload.</li>
@@ -83,7 +83,7 @@ export default function Privacy() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">2. Why We Collect It</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">2. Why We Collect It</h3>
                                 <p>We use your information to:</p>
                                 <ul className="list-disc list-inside space-y-1 ml-4">
                                     <li>create and secure your account, including SMS verification and two-factor authentication;</li>
@@ -96,7 +96,7 @@ export default function Privacy() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">3. Who We Share It With</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">3. Who We Share It With</h3>
                                 <p>We do not sell or trade your personal information. We share it only with service providers who help us run the platform, and where required by law:</p>
                                 <ul className="list-disc list-inside space-y-1 ml-4">
                                     <li><strong>Google (Firebase and Google Maps)</strong> – account login, data storage, photo storage and address lookup;</li>
@@ -109,12 +109,12 @@ export default function Privacy() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">4. Overseas Disclosure</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">4. Overseas Disclosure</h3>
                                 <p>Our service providers may store or process your information outside Australia, including in the United States and other countries where they operate data centres. We take reasonable steps to ensure these providers handle your information consistently with the APPs.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">5. Access, Correction and Deletion</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">5. Access, Correction and Deletion</h3>
                                 <p>You can update most details in your Profile at any time. You can also ask us to:</p>
                                 <ul className="list-disc list-inside space-y-1 ml-4">
                                     <li>give you access to the personal information we hold about you;</li>
@@ -125,18 +125,18 @@ export default function Privacy() {
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">6. Data Security and Breaches</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">6. Data Security and Breaches</h3>
                                 <p>We take reasonable steps to protect your information from misuse, loss and unauthorised access, including encrypted connections, access controls and two-factor authentication. No system is completely secure, so please avoid including unnecessary private details in your listing.</p>
                                 <p className="mt-2">If a data breach is likely to result in serious harm, we will notify affected individuals and the OAIC as required by the Notifiable Data Breaches scheme.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">7. Cookies</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">7. Cookies</h3>
                                 <p>Urban Garage Sale uses cookies and similar browser storage to keep you signed in and remember your preferences. You can disable cookies in your browser settings, but some features may stop working.</p>
                             </div>
 
                             <div>
-                                <h3 className="font-bold text-[#001f3f] mt-6 mb-2">8. Complaints and Contact</h3>
+                                <h3 className="font-bold text-navy-dark mt-6 mb-2">8. Complaints and Contact</h3>
                                 <p>To request access or correction of personal information, or to make a privacy complaint, contact Urban Garage Sale at support@urbangaragesales.com.au.</p>
                                 <p className="mt-2">We aim to respond within 30 days. If you are not satisfied with our response, you may contact the Office of the Australian Information Commissioner (OAIC) at www.oaic.gov.au or on 1300 363 992.</p>
                             </div>

@@ -43,12 +43,12 @@ export default class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#f5f1e8] flex items-center justify-center p-4">
+        <div className="min-h-screen bg-brand-cream flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white rounded-2xl p-8 shadow-lg border border-red-200">
             <div className="flex justify-center mb-4">
               <AlertCircle className="w-12 h-12 text-red-500" />
             </div>
-            <h1 className="text-2xl font-bold text-[#1e3a5f] mb-2 text-center">
+            <h1 className="text-2xl font-bold text-navy mb-2 text-center">
               Something went wrong
             </h1>
             <p className="text-slate-600 text-center mb-4">
@@ -62,7 +62,7 @@ export default class ErrorBoundary extends React.Component {
             )}
             <Button
               onClick={this.handleReset}
-              className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
+              className="w-full bg-navy hover:bg-navy-dark"
             >
               Try Again
             </Button>

@@ -99,8 +99,12 @@ function clearRecaptchaElement(element) {
 
 // The current invisible reCAPTCHA verifier for SMS codes (one per page).
 let recaptchaVerifier = null;
+// A verifier loaded ahead of time by prepareRecaptcha, waiting for its first send:
+// { elementId, element, verifier }.
+let preparedRecaptcha = null;
 
 function clearRecaptchaVerifier() {
+  preparedRecaptcha = null;
   if (recaptchaVerifier) {
     try {
       recaptchaVerifier.clear();
@@ -109,6 +113,18 @@ function clearRecaptchaVerifier() {
     }
     recaptchaVerifier = null;
   }
+}
+
+// The verifier prepareRecaptcha loaded for this element, if it's still unused and on the page;
+// otherwise a fresh one. Each is used for one send only (see setupRecaptcha).
+function recaptchaFor(elementId) {
+  const prepared = preparedRecaptcha;
+  preparedRecaptcha = null;
+  if (prepared && prepared.elementId === elementId && prepared.verifier === recaptchaVerifier
+      && prepared.element?.isConnected && document.getElementById(elementId) === prepared.element) {
+    return Promise.resolve(prepared.verifier);
+  }
+  return firebaseAuth.setupRecaptcha(elementId);
 }
 
 // Authentication functions
@@ -320,31 +336,44 @@ export const firebaseAuth = {
       const host = document.createElement('div');
       element.appendChild(host);
 
-      // Wait for DOM to update before creating new verifier
-      setTimeout(() => {
-        try {
-          // Firebase's invisible reCAPTCHA for phone/SMS auth needs no site key of our own.
-          // In development with appVerificationDisabledForTesting=true, Firebase skips reCAPTCHA
-          // validation but the verifier object is still required.
-          const verifier = new RecaptchaVerifier(auth, host, {
-            size: 'invisible',
-            'expired-callback': () => {
-              console.log('⚠️ reCAPTCHA expired');
-            },
-            'error-callback': (error) => {
-              console.error('❌ reCAPTCHA error:', error);
-            }
-          });
+      try {
+        // Firebase's invisible reCAPTCHA for phone/SMS auth needs no site key of our own.
+        // In development with appVerificationDisabledForTesting=true, Firebase skips reCAPTCHA
+        // validation but the verifier object is still required.
+        const verifier = new RecaptchaVerifier(auth, host, {
+          size: 'invisible',
+          'expired-callback': () => {
+            console.log('⚠️ reCAPTCHA expired');
+          },
+          'error-callback': (error) => {
+            console.error('❌ reCAPTCHA error:', error);
+          }
+        });
 
-          recaptchaVerifier = verifier;
-          resolve(verifier);
-        } catch (error) {
-          console.error('❌ Failed to create reCAPTCHA verifier', isDevelopment ? '(dev mode):' : ':', error.message);
-          recaptchaVerifier = null;
-          reject(error);
-        }
-      }, 100);
+        recaptchaVerifier = verifier;
+        resolve(verifier);
+      } catch (error) {
+        console.error('❌ Failed to create reCAPTCHA verifier', isDevelopment ? '(dev mode):' : ':', error.message);
+        recaptchaVerifier = null;
+        reject(error);
+      }
     });
+  },
+
+  // Loads Google's reCAPTCHA before it's needed, so pressing Send doesn't wait for it to
+  // download. Call once the element is on the page. A failure here is ignored: the send then
+  // sets up its own verifier.
+  prepareRecaptcha: async (elementId) => {
+    try {
+      const verifier = await firebaseAuth.setupRecaptcha(elementId);
+      await verifier.render();
+      // A send may have replaced it while it loaded.
+      if (recaptchaVerifier === verifier) {
+        preparedRecaptcha = { elementId, element: document.getElementById(elementId), verifier };
+      }
+    } catch (error) {
+      console.log('ℹ reCAPTCHA not loaded ahead:', error.message);
+    }
   },
 
   // ---------- Two-factor authentication (Firebase multi-factor auth, SMS) ----------
@@ -377,7 +406,7 @@ export const firebaseAuth = {
     if (!hint) {
       throw new AppError('No phone is enrolled for two-factor sign-in on this account.', { code: 'auth/no-phone-factor' });
     }
-    const verifier = await firebaseAuth.setupRecaptcha(recaptchaElementId);
+    const verifier = await recaptchaFor(recaptchaElementId);
     try {
       pendingMfaVerificationId = await new PhoneAuthProvider(auth).verifyPhoneNumber(
         { multiFactorHint: hint, session: pendingMfaResolver.session },
@@ -431,7 +460,8 @@ export const firebaseAuth = {
     const user = auth.currentUser;
     if (!user) throw notSignedIn();
 
-    await user.reload();
+    // Both take a moment, so do them together.
+    const [, verifier] = await Promise.all([user.reload(), recaptchaFor(recaptchaElementId)]);
     if (!user.emailVerified) {
       throw new AppError('Please verify your email address first. Check your inbox for the verification link.', {
         code: 'auth/unverified-email',
@@ -440,7 +470,6 @@ export const firebaseAuth = {
     }
 
     const normalized = normalizePhone(phoneNumber);
-    const verifier = await firebaseAuth.setupRecaptcha(recaptchaElementId);
     try {
       const session = await multiFactor(user).getSession();
       pendingEnrollmentVerificationId = await new PhoneAuthProvider(auth).verifyPhoneNumber(

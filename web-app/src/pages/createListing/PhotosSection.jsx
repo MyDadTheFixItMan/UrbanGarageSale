@@ -92,7 +92,7 @@ export default function PhotosSection({ photos, onChange, userId }) {
                     ))}
 
                     {photos.length < MAX_PHOTOS && (
-                        <label className="aspect-square rounded-xl border-2 border-dashed border-slate-200 hover:border-[#1e3a5f] transition-colors cursor-pointer flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-[#1e3a5f]">
+                        <label className="aspect-square rounded-xl border-2 border-dashed border-slate-200 hover:border-navy transition-colors cursor-pointer flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-navy">
                             {uploading ? (
                                 <Loader2 className="w-6 h-6 animate-spin" />
                             ) : (

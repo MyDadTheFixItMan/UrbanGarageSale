@@ -123,7 +123,7 @@ export default function ResetPassword() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
+        <div className="min-h-screen bg-brand-cream overflow-hidden pb-24 md:pb-0">
             {/* Watermark U Shape */}
             <style>{`
                 @media (min-width: 768px) {
@@ -149,18 +149,18 @@ export default function ResetPassword() {
 
             {/* Advertising Ribbon */}
             {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">
                         {allPromotions[promoIndex]?.message}
                     </p>
                 </div>
             )}
 
-            <section className="relative bg-[#f5f1e8] overflow-hidden">
+            <section className="relative bg-brand-cream overflow-hidden">
                 <div className="max-w-md mx-auto px-4 sm:px-6 pt-32 md:pt-20 pb-12 relative z-10">
                     <div className="bg-white rounded-2xl shadow-lg p-8 border border-slate-100">
                         {/* Back Link */}
-                        <Link to={createPageUrl('Login')} className="inline-flex items-center gap-2 text-[#1e3a5f] hover:text-[#152a45] text-sm font-medium mb-6">
+                        <Link to={createPageUrl('Login')} className="inline-flex items-center gap-2 text-navy hover:text-navy-dark text-sm font-medium mb-6">
                             <ArrowLeft className="w-4 h-4" />
                             Back to Login
                         </Link>
@@ -168,7 +168,7 @@ export default function ResetPassword() {
                         {!isConfirmingReset ? (
                             <>
                                 <div className="mb-8">
-                                    <h1 className="text-2xl font-bold text-[#1e3a5f] mb-2">Reset Your Password</h1>
+                                    <h1 className="text-2xl font-bold text-navy mb-2">Reset Your Password</h1>
                                     <p className="text-slate-600 text-sm">
                                         Enter your email address and we'll send you a link to reset your password.
                                     </p>
@@ -202,7 +202,7 @@ export default function ResetPassword() {
                                     <Button
                                         type="submit"
                                         disabled={loading}
-                                        className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2"
+                                        className="w-full bg-navy hover:bg-navy-dark text-white font-semibold py-2"
                                     >
                                         {loading ? (
                                             <>
@@ -217,7 +217,7 @@ export default function ResetPassword() {
 
                                 <div className="mt-6 pt-6 border-t text-center">
                                     <p className="text-slate-600 text-sm mb-3">Know your password?</p>
-                                    <Link to={createPageUrl('Login')} className="inline-block px-4 py-2 bg-slate-100 hover:bg-slate-200 text-[#1e3a5f] font-medium rounded-lg transition-colors">
+                                    <Link to={createPageUrl('Login')} className="inline-block px-4 py-2 bg-slate-100 hover:bg-slate-200 text-navy font-medium rounded-lg transition-colors">
                                         Back to Sign In
                                     </Link>
                                 </div>
@@ -225,7 +225,7 @@ export default function ResetPassword() {
                         ) : (
                             <>
                                 <div className="mb-8">
-                                    <h1 className="text-2xl font-bold text-[#1e3a5f] mb-2">Create New Password</h1>
+                                    <h1 className="text-2xl font-bold text-navy mb-2">Create New Password</h1>
                                     <p className="text-slate-600 text-sm">
                                         Please enter your new password below.
                                     </p>
@@ -244,7 +244,7 @@ export default function ResetPassword() {
                                 )}
 
                                 {!linkUsable ? (
-                                    <Link to={createPageUrl('ResetPassword')} className="text-sm font-medium text-[#1e3a5f] underline">
+                                    <Link to={createPageUrl('ResetPassword')} className="text-sm font-medium text-navy underline">
                                         Request a new reset link
                                     </Link>
                                 ) : (
@@ -277,7 +277,7 @@ export default function ResetPassword() {
                                     <Button
                                         type="submit"
                                         disabled={loading}
-                                        className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-semibold py-2"
+                                        className="w-full bg-navy hover:bg-navy-dark text-white font-semibold py-2"
                                     >
                                         {loading ? (
                                             <>

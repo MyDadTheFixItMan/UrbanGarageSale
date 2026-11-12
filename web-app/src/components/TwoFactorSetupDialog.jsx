@@ -14,6 +14,11 @@ import {
 
 const RECAPTCHA_ID = 'recaptcha-container-2fa';
 
+// Loads reCAPTCHA as soon as the dialog's element is on the page, so Send code is quicker.
+const prepareRecaptcha = (element) => {
+    if (element) firebase.auth.prepareRecaptcha(RECAPTCHA_ID);
+};
+
 // Enrols the user's mobile as a Firebase multi-factor (SMS) second factor.
 // After this, Firebase requires the SMS code at every sign-in.
 export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone = '', onEnabled }) {
@@ -127,7 +132,7 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
                 </DialogHeader>
 
                 {/* Invisible reCAPTCHA used by Firebase when sending the SMS */}
-                <div id={RECAPTCHA_ID}></div>
+                <div id={RECAPTCHA_ID} ref={prepareRecaptcha}></div>
 
                 {error && (
                     <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">{error}</div>
@@ -149,7 +154,7 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
                                 autoComplete="tel"
                             />
                         </div>
-                        <Button onClick={sendCode} disabled={loading || !phone} className="w-full bg-[#1e3a5f] hover:bg-[#152a45]">
+                        <Button onClick={sendCode} disabled={loading || !phone} className="w-full bg-navy hover:bg-navy-dark">
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send code'}
                         </Button>
                     </div>
@@ -169,7 +174,7 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
                                 className="text-center text-2xl tracking-widest"
                             />
                         </div>
-                        <Button type="submit" disabled={loading} className="w-full bg-[#1e3a5f] hover:bg-[#152a45]">
+                        <Button type="submit" disabled={loading} className="w-full bg-navy hover:bg-navy-dark">
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Turn on 2FA'}
                         </Button>
                         <button type="button" onClick={sendCode} disabled={loading} className="w-full text-sm text-slate-600 hover:text-slate-800">
@@ -186,7 +191,7 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
                         <Button onClick={resendVerificationEmail} disabled={loading} variant="outline" className="w-full">
                             Resend verification email
                         </Button>
-                        <Button onClick={checkEmailVerified} disabled={loading} className="w-full bg-[#1e3a5f] hover:bg-[#152a45]">
+                        <Button onClick={checkEmailVerified} disabled={loading} className="w-full bg-navy hover:bg-navy-dark">
                             I've verified my email
                         </Button>
                     </div>

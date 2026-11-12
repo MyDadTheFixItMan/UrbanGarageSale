@@ -47,110 +47,76 @@ export default function Layout({ children, currentPageName }) {
         }
     };
 
+    // shortName labels the mobile bottom bar, where there is room for one word.
     const navItems = [
-        { name: 'Home', page: 'Home', icon: Home, requiresAuth: false },
-        { name: 'Create Listing', page: 'CreateListing', icon: Plus, requiresAuth: false },
-        { name: 'Favourites', page: 'SavedListings', icon: Heart, requiresAuth: false },
-        { name: 'Urban Pay', page: 'UrbanPay', icon: Smartphone, requiresAuth: true },
-        { name: 'Profile', page: 'Profile', icon: User, requiresAuth: true },
-        { name: 'Admin', page: 'AdminDashboard', icon: Shield, requiresAuth: 'admin' },
+        { name: 'Home', shortName: 'Home', page: 'Home', icon: Home, requiresAuth: false },
+        { name: 'Create Listing', shortName: 'Create', page: 'CreateListing', icon: Plus, requiresAuth: false },
+        { name: 'Favourites', shortName: 'Favourites', page: 'SavedListings', icon: Heart, requiresAuth: false },
+        { name: 'Urban Pay', shortName: 'Pay', page: 'UrbanPay', icon: Smartphone, requiresAuth: true },
+        { name: 'Profile', shortName: 'Profile', page: 'Profile', icon: User, requiresAuth: true },
+        { name: 'Admin', shortName: 'Admin', page: 'AdminDashboard', icon: Shield, requiresAuth: 'admin' },
     ];
 
-    return (
-        <div className="min-h-screen bg-slate-50 flex flex-col pb-20 md:pb-0">
-            <style>{`
-                :root {
-                    --primary: #1e3a5f;
-                    --primary-light: #2d4a6f;
-                    --primary-dark: #152a45;
-                    --accent: #f97316;
-                    --accent-light: #fb923c;
-                }
-            `}</style>
+    const visibleNavItems = navItems.filter((item) =>
+        item.requiresAuth === false ||
+        (item.requiresAuth === true && isAuthenticated) ||
+        (item.requiresAuth === 'admin' && user?.role === 'admin')
+    );
 
-            {/* Header */}
+    return (
+        <div className="min-h-screen bg-brand-cream flex flex-col pb-20 md:pb-0">
+            {/* Header: logo, menu and log in/out. The three-column grid keeps the menu centred. */}
             <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 w-full h-20 flex items-center">
-                <div className="w-full px-4 sm:px-6 relative flex items-center justify-center">
-                        {/* Logo */}
-                        <Link to={createPageUrl('Home')} className="absolute -left-20 flex items-center flex-shrink-0">
-                            <img 
-                                src="/logo-web.webp" 
-                                alt="Urban Garage Sale" 
-                                className="h-36 w-auto"
-                                style={{ minWidth: '324px', objectFit: 'contain' }}
-                            />
-                        </Link>
+                <div className="w-full px-4 sm:px-6 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                    <Link to={createPageUrl('Home')} className="justify-self-start flex-shrink-0">
+                        <img
+                            src="/logo-header.webp"
+                            alt="Urban Garage Sale"
+                            width="383"
+                            height="176"
+                            className="h-12 md:h-14 w-auto"
+                        />
+                    </Link>
 
                     {/* Desktop Navigation */}
                     <nav className="hidden md:flex items-center gap-1">
-                        {navItems.map((item) => {
-                            const hasAccess = item.requiresAuth === false || 
-                                            (item.requiresAuth === true && isAuthenticated) ||
-                                            (item.requiresAuth === 'admin' && user?.role === 'admin');
-                            
-                            return (
-                                <div
-                                    key={item.page}
-                                    style={{ visibility: !hasAccess ? 'hidden' : 'visible' }}
-                                >
-                                    <Link
-                                        to={createPageUrl(item.page)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                                            currentPageName === item.page
-                                                ? 'bg-[#1e3a5f] text-white'
-                                                : 'text-slate-600 hover:bg-slate-100'
-                                        }`}
-                                    >
-                                        {item.name}
-                                    </Link>
-                                </div>
-                            );
-                        })}
+                        {visibleNavItems.map((item) => (
+                            <Link
+                                key={item.page}
+                                to={createPageUrl(item.page)}
+                                aria-current={currentPageName === item.page ? 'page' : undefined}
+                                className={`px-2.5 lg:px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+                                    currentPageName === item.page
+                                        ? 'bg-navy text-white'
+                                        : 'text-slate-700 hover:bg-slate-100'
+                                }`}
+                            >
+                                {item.name}
+                            </Link>
+                        ))}
                     </nav>
 
-                    {/* Auth Buttons - Desktop */}
-                    <div className="absolute right-4 hidden md:flex items-center gap-3 flex-shrink-0">
-                            {isAuthenticated ? (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleLogout}
-                                    className="text-slate-600 hover:text-slate-900"
-                                >
-                                    <LogOut className="w-4 h-4 mr-2" />
-                                    Log Out
-                                </Button>
-                            ) : (
-                                <Button
-                                    onClick={() => window.location.href = '/login'}
-                                    className="bg-[#1e3a5f] hover:bg-[#152a45] text-white"
-                                >
-                                    Sign Up / Log In
-                                </Button>
-                            )}
-                        </div>
-
-                    {/* Auth Buttons - Mobile */}
-                    <div className="absolute right-4 md:hidden flex items-center gap-2 flex-shrink-0">
+                    <div className="justify-self-end col-start-3 flex items-center gap-2">
                         {isAuthenticated ? (
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={handleLogout}
-                                className="p-2 text-slate-600 hover:text-slate-900"
-                                title="Log Out"
+                                className="text-slate-700 hover:text-slate-900"
+                                aria-label="Log Out"
                             >
-                                <LogOut className="w-4 h-4" />
-                            </button>
+                                <LogOut className="w-4 h-4 lg:mr-2" />
+                                <span className="hidden lg:inline">Log Out</span>
+                            </Button>
                         ) : (
                             <Button
                                 onClick={() => window.location.href = '/login'}
-                                className="bg-[#1e3a5f] hover:bg-[#152a45] text-white text-xs py-1 px-2"
+                                className="bg-navy hover:bg-navy-dark text-white text-xs md:text-sm px-3 md:px-4"
                             >
                                 Sign Up / Log In
                             </Button>
                         )}
                     </div>
-
-
                 </div>
             </header>
 
@@ -160,7 +126,7 @@ export default function Layout({ children, currentPageName }) {
             </main>
 
             {/* Footer Ribbon */}
-            <footer className="bg-[#001f3f] text-white">
+            <footer className="bg-navy-dark text-white">
                 <div className="w-full px-4 py-4 md:py-6">
                     <div className="flex items-center justify-center md:justify-center">
                         <nav className="flex items-center gap-4 md:gap-6 flex-wrap justify-center">
@@ -173,35 +139,31 @@ export default function Layout({ children, currentPageName }) {
                             <Link to={createPageUrl('Terms')} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Terms</Link>
                         </nav>
                     </div>
-                    <p className="mt-2 text-center text-xs text-slate-400">
+                    <p className="mt-2 text-center text-xs text-slate-300">
                         © {new Date().getFullYear()} {BUSINESS_NAME}{BUSINESS_ABN && ` · ABN ${BUSINESS_ABN}`}
                     </p>
                 </div>
             </footer>
 
-            {/* Mobile Bottom Navigation */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#FF9500] border-t border-orange-400 z-40 w-full">
-                <div className="flex justify-around items-center h-20">
-                    {navItems.map((item) => {
+            {/* Mobile Bottom Navigation: white so the labels stay readable, with the current page in orange. */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] z-40 w-full">
+                <div className="flex justify-around items-stretch h-20">
+                    {visibleNavItems.map((item) => {
                         const Icon = item.icon;
-                        const hasAccess = item.requiresAuth === false || 
-                                        (item.requiresAuth === true && isAuthenticated) ||
-                                        (item.requiresAuth === 'admin' && user?.role === 'admin');
-                        
-                        if (!hasAccess) return null;
-                        
+                        const isCurrent = currentPageName === item.page;
                         return (
                             <Link
                                 key={item.page}
                                 to={createPageUrl(item.page)}
-                                className={`flex flex-col items-center justify-center w-16 h-20 transition-colors ${
-                                    currentPageName === item.page
-                                        ? 'text-white bg-orange-600'
-                                        : 'text-white hover:text-orange-100'
+                                aria-current={isCurrent ? 'page' : undefined}
+                                className={`flex-1 flex flex-col items-center justify-center border-t-[3px] transition-colors ${
+                                    isCurrent
+                                        ? 'text-brand-orange-dark border-brand-orange'
+                                        : 'text-slate-600 border-transparent hover:text-navy'
                                 }`}
                             >
                                 <Icon className="w-5 h-5 mb-1" />
-                                <span className="text-xs font-medium">{item.name.split(' ')[0]}</span>
+                                <span className={`text-xs ${isCurrent ? 'font-bold' : 'font-medium'}`}>{item.shortName}</span>
                             </Link>
                         );
                     })}

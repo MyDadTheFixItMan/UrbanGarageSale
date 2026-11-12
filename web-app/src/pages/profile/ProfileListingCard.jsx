@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
-import { Tag, Trash2, Eye, Pencil, Printer } from 'lucide-react';
+import { Trash2, Eye, Pencil, Printer } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,6 +20,7 @@ import { LISTING_FEE_AUD } from '@/lib/pricing';
 import { createPageUrl } from '../../utils';
 import { listingActions } from './profileListings';
 import { coverImage } from '@/lib/listings';
+import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
 
 const statusConfig = {
     draft: { label: 'Draft', color: 'bg-slate-100 text-slate-700' },
@@ -39,9 +40,7 @@ export default function ProfileListingCard({ listing, edit, onDelete, onPrint })
                 {coverImage(listing) ? (
                     <img src={coverImage(listing)} alt={listing.title} className="w-full h-full object-cover" />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-                        <Tag className="w-12 h-12 text-slate-400" />
-                    </div>
+                    <ListingPlaceholder saleType={listing.sale_type} />
                 )}
             </div>
 
@@ -106,7 +105,7 @@ export default function ProfileListingCard({ listing, edit, onDelete, onPrint })
 
                     {actions.pay && (
                         <Link to={createPageUrl(`Payment?id=${listing.id}`)} className="flex-1">
-                            <Button size="sm" className="w-full h-9 text-sm font-medium bg-[#1e3a5f] hover:bg-[#152a45]">
+                            <Button size="sm" className="w-full h-9 text-sm font-medium bg-navy hover:bg-navy-dark">
                                 Pay {formatAud(LISTING_FEE_AUD)}
                             </Button>
                         </Link>

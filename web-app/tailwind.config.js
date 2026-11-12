@@ -1,15 +1,34 @@
+const defaultTheme = require('tailwindcss/defaultTheme');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
     darkMode: ["class"],
     content: ["./index.html", "./src/**/*.{ts,tsx,js,jsx}"],
   theme: {
   	extend: {
+  		fontFamily: {
+  			sans: ['"Nunito Variable"', ...defaultTheme.fontFamily.sans]
+  		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		colors: {
+  			// Brand colours. White text needs brand-orange-dark or darker to be readable;
+  			// brand-orange itself is for accents, icons and borders.
+  			navy: {
+  				DEFAULT: '#1e3a5f',
+  				dark: '#152a45',
+  				light: '#2d4a6f'
+  			},
+  			brand: {
+  				orange: '#f97316',
+  				'orange-dark': '#c2410c',
+  				'orange-darker': '#9a3412',
+  				teal: '#0d9488',
+  				cream: '#f5f1e8'
+  			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

@@ -78,7 +78,7 @@ export default function Contact() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-0">
+        <div className="min-h-screen bg-brand-cream overflow-hidden pb-24 md:pb-0">
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -103,7 +103,7 @@ export default function Contact() {
             />
 
             {/* Advertising Ribbon */}
-            <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+            <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                 <p className="text-sm sm:text-base font-semibold">
                     {promotions[promoIndex]?.message}
                 </p>
@@ -112,13 +112,13 @@ export default function Contact() {
             {/* Main Content */}
             <section className="max-w-2xl mx-auto px-4 sm:px-6 pt-24 pb-12 relative z-10">
                 <div className="bg-white rounded-lg shadow-md p-8">
-                    <h1 className="text-4xl font-bold text-[#001f3f] mb-2">Contact Us</h1>
+                    <h1 className="text-4xl font-bold text-navy-dark mb-2">Contact Us</h1>
                     <p className="text-slate-600 mb-8">We'd love to hear from you! Send us a message and we'll reply to the email address on your account.</p>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Name Field */}
                         <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-[#001f3f] mb-2">
+                            <label htmlFor="name" className="block text-sm font-medium text-navy-dark mb-2">
                                 Your Name
                             </label>
                             <input
@@ -128,14 +128,14 @@ export default function Contact() {
                                 value={formData.name}
                                 onChange={handleChange}
                                 placeholder="Enter your full name"
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF9500]"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange"
                                 required
                             />
                         </div>
 
                         {/* Message Field */}
                         <div>
-                            <label htmlFor="message" className="block text-sm font-medium text-[#001f3f] mb-2">
+                            <label htmlFor="message" className="block text-sm font-medium text-navy-dark mb-2">
                                 Message
                             </label>
                             <textarea
@@ -145,7 +145,7 @@ export default function Contact() {
                                 onChange={handleChange}
                                 placeholder="Tell us what's on your mind..."
                                 rows={6}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF9500] resize-none"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange resize-none"
                                 required
                             />
                         </div>
@@ -154,7 +154,7 @@ export default function Contact() {
                         <Button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-[#FF9500] hover:bg-[#e68400] text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                            className="w-full bg-brand-orange-dark hover:bg-brand-orange-darker text-white font-medium py-2 px-4 rounded-lg transition-colors"
                         >
                             {isLoading ? 'Sending...' : 'Send Message'}
                         </Button>
@@ -174,7 +174,7 @@ export default function Contact() {
                     <div className="pt-4">
                         <Button
                             onClick={() => setShowSuccessDialog(false)}
-                            className="w-full bg-[#FF9500] hover:bg-[#e68400]"
+                            className="w-full bg-brand-orange-dark hover:bg-brand-orange-darker"
                         >
                             Close
                         </Button>

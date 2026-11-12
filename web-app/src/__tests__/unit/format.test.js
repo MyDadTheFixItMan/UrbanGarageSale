@@ -1,4 +1,4 @@
-import { formatAud, formatDateAU, formatDateTimeAU } from '@/lib/format';
+import { formatAud, formatDateAU, formatDateTimeAU, formatTimeAU, saleDayLabel, saleWhenLabel, formatDistanceKm } from '@/lib/format';
 
 describe('Australian formatting helpers', () => {
   describe('formatAud', () => {
@@ -43,5 +43,60 @@ describe('Australian formatting helpers', () => {
       expect(text.startsWith('05/10/2026')).toBe(true);
       expect(text).toMatch(/2:30/);
     });
+  });
+});
+
+describe('listing card labels', () => {
+  const NOW = new Date(2026, 10, 10, 9, 30); // Tue 10 Nov 2026, 9:30 am
+
+  describe('formatTimeAU', () => {
+    it('shows whole hours without minutes', () => {
+      expect(formatTimeAU('08:00')).toBe('8am');
+      expect(formatTimeAU('15:00')).toBe('3pm');
+    });
+
+    it('keeps minutes and handles midday and midnight', () => {
+      expect(formatTimeAU('13:30')).toBe('1:30pm');
+      expect(formatTimeAU('12:00')).toBe('12pm');
+      expect(formatTimeAU('00:15')).toBe('12:15am');
+    });
+
+    it('returns text it does not recognise unchanged', () => {
+      expect(formatTimeAU('early')).toBe('early');
+      expect(formatTimeAU(undefined)).toBe('');
+    });
+  });
+
+  describe('saleDayLabel', () => {
+    it('says Today for a sale today or one already running', () => {
+      expect(saleDayLabel('2026-11-10', '2026-11-10', NOW)).toBe('Today');
+      expect(saleDayLabel('2026-11-08', '2026-11-11', NOW)).toBe('Today');
+    });
+
+    it('says Tomorrow, then the weekday within the next week', () => {
+      expect(saleDayLabel('2026-11-11', '2026-11-11', NOW)).toBe('Tomorrow');
+      expect(saleDayLabel('2026-11-14', '2026-11-15', NOW)).toBe('Sat');
+    });
+
+    it('adds the date for sales a week or more away', () => {
+      expect(saleDayLabel('2026-11-17', '2026-11-17', NOW)).toBe('Tue 17 Nov');
+    });
+
+    it('returns nothing without a start date', () => {
+      expect(saleDayLabel(undefined, undefined, NOW)).toBe('');
+    });
+  });
+
+  it('saleWhenLabel joins the day and hours', () => {
+    const sale = { start_date: '2026-11-14', end_date: '2026-11-14', start_time: '07:00', end_time: '13:00' };
+    expect(saleWhenLabel(sale, NOW)).toBe('Sat · 7am–1pm');
+    expect(saleWhenLabel({ start_date: '2026-11-14' }, NOW)).toBe('Sat');
+  });
+
+  it('formatDistanceKm rounds to suit the distance', () => {
+    expect(formatDistanceKm(0.43)).toBe('0.4 km away');
+    expect(formatDistanceKm(9.97)).toBe('10 km away');
+    expect(formatDistanceKm(23.6)).toBe('24 km away');
+    expect(formatDistanceKm(undefined)).toBe('');
   });
 });

@@ -134,7 +134,7 @@ export default function Payment() {
     if (loading || processingPayment) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-                <Loader2 className="w-8 h-8 animate-spin text-[#1e3a5f]" />
+                <Loader2 className="w-8 h-8 animate-spin text-navy" />
                 <p className="text-slate-600">
                     {processingPayment ? 'Verifying your payment...' : 'Loading...'}
                 </p>
@@ -144,7 +144,7 @@ export default function Payment() {
 
     if (paymentSuccess) {
         return (
-            <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen flex flex-col overflow-hidden pb-24 md:pb-0">
+            <div className="bg-brand-cream min-h-screen flex flex-col overflow-hidden pb-24 md:pb-0">
                 {/* Watermark */}
                 <style>{`
                     @media (min-width: 768px) {
@@ -168,7 +168,7 @@ export default function Payment() {
 
                 {/* Advertising Ribbon */}
                 {allPromotions.length > 0 && (
-                    <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                    <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                         <p className="text-sm sm:text-base font-semibold">
                             {allPromotions[promoIndex]?.message}
                         </p>
@@ -201,7 +201,7 @@ export default function Payment() {
                                     </Button>
                                 </Link>
                                 <Link to={createPageUrl('Home')} className="w-full">
-                                    <Button className="w-full bg-[#1e3a5f] hover:bg-[#152a45]">
+                                    <Button className="w-full bg-navy hover:bg-navy-dark">
                                         Back to Home
                                     </Button>
                                 </Link>
@@ -215,7 +215,7 @@ export default function Payment() {
 
     // If no session_id, show payment checkout
     return (
-        <div style={{ backgroundColor: '#f5f1e8' }} className="min-h-screen flex flex-col overflow-hidden pb-24 md:pb-0">
+        <div className="bg-brand-cream min-h-screen flex flex-col overflow-hidden pb-24 md:pb-0">
             {/* Watermark */}
             <style>{`
                 @media (min-width: 768px) {
@@ -239,7 +239,7 @@ export default function Payment() {
 
             {/* Advertising Ribbon */}
             {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">
                         {allPromotions[promoIndex]?.message}
                     </p>
@@ -263,7 +263,7 @@ export default function Payment() {
 
                         <div className="bg-slate-100 rounded-lg p-4 text-center">
                             <p className="text-sm text-slate-600 mb-2">Listing Fee</p>
-                            <p className="text-3xl font-bold text-[#1e3a5f]">{formatAud(LISTING_FEE_AUD, { withCode: true })}</p>
+                            <p className="text-3xl font-bold text-navy">{formatAud(LISTING_FEE_AUD, { withCode: true })}</p>
                             <p className="text-xs text-slate-500 mt-2">One-time fee to list your garage sale, including GST</p>
                         </div>
 
@@ -272,7 +272,7 @@ export default function Payment() {
                                 <Button
                                     onClick={handleCheckout}
                                     disabled={processingPayment}
-                                    className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
+                                    className="w-full bg-navy hover:bg-navy-dark"
                                 >
                                     {processingPayment && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                     {processingPayment ? 'Processing...' : `Pay ${formatAud(LISTING_FEE_AUD, { withCode: true })} with Stripe`}

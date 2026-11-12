@@ -89,7 +89,7 @@ export default function FreeListingCard({ appSettings }) {
                     <div className="flex items-center gap-3">
                         <div className={`w-3 h-3 rounded-full ${runningToday ? 'bg-green-500' : 'bg-slate-300'}`} />
                         <div>
-                            <p className="font-medium text-[#1e3a5f]">Free Listings</p>
+                            <p className="font-medium text-navy">Free Listings</p>
                             <p className="text-sm text-slate-500">
                                 {runningToday
                                     ? 'Currently active - listings are FREE'
@@ -107,7 +107,7 @@ export default function FreeListingCard({ appSettings }) {
                             onChange={(e) => setActive(e.target.checked)}
                             className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1e3a5f]"></div>
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-navy"></div>
                     </label>
                 </div>
 
@@ -130,14 +130,14 @@ export default function FreeListingCard({ appSettings }) {
                     </div>
                 )}
 
-                <Button onClick={handleSave} disabled={saveMutation.isPending} className="bg-[#1e3a5f] hover:bg-[#152a45]">
+                <Button onClick={handleSave} disabled={saveMutation.isPending} className="bg-navy hover:bg-navy-dark">
                     {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     Save Settings
                 </Button>
 
                 {active && start && end && (
                     <div className={`p-4 rounded-xl border ${runningToday ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-100'}`}>
-                        <p className={`text-sm font-medium ${runningToday ? 'text-green-700' : 'text-[#1e3a5f]'}`}>
+                        <p className={`text-sm font-medium ${runningToday ? 'text-green-700' : 'text-navy'}`}>
                             {runningToday ? '✅ FREE PERIOD ACTIVE TODAY!' : '⏳ Free period scheduled'}
                         </p>
                         <p className="text-sm mt-2">

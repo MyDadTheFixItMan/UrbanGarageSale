@@ -263,13 +263,13 @@ export default function CreateListing() {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-[#1e3a5f]" />
+                <Loader2 className="w-8 h-8 animate-spin text-navy" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#f5f1e8] overflow-hidden pb-24 md:pb-8">
+        <div className="min-h-screen bg-brand-cream overflow-hidden pb-24 md:pb-8">
             {/* Watermark U Shape */}
             <style>{`
                 @media (min-width: 768px) {
@@ -295,22 +295,22 @@ export default function CreateListing() {
 
             {/* Advertising Ribbon */}
             {allPromotions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FF9500] to-[#f97316] text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full" style={{ backgroundColor: 'rgb(255, 149, 0)' }}>
+                <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">
                         {allPromotions[promoIndex]?.message}
                     </p>
                 </div>
             )}
 
-            <section className="relative bg-[#f5f1e8] py-16 px-4 sm:px-6 overflow-hidden">
+            <section className="relative bg-brand-cream py-16 px-4 sm:px-6 overflow-hidden">
             <div className="max-w-4xl mx-auto pt-2 md:pt-4 relative z-10">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-1 sm:mb-8">
-                    <div className="w-12 h-12 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-xl bg-navy flex items-center justify-center">
                         <Plus className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-[#1e3a5f]">{isActiveEdit ? 'Edit Listing' : 'Create Listing'}</h1>
+                        <h1 className="text-2xl font-bold text-navy">{isActiveEdit ? 'Edit Listing' : 'Create Listing'}</h1>
                         <p className="text-slate-500">
                             {isActiveEdit ? 'You can change the title, description, sale type and photos' : 'Add a new garage sale to the platform'}
                         </p>
@@ -318,8 +318,8 @@ export default function CreateListing() {
                 </div>
 
                 {needsReapproval && (
-                    <Alert className="mb-6 border-[#FF9500]/30 bg-[#FF9500]/10">
-                        <AlertDescription className="text-[#1e3a5f] text-center">
+                    <Alert className="mb-6 border-brand-orange/30 bg-brand-orange/10">
+                        <AlertDescription className="text-navy text-center">
                             Changes need admin approval. <strong>Buyers keep seeing your listing as it is now until they're approved.</strong>
                         </AlertDescription>
                     </Alert>
@@ -344,8 +344,8 @@ export default function CreateListing() {
 
                 {/* Pricing Info */}
                 {!isActiveEdit && (
-                    <Alert className="mb-6 border-[#FF9500]/30 bg-[#FF9500]/10">
-                        <AlertDescription className="text-[#1e3a5f] text-center">
+                    <Alert className="mb-6 border-brand-orange/30 bg-brand-orange/10">
+                        <AlertDescription className="text-navy text-center">
                             Listings are <strong>{formatAud(LISTING_FEE_AUD, { withCode: true })}</strong> (incl. GST) to publish. Drafts are free. Anything not paid for is saved for 2 days, then deleted.
                         </AlertDescription>
                     </Alert>
@@ -381,7 +381,7 @@ export default function CreateListing() {
                         <Button
                             onClick={() => handleSubmit(false)}
                             disabled={createMutation.isPending}
-                            className={`flex-1 h-12 gap-2 ${freePeriod ? 'bg-green-600 hover:bg-green-700' : 'bg-[#1e3a5f] hover:bg-[#152a45]'}`}
+                            className={`flex-1 h-12 gap-2 ${freePeriod ? 'bg-green-600 hover:bg-green-700' : 'bg-navy hover:bg-navy-dark'}`}
                         >
                             {createMutation.isPending ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />

@@ -148,7 +148,7 @@ export function EditProfileDialog({ user, onSaved }) {
                     <Button
                         onClick={profile.save}
                         disabled={profile.isSaving}
-                        className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
+                        className="w-full bg-navy hover:bg-navy-dark"
                     >
                         {profile.isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
                     </Button>
@@ -179,7 +179,7 @@ export function CompleteProfileDialog({ user, onSaved, onSignOut }) {
                     <Button
                         onClick={profile.save}
                         disabled={profile.isSaving}
-                        className="w-full bg-[#1e3a5f] hover:bg-[#152a45]"
+                        className="w-full bg-navy hover:bg-navy-dark"
                     >
                         {profile.isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save and Continue'}
                     </Button>
@@ -270,7 +270,7 @@ export function ChangePasswordDialog({ email }) {
                             {error}
                         </div>
                     )}
-                    <Button type="submit" disabled={changeMutation.isPending} className="w-full bg-[#1e3a5f] hover:bg-[#152a45]">
+                    <Button type="submit" disabled={changeMutation.isPending} className="w-full bg-navy hover:bg-navy-dark">
                         {changeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update Password'}
                     </Button>
                     <div className="pt-2 border-t">
@@ -327,7 +327,7 @@ export function PrintSignDialog({ listing, onClose, onPrint }) {
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button className="bg-[#1e3a5f] hover:bg-[#152a45]" onClick={() => onPrint(lastListing.current, size)}>
+                    <Button className="bg-navy hover:bg-navy-dark" onClick={() => onPrint(lastListing.current, size)}>
                         <Printer className="w-4 h-4 mr-2" />
                         Print Sign
                     </Button>

@@ -169,7 +169,7 @@ export default function ApprovalTab() {
                 <>
                     {edits.length > 0 && (
                         <>
-                            <h3 className="font-semibold text-[#1e3a5f]">Edits to live listings</h3>
+                            <h3 className="font-semibold text-navy">Edits to live listings</h3>
                             <p className="text-sm text-slate-500">Buyers keep seeing the current version until you approve.</p>
                             {edits.map(({ edit, listing }) => (
                                 <ListingEditRow
@@ -185,7 +185,7 @@ export default function ApprovalTab() {
                         </>
                     )}
                     {pendingListings.length > 0 && edits.length > 0 && (
-                        <h3 className="font-semibold text-[#1e3a5f]">New listings</h3>
+                        <h3 className="font-semibold text-navy">New listings</h3>
                     )}
                     {pendingListings.map((listing) => (
                         <ListingRow

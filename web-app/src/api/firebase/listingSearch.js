@@ -58,6 +58,24 @@ export function hasEnded(listing, now = new Date()) {
   return endDate < startOfToday;
 }
 
+// A listing date (YYYY-MM-DD string, Date or Firestore Timestamp) as a local YYYY-MM-DD string.
+export function toLocalIsoDate(value) {
+  if (!value) return null;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = value.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// True if the sale runs on `day` (YYYY-MM-DD): any day from start_date to end_date counts, so a
+// three-day sale matches each of its three days. A missing start or end leaves that side open.
+export function runsOnDate(listing, day) {
+  const start = toLocalIsoDate(listing.start_date);
+  const end = toLocalIsoDate(listing.end_date) || start;
+  return (!start || start <= day) && (!end || day <= end);
+}
+
 // True if the listing has coordinates within radius of the searcher.
 export function isWithinRadius(listing, filters) {
   if (!listing.latitude || !listing.longitude) return false;
@@ -65,12 +83,15 @@ export function isWithinRadius(listing, filters) {
   return distance <= radiusKm(filters);
 }
 
-// Applies the in-memory part of a listing search (past listings, radius) and removes duplicates
+// Applies the in-memory part of a listing search (past listings, sale date, radius) and removes duplicates
 // that appear when geohash cells overlap.
 export function refineListingResults(results, filters = {}, now = new Date()) {
   let refined = results;
   if (!filters.includePast) {
     refined = refined.filter((listing) => !hasEnded(listing, now));
+  }
+  if (filters.saleDate) {
+    refined = refined.filter((listing) => runsOnDate(listing, filters.saleDate));
   }
   if (hasLocationFilter(filters)) {
     refined = refined.filter((listing) => isWithinRadius(listing, filters));

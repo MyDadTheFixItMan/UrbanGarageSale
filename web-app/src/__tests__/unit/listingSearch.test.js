@@ -6,6 +6,7 @@ import {
   isWithinRadius,
   refineListingResults,
   radiusKm,
+  runsOnDate,
 } from '@/api/firebase/listingSearch';
 
 const NOW = new Date(2026, 9, 9, 15, 0); // 9 Oct 2026, 3 pm local time
@@ -64,6 +65,30 @@ describe('hasEnded', () => {
   });
 });
 
+describe('runsOnDate', () => {
+  const threeDaySale = { start_date: '2026-10-09', end_date: '2026-10-11' };
+
+  it('matches every day of a multi-day sale, including the first and last', () => {
+    expect(['2026-10-09', '2026-10-10', '2026-10-11'].every((day) => runsOnDate(threeDaySale, day))).toBe(true);
+  });
+
+  it('does not match the days before or after the sale', () => {
+    expect(runsOnDate(threeDaySale, '2026-10-08')).toBe(false);
+    expect(runsOnDate(threeDaySale, '2026-10-12')).toBe(false);
+  });
+
+  it('treats a sale with only a start date as a one-day sale', () => {
+    expect(runsOnDate({ start_date: '2026-10-09' }, '2026-10-09')).toBe(true);
+    expect(runsOnDate({ start_date: '2026-10-09' }, '2026-10-10')).toBe(false);
+  });
+
+  it('reads Firestore Timestamps and Dates as local days', () => {
+    const sale = { start_date: { toDate: () => new Date(2026, 9, 9, 0, 0) }, end_date: new Date(2026, 9, 10, 23, 0) };
+    expect(runsOnDate(sale, '2026-10-10')).toBe(true);
+    expect(runsOnDate(sale, '2026-10-11')).toBe(false);
+  });
+});
+
 describe('radius search', () => {
   it('defaults to 25 km when the distance is not a number', () => {
     expect(radiusKm({ distance: 'abc' })).toBe(25);
@@ -92,6 +117,12 @@ describe('refineListingResults', () => {
   it('applies the radius only when a location is given', () => {
     expect(refineListingResults([current, farAway], searchFrom(10), NOW).map((l) => l.id)).toEqual(['a']);
     expect(refineListingResults([current, farAway], {}, NOW).map((l) => l.id)).toEqual(['a', 'c']);
+  });
+
+  it('keeps only sales running on the chosen date', () => {
+    const later = { ...current, id: 'd', start_date: '2026-10-12', end_date: '2026-10-14' };
+    const results = refineListingResults([{ ...current, start_date: '2026-10-09' }, later], { saleDate: '2026-10-13' }, NOW);
+    expect(results.map((l) => l.id)).toEqual(['d']);
   });
 
   it('removes duplicates returned by overlapping geohash cells', () => {

@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import SaleMap from '../components/map/SaleMap';
 import { saleWhenLabel, formatDistanceKm } from '@/lib/format';
 import { coverImage, SALE_TYPE_LABELS } from '@/lib/listings';
-import { calculateDistance } from '@/api/firebase/listingSearch';
+import { calculateDistance, toLocalIsoDate } from '@/api/firebase/listingSearch';
 import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
 import { useToggleSaved } from '@/lib/useToggleSaved';
 
@@ -31,6 +31,7 @@ export default function Home() {
         postcode: '',
         distance: '25',
         saleType: 'all',
+        saleDate: '',
     });
 
     // Restore the last search's filters and search again, so a sale that has since been deleted,
@@ -41,6 +42,8 @@ export default function Home() {
         if (!savedFilters) return;
         try {
             const restored = JSON.parse(savedFilters);
+            // A date saved from an earlier visit that has since passed would match nothing.
+            if (restored.saleDate && restored.saleDate < toLocalIsoDate(new Date())) restored.saleDate = '';
             setFilters(restored);
             if (restored.postcode) runSearch(restored, { quiet: true });
         } catch (error) {
@@ -187,6 +190,7 @@ export default function Home() {
                     status: 'active',
                     saleType: filters.saleType !== 'all' ? filters.saleType : undefined,
                     distance: filters.distance,
+                    saleDate: filters.saleDate || undefined,
                 };
 
                 // Try to get coordinates from suburb/postcode input
@@ -230,7 +234,7 @@ export default function Home() {
                         if (results.length === 0 && placeUnknown) {
                             toast.info(`We couldn't find "${filters.postcode}". Try a suburb name or a 4-digit postcode.`);
                         } else if (results.length === 0) {
-                            toast.info('No listings found in your search area');
+                            toast.info(filters.saleDate ? 'No listings found in your search area on that date' : 'No listings found in your search area');
                         } else {
                             toast.success(`Found ${results.length} listing${results.length !== 1 ? 's' : ''}`);
                         }
@@ -311,7 +315,7 @@ export default function Home() {
                     {/* Search Box */}
                     <div className="max-w-4xl mx-auto relative z-20">
                         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div>
                                     <label htmlFor="search-location" className="block text-slate-800 text-sm font-medium mb-2">Suburb or Postcode</label>
                                     <input
@@ -357,6 +361,25 @@ export default function Home() {
                                             <SelectItem value="200">200 km</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                </div>
+
+                                <div>
+                                    <div className="flex items-baseline justify-between mb-2">
+                                        <label htmlFor="search-date" className="block text-slate-800 text-sm font-medium">Date</label>
+                                        {filters.saleDate && (
+                                            <button type="button" onClick={() => setFilters({ ...filters, saleDate: '' })} className="text-xs text-slate-600 underline hover:text-slate-800">
+                                                Any date
+                                            </button>
+                                        )}
+                                    </div>
+                                    <input
+                                        id="search-date"
+                                        type="date"
+                                        min={toLocalIsoDate(new Date())}
+                                        className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-800"
+                                        value={filters.saleDate || ''}
+                                        onChange={(e) => setFilters({ ...filters, saleDate: e.target.value })}
+                                    />
                                 </div>
                             </div>
 

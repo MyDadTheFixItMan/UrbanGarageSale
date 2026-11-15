@@ -73,13 +73,13 @@ function emailButton(label, url) {
     return `
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
                     <tr><td align="center" bgcolor="${EMAIL_COLOURS.orangeDark}" style="border-radius:8px;">
-                        <a href="${escapeHtml(url)}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${EMAIL_FONT};font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">${label}</a>
+                        <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;font-family:${EMAIL_FONT};font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">${label}</a>
                     </td></tr>
                 </table>`;
 }
 
 function emailLink(label, url) {
-    return `<a href="${escapeHtml(url)}" target="_blank" style="color:${EMAIL_COLOURS.teal};font-weight:bold;text-decoration:underline;">${label}</a>`;
+    return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="color:${EMAIL_COLOURS.teal};font-weight:bold;text-decoration:underline;">${label}</a>`;
 }
 
 // The branded wrapper around every email: logo, heading, the email's own message, an optional
@@ -118,7 +118,7 @@ function emailLayout({ siteUrl, preheader, heading, body, button, signoff = true
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:${EMAIL_FONT};">
             <tr><td height="6" bgcolor="${c.orange}" style="height:6px;line-height:6px;font-size:0;background:${c.orange};background-image:linear-gradient(90deg, ${c.orange}, ${c.teal});">&nbsp;</td></tr>
             <tr><td class="ugs-pad" style="padding:24px 32px 8px;">
-                <a href="${escapeHtml(site)}" target="_blank" style="text-decoration:none;"><img src="${escapeHtml(site)}/email-logo.png" width="170" height="78" alt="Urban Garage Sale" style="display:block;border:0;width:170px;height:78px;font-family:${EMAIL_FONT};font-size:24px;font-weight:bold;color:${c.orangeDark};"></a>
+                <a href="${escapeHtml(site)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;"><img src="${escapeHtml(site)}/email-logo.png" width="170" height="78" alt="Urban Garage Sale" style="display:block;border:0;width:170px;height:78px;font-family:${EMAIL_FONT};font-size:24px;font-weight:bold;color:${c.orangeDark};"></a>
             </td></tr>
             <tr><td class="ugs-pad" style="padding:16px 32px 8px;color:${c.text};font-size:16px;line-height:1.6;">
                 <h1 class="ugs-heading" style="margin:0 0 16px;color:${c.navy};font-size:26px;line-height:1.25;font-weight:800;">${heading}</h1>

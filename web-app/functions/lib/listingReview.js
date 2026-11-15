@@ -2,7 +2,7 @@
 // the prompt sent to Claude and how its answer is read. No Firebase or network, so they are unit
 // tested directly (functions/test/listingReview.test.js).
 const crypto = require('node:crypto');
-const { escapeHtml } = require('./helpers');
+const { escapeHtml, EMAIL_COLOURS, EMAIL_ADMIN_NOTE, emailLayout, emailParagraph, emailList } = require('./helpers');
 
 // The listing rules. The Terms page (web-app/src/pages/Terms.jsx, "Listing Rules") shows the same
 // rules to sellers; change both together.
@@ -160,14 +160,13 @@ const RULE_TEXT = Object.fromEntries([...LISTING_RULES, ['other', 'Other']]);
 
 // The email to the admin about a listing waiting for them: one the check didn't approve, or in
 // advice mode any listing. Everything the seller typed is escaped.
-function adminReviewEmailHtml({ kind, listing, verdict, adminUrl, footer }) {
+function adminReviewEmailHtml({ kind, listing, verdict, adminUrl, siteUrl }) {
     const what = kind === 'edit' ? 'Changes to a live listing' : 'A new listing';
     const outcome = verdict.decision === 'approve'
         ? 'Claude would approve it. Automatic approval is off, so it is waiting for you in the Approval tab.'
         : 'Claude did not approve it. It is waiting for you in the Approval tab.';
     const problems = verdict.problems.length
-        ? `<ul style="margin:0 0 16px;padding-left:20px;">${verdict.problems.map((p) =>
-            `<li style="margin:0 0 6px;"><strong>${escapeHtml(RULE_TEXT[p.rule] || p.rule)}</strong><br>${escapeHtml(p.reason)}</li>`).join('')}</ul>`
+        ? emailList(verdict.problems.map((p) => `<strong>${escapeHtml(RULE_TEXT[p.rule] || p.rule)}</strong><br>${escapeHtml(p.reason)}`))
         : '';
     const rows = [
         ['Title', listing.title],
@@ -177,16 +176,20 @@ function adminReviewEmailHtml({ kind, listing, verdict, adminUrl, footer }) {
         ['Photos', String(listing.photos?.length ?? 0)],
         ['Description', listing.description],
     ].map(([label, value]) =>
-        `<tr><td style="padding:4px 12px 4px 0;vertical-align:top;color:#71717a;">${label}</td><td style="padding:4px 0;white-space:pre-line;">${escapeHtml(value || '(blank)')}</td></tr>`).join('');
-    return `
-        <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#27272a;max-width:600px;">
-            <h1 style="font-size:20px;color:#1e3a5f;margin:0 0 12px;">${what} needs a look</h1>
-            <p style="margin:0 0 16px;">${outcome}</p>
-            ${problems}
-            <table style="border-collapse:collapse;margin:0 0 16px;">${rows}</table>
-            <p style="margin:0 0 16px;"><a href="${escapeHtml(adminUrl)}" style="color:#17A2A2;">Open the Approval tab</a></p>
-            <p style="margin:0;color:#71717a;font-size:12px;">${footer}</p>
-        </div>`;
+        `<tr><td style="padding:8px 12px 8px 0;vertical-align:top;color:${EMAIL_COLOURS.muted};border-bottom:1px solid ${EMAIL_COLOURS.line};white-space:nowrap;">${label}</td><td style="padding:8px 0;border-bottom:1px solid ${EMAIL_COLOURS.line};white-space:pre-line;">${escapeHtml(value || '(blank)')}</td></tr>`).join('');
+    return emailLayout({
+        siteUrl,
+        preheader: outcome,
+        heading: `${what} needs a look`,
+        body: [
+            emailParagraph(outcome),
+            problems,
+            `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 0 16px;font-size:15px;">${rows}</table>`,
+        ].join('\n'),
+        button: { label: 'Open the Approval tab', url: adminUrl },
+        signoff: false,
+        note: EMAIL_ADMIN_NOTE,
+    });
 }
 
 module.exports = {

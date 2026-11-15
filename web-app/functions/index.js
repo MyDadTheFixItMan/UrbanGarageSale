@@ -13,7 +13,7 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
-    isDocId, isRole, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, unusedPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
+    isDocId, isRole, emailText, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, unusedPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
     isUnpaidListing, isExpiredDraft, refundablePayments, storagePathFromUrl,
 } = require('./lib/helpers');
 const listingReview = require('./lib/listingReview');
@@ -48,11 +48,18 @@ function getStripe() {
 
 // Returns false (and sends nothing) when SendGrid isn't configured. Secret Manager can't hold an
 // empty value, so projects without email (e.g. staging) set the secret to "not-configured".
+// Every email goes out from "Urban Garage Sale", replies go to support, and a plain-text copy is
+// made from the HTML (lib/helpers.js emailLayout gives every email the same look).
 async function sendEmail(message) {
     const key = process.env.SENDGRID_API_KEY;
     if (!key || key === 'not-configured') return false;
     sgMail.setApiKey(key);
-    await sgMail.send(message);
+    await sgMail.send({
+        from: { email: FROM_EMAIL, name: 'Urban Garage Sale' },
+        replyTo: SUPPORT_EMAIL,
+        text: emailText(message.html),
+        ...message,
+    });
     return true;
 }
 
@@ -61,7 +68,7 @@ const LISTING_FEE_CENTS = 1000;
 // Public URL of the web app, used for Stripe redirects and email links (e.g. https://urbangaragesales.com.au).
 const APP_URL = process.env.APP_URL;
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'notification@urbangaragesales.com.au';
-const BUSINESS_FOOTER = 'Urban Garage Sale · urbangaragesales.com.au · support@urbangaragesales.com.au';
+const SUPPORT_EMAIL = 'support@urbangaragesales.com.au';
 
 // Automatic listing check by Claude, set by CLAUDE_REVIEW_MODE in functions/.env:
 //   off    - no check; the admin approves every listing as before
@@ -324,9 +331,8 @@ async function emailApproval(saleId, listing) {
     }
     const sent = await sendEmail({
         to,
-        from: FROM_EMAIL,
-        subject: 'Your garage sale listing has been approved',
-        html: approvalEmailHtml({ title: listing.title, footer: BUSINESS_FOOTER }),
+        subject: 'Your garage sale is live!',
+        html: approvalEmailHtml({ title: listing.title, saleId, siteUrl: APP_URL }),
     });
     if (!sent) logger.warn(`Email not sent (SendGrid not configured). Approval for listing ${saleId}`);
     return sent;
@@ -360,9 +366,8 @@ async function emailRejection(saleId, listing, reason, refunded) {
         }
         const sent = await sendEmail({
             to,
-            from: FROM_EMAIL,
             subject: "Your garage sale listing wasn't approved",
-            html: rejectionEmailHtml({ title: listing.title, reason, refunded, footer: BUSINESS_FOOTER }),
+            html: rejectionEmailHtml({ title: listing.title, reason, refunded, siteUrl: APP_URL }),
         });
         if (!sent) logger.warn(`Email not sent (SendGrid not configured). Rejection of listing ${saleId}`);
         return sent;
@@ -497,9 +502,8 @@ exports.refuseListingEdit = callable(['SENDGRID_API_KEY'], async (request) => {
         if (to) {
             emailed = await sendEmail({
                 to,
-                from: FROM_EMAIL,
                 subject: "Your listing changes weren't approved",
-                html: editRefusedEmailHtml({ title: listing.data()?.title, reason, footer: BUSINESS_FOOTER }),
+                html: editRefusedEmailHtml({ title: listing.data()?.title, reason, siteUrl: APP_URL }),
             });
         }
         if (!emailed) logger.warn(`Refusal email not sent for listing ${saleId}`);
@@ -611,14 +615,13 @@ async function finishReview({ reviewId, kind, saleId, listing, verdict, outcome 
     try {
         const sent = await sendEmail({
             to: ADMIN_REVIEW_EMAIL,
-            from: FROM_EMAIL,
             subject: `${kind === 'edit' ? 'Listing changes' : 'Listing'} to review: ${String(listing.title || 'untitled').replace(/\s+/g, ' ').slice(0, 80)}`,
             html: listingReview.adminReviewEmailHtml({
                 kind,
                 listing,
                 verdict,
                 adminUrl: `${APP_URL}/AdminDashboard`,
-                footer: BUSINESS_FOOTER,
+                siteUrl: APP_URL,
             }),
         });
         if (!sent) logger.warn(`Review email not sent (SendGrid not configured) for listing ${saleId}`);
@@ -734,9 +737,8 @@ exports.sendContactResponseEmail = callable(['SENDGRID_API_KEY'], async (request
 
     const sent = await sendEmail({
         to: userEmail,
-        from: FROM_EMAIL,
         subject: 'Re: Your Urban Garage Sale enquiry',
-        html: contactResponseEmailHtml({ userName, originalMessage, responseMessage, footer: BUSINESS_FOOTER }),
+        html: contactResponseEmailHtml({ userName, originalMessage, responseMessage, siteUrl: APP_URL }),
     });
     return { success: true, message: sent ? 'Response email sent' : 'Email service not configured' };
 });

@@ -24,98 +24,215 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-const EMAIL_ORANGE = '#FF9500';
-const EMAIL_TEAL = '#17A2A2';
-const EMAIL_NAVY = '#1e3a5f';
-const EMAIL_SELLER_NOTE = 'You received this email because you listed a garage sale on Urban Garage Sale.';
+// The house style for every email Urban Garage Sale sends. The colours are the website's
+// (web-app/tailwind.config.js); white text only goes on orangeDark or darker, as on the site.
+const EMAIL_COLOURS = {
+    navy: '#1e3a5f',
+    orange: '#f97316',
+    orangeDark: '#c2410c',
+    teal: '#0d9488',
+    cream: '#f5f1e8',
+    text: '#334155',
+    muted: '#64748b',
+    line: '#e2e8f0',
+};
+const EMAIL_FONT = "'Nunito', 'Segoe UI', Arial, Helvetica, sans-serif";
+const SUPPORT_EMAIL = 'support@urbangaragesales.com.au';
+const DEFAULT_SITE_URL = 'https://urbangaragesales.com.au';
+const EMAIL_SELLER_NOTE = 'You received this email because you listed a sale on Urban Garage Sale.';
+const EMAIL_CONTACT_NOTE = 'You received this email because you sent us a message through Urban Garage Sale.';
+const EMAIL_ADMIN_NOTE = 'You received this email because you are an Urban Garage Sale admin.';
+
+// The website address links point at, without a trailing slash.
+function siteBase(siteUrl) {
+    return String(siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, '');
+}
 
 function emailParagraph(html) {
     return `<p style="margin:0 0 16px;">${html}</p>`;
 }
 
+// A bulleted list. Items are HTML, so escape anything typed by a user first.
+function emailList(items) {
+    return `<ul style="margin:0 0 16px;padding-left:22px;">${items.map((item) => `<li style="margin:0 0 6px;">${item}</li>`).join('')}</ul>`;
+}
+
 // A labelled block of typed text. The text is escaped and its line breaks are kept.
 function emailBox(label, text, colour) {
     return `
-                <div style="background:#f7f5f0;border-left:4px solid ${colour};padding:14px 16px;margin:0 0 16px;">
-                    <p style="margin:0 0 6px;font-weight:bold;">${label}</p>
-                    <p style="margin:0;white-space:pre-line;">${escapeHtml(text)}</p>
-                </div>`;
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">
+                    <tr><td style="background:${EMAIL_COLOURS.cream};border-left:4px solid ${colour};border-radius:4px;padding:14px 16px;">
+                        <p style="margin:0 0 6px;font-weight:bold;color:${EMAIL_COLOURS.navy};">${label}</p>
+                        <p style="margin:0;white-space:pre-line;">${escapeHtml(text)}</p>
+                    </td></tr>
+                </table>`;
 }
 
-// The branded wrapper around every email. The name is text, not an image, because many mail
-// apps block images. All styles are inline, because many mail apps drop style blocks.
-function emailLayout({ heading, body, note, footer }) {
+// The call-to-action button. A table cell rather than a styled link, so Outlook draws it too.
+function emailButton(label, url) {
     return `
-        <div style="background:#f4f4f5;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">
-            <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;">
-                <div style="background:${EMAIL_NAVY};border-bottom:4px solid ${EMAIL_ORANGE};padding:18px 24px;font-size:20px;font-weight:bold;">
-                    <span style="color:${EMAIL_ORANGE};">Urban</span> <span style="color:#ffffff;">Garage Sale</span>
-                </div>
-                <div style="padding:24px;color:#27272a;font-size:15px;line-height:1.5;">
-                    <h1 style="margin:0 0 16px;color:${EMAIL_NAVY};font-size:22px;line-height:1.3;">${heading}</h1>
-                    ${body}
-                </div>
-                <div style="padding:16px 24px;background:#fafafa;color:#71717a;font-size:12px;line-height:1.5;">
-                    ${note ? `${note}<br>` : ''}${footer}
-                </div>
-            </div>
-        </div>
-    `;
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
+                    <tr><td align="center" bgcolor="${EMAIL_COLOURS.orangeDark}" style="border-radius:8px;">
+                        <a href="${escapeHtml(url)}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${EMAIL_FONT};font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">${label}</a>
+                    </td></tr>
+                </table>`;
 }
 
-function approvalEmailHtml({ title, footer }) {
+function emailLink(label, url) {
+    return `<a href="${escapeHtml(url)}" target="_blank" style="color:${EMAIL_COLOURS.teal};font-weight:bold;text-decoration:underline;">${label}</a>`;
+}
+
+// The branded wrapper around every email: logo, heading, the email's own message, an optional
+// button, a sign-off and the shared footer. Built from tables with inline styles, because many
+// mail apps (Outlook especially) ignore layout CSS and style blocks. The logo's alt text is
+// styled, so the name still shows where images are blocked. The preheader is the preview line
+// mail apps show next to the subject; it is hidden in the email itself.
+function emailLayout({ siteUrl, preheader, heading, body, button, signoff = true, note }) {
+    const site = siteBase(siteUrl);
+    const c = EMAIL_COLOURS;
+    const footerLinks = [
+        emailLink('Find a sale', site),
+        emailLink('List your sale', `${site}/CreateListing`),
+        emailLink('Contact us', `${site}/Contact`),
+    ].join(' &nbsp;·&nbsp; ');
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>${heading}</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+    @media (max-width: 620px) {
+        .ugs-pad { padding-left: 20px !important; padding-right: 20px !important; }
+        .ugs-heading { font-size: 22px !important; }
+    }
+</style>
+</head>
+<body style="margin:0;padding:0;background:${c.cream};">
+<!--preheader--><div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${preheader ? escapeHtml(preheader) : ''}${'&#847;&zwnj;&nbsp;'.repeat(40)}</div><!--/preheader-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${c.cream}" style="background:${c.cream};">
+    <tr><td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:${EMAIL_FONT};">
+            <tr><td height="6" bgcolor="${c.orange}" style="height:6px;line-height:6px;font-size:0;background:${c.orange};background-image:linear-gradient(90deg, ${c.orange}, ${c.teal});">&nbsp;</td></tr>
+            <tr><td class="ugs-pad" style="padding:24px 32px 8px;">
+                <a href="${escapeHtml(site)}" target="_blank" style="text-decoration:none;"><img src="${escapeHtml(site)}/email-logo.png" width="170" height="78" alt="Urban Garage Sale" style="display:block;border:0;width:170px;height:78px;font-family:${EMAIL_FONT};font-size:24px;font-weight:bold;color:${c.orangeDark};"></a>
+            </td></tr>
+            <tr><td class="ugs-pad" style="padding:16px 32px 8px;color:${c.text};font-size:16px;line-height:1.6;">
+                <h1 class="ugs-heading" style="margin:0 0 16px;color:${c.navy};font-size:26px;line-height:1.25;font-weight:800;">${heading}</h1>
+                ${body}
+                ${button ? emailButton(button.label, button.url) : ''}
+                ${signoff ? emailParagraph('Cheers,<br><strong>The Urban Garage Sale team</strong>') : ''}
+            </td></tr>
+            <tr><td class="ugs-pad" style="padding:20px 32px 24px;border-top:1px solid ${c.line};background:#fbfaf7;color:${c.muted};font-size:13px;line-height:1.6;">
+                <p style="margin:0 0 10px;">${footerLinks}</p>
+                <p style="margin:0 0 10px;"><strong style="color:${c.navy};">Urban Garage Sale</strong> · Find unique treasures in your neighbourhood.</p>
+                <p style="margin:0;">${note ? `${note} ` : ''}Questions? Email ${emailLink(SUPPORT_EMAIL, `mailto:${SUPPORT_EMAIL}`)} or read our ${emailLink('privacy policy', `${site}/Privacy`)}.</p>
+            </td></tr>
+        </table>
+    </td></tr>
+</table>
+</body>
+</html>`;
+}
+
+// The plain-text copy sent alongside the HTML. Spam filters favour emails that have one, and
+// some people read mail as text only. Links keep their address after the label.
+function emailText(html) {
+    const entities = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&nbsp;': ' ' };
+    return String(html)
+        .replace(/<head[\s\S]*?<\/head>/i, '')
+        .replace(/<!--preheader-->[\s\S]*?<!--\/preheader-->/, '')
+        .replace(/<img [^>]*alt="([^"]*)"[^>]*>/g, '$1')
+        .replace(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g, (match, href, label) => {
+            const text = label.replace(/<[^>]+>/g, '');
+            const url = href.replace(/^mailto:/, '');
+            return text === url ? text : `${text} (${url})`;
+        })
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<li[^>]*>/gi, '- ')
+        .replace(/<\/(p|h1|li|tr|ul)>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (entity) => entities[entity])
+        .replace(/&#847;|&zwnj;/g, '')
+        .split('\n').map((line) => line.replace(/[ \t]+/g, ' ').trim()).join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+const listingName = (title) => `<strong>${escapeHtml(title || 'your listing')}</strong>`;
+
+function approvalEmailHtml({ title, saleId, siteUrl }) {
+    const site = siteBase(siteUrl);
     return emailLayout({
-        heading: 'Your listing has been approved!',
+        siteUrl,
+        preheader: 'Your listing has been approved and buyers can now find it.',
+        heading: 'Your garage sale is live!',
         body: [
-            emailParagraph(`Great news! Your garage sale listing "<strong>${escapeHtml(title || 'your listing')}</strong>" is now live on Urban Garage Sale.`),
-            emailParagraph('You can view and manage it from your profile on Urban Garage Sale.'),
+            emailParagraph(`Great news! ${listingName(title)} has been approved and is now live on Urban Garage Sale, so buyers near you can find it.`),
+            emailParagraph('<strong>A few tips for a great sale:</strong>'),
+            emailList([
+                'Share your listing with friends, family and local community groups.',
+                'Put up signs on the day so passers-by can find you.',
+                'Price items clearly and have some change ready.',
+            ]),
         ].join('\n'),
+        button: { label: 'View your listing', url: saleId ? `${site}/ListingDetails?id=${encodeURIComponent(saleId)}` : `${site}/Profile` },
         note: EMAIL_SELLER_NOTE,
-        footer,
     });
 }
 
 // The email telling a seller their listing was rejected. Title and reason are escaped.
-function rejectionEmailHtml({ title, reason, refunded, footer }) {
+function rejectionEmailHtml({ title, reason, refunded, siteUrl }) {
     const refundLine = refunded > 0
-        ? emailParagraph(`Your listing fee of A$${refunded.toFixed(2)} has been refunded to the card you paid with. Refunds usually appear within 5–10 business days.`)
+        ? emailParagraph(`Your listing fee of <strong>A$${refunded.toFixed(2)}</strong> has been refunded to the card you paid with. Refunds usually appear within 5–10 business days.`)
         : '';
     return emailLayout({
+        siteUrl,
+        preheader: "Here's why, and how to list your sale again.",
         heading: "Your listing wasn't approved",
         body: [
-            emailParagraph(`Your garage sale listing "<strong>${escapeHtml(title || 'your listing')}</strong>" wasn't approved, so it won't appear on Urban Garage Sale.`),
-            emailBox('Reason', reason, EMAIL_ORANGE),
+            emailParagraph(`Unfortunately ${listingName(title)} wasn't approved, so it won't appear on Urban Garage Sale.`),
+            emailBox('Reason', reason, EMAIL_COLOURS.orange),
             refundLine,
-            emailParagraph("You're welcome to create a new listing with these changes. If you have any questions, contact support@urbangaragesales.com.au."),
+            emailParagraph("You're welcome to create a new listing with these changes. We'd love to help you have a great sale."),
         ].join('\n'),
+        button: { label: 'Create a new listing', url: `${siteBase(siteUrl)}/CreateListing` },
         note: EMAIL_SELLER_NOTE,
-        footer,
     });
 }
 
-function editRefusedEmailHtml({ title, reason, footer }) {
+function editRefusedEmailHtml({ title, reason, siteUrl }) {
     return emailLayout({
+        siteUrl,
+        preheader: 'Your listing is still live, exactly as it was before.',
         heading: "Your changes weren't approved",
         body: [
-            emailParagraph(`The changes you made to your garage sale listing "<strong>${escapeHtml(title || 'your listing')}</strong>" weren't approved. Your listing is still live, exactly as it was before you changed it.`),
-            emailBox('Reason', reason, EMAIL_ORANGE),
-            emailParagraph('You can edit your listing from your profile and send new changes for approval. If you have any questions, contact support@urbangaragesales.com.au.'),
+            emailParagraph(`The changes you made to ${listingName(title)} weren't approved. Don't worry: your listing is still live, exactly as it was before you changed it.`),
+            emailBox('Reason', reason, EMAIL_COLOURS.orange),
+            emailParagraph('You can edit your listing from your profile and send new changes for approval.'),
         ].join('\n'),
+        button: { label: 'Go to my listings', url: `${siteBase(siteUrl)}/Profile` },
         note: EMAIL_SELLER_NOTE,
-        footer,
     });
 }
 
-function contactResponseEmailHtml({ userName, originalMessage, responseMessage, footer }) {
+function contactResponseEmailHtml({ userName, originalMessage, responseMessage, siteUrl }) {
     return emailLayout({
-        heading: 'We have replied to your message',
+        siteUrl,
+        preheader: 'Our team has replied to your message.',
+        heading: "We've replied to your message",
         body: [
             emailParagraph(`Hi ${escapeHtml(userName || 'there')},`),
-            emailParagraph('Thank you for contacting Urban Garage Sale. Our team has responded to your message.'),
-            emailBox('Your message', originalMessage, EMAIL_ORANGE),
-            emailBox('Our response', responseMessage, EMAIL_TEAL),
+            emailParagraph('Thanks for getting in touch with Urban Garage Sale. Here is our reply.'),
+            emailBox('Our reply', responseMessage, EMAIL_COLOURS.teal),
+            emailBox('Your message', originalMessage, EMAIL_COLOURS.line),
+            emailParagraph('If you have any more questions, send us another message through our Contact page.'),
         ].join('\n'),
-        footer,
+        button: { label: 'Find sales near you', url: siteBase(siteUrl) },
+        note: EMAIL_CONTACT_NOTE,
     });
 }
 
@@ -199,6 +316,12 @@ module.exports = {
     isUnpaidListing,
     isExpiredDraft,
     refundablePayments,
+    EMAIL_COLOURS,
+    EMAIL_ADMIN_NOTE,
+    emailLayout,
+    emailParagraph,
+    emailList,
+    emailText,
     approvalEmailHtml,
     rejectionEmailHtml,
     contactResponseEmailHtml,

@@ -6,6 +6,7 @@ const {
     rejectionEmailHtml,
     editRefusedEmailHtml,
     contactResponseEmailHtml,
+    emailText,
 } = require('../lib/helpers');
 
 const photoUrl = (path) =>
@@ -121,48 +122,62 @@ test('refundablePayments picks completed Stripe payments with a PaymentIntent', 
 });
 
 test('editRefusedEmailHtml says the listing is still live and escapes what was typed', () => {
-    const html = editRefusedEmailHtml({ title: '<b>Sale</b>', reason: 'Photos show <prices>', footer: 'Footer' });
+    const html = editRefusedEmailHtml({ title: '<b>Sale</b>', reason: 'Photos show <prices>' });
     assert.match(html, /still live/);
     assert.match(html, /Photos show &lt;prices&gt;/);
     assert.doesNotMatch(html, /<b>Sale<\/b>/);
 });
 
 test('rejectionEmailHtml gives the reason and escapes what the seller or admin typed', () => {
-    const html = rejectionEmailHtml({ title: '<b>Sale</b>', reason: 'Photos show <prices>', refunded: 0, footer: 'Footer' });
+    const html = rejectionEmailHtml({ title: '<b>Sale</b>', reason: 'Photos show <prices>', refunded: 0 });
     assert.match(html, /&lt;b&gt;Sale&lt;\/b&gt;/);
     assert.match(html, /Photos show &lt;prices&gt;/);
-    assert.match(html, /Footer/);
 });
 
 test('rejectionEmailHtml only mentions a refund when there was one', () => {
-    const email = (refunded) => rejectionEmailHtml({ title: 'Sale', reason: 'No', refunded, footer: '' });
-    assert.match(email(10), /A\$10\.00 has been refunded/);
+    const email = (refunded) => rejectionEmailHtml({ title: 'Sale', reason: 'No', refunded });
+    assert.match(email(10), /A\$10\.00<\/strong> has been refunded/);
     assert.doesNotMatch(email(0), /refund/i);
 });
 
 test('approvalEmailHtml names the listing and escapes its title', () => {
-    const html = approvalEmailHtml({ title: '<b>Sale</b>', footer: 'Footer' });
+    const html = approvalEmailHtml({ title: '<b>Sale</b>', saleId: 'abc123', siteUrl: 'https://example.com/' });
     assert.match(html, /has been approved/);
+    assert.match(html, /href="https:\/\/example\.com\/ListingDetails\?id=abc123"/);
     assert.match(html, /&lt;b&gt;Sale&lt;\/b&gt;/);
     assert.doesNotMatch(html, /<b>Sale<\/b>/);
 });
 
 test('contactResponseEmailHtml escapes the name and both messages', () => {
-    const html = contactResponseEmailHtml({ userName: '<i>Sam</i>', originalMessage: 'Is <x> ok?', responseMessage: 'Yes & <y>', footer: 'Footer' });
+    const html = contactResponseEmailHtml({ userName: '<i>Sam</i>', originalMessage: 'Is <x> ok?', responseMessage: 'Yes & <y>' });
     assert.match(html, /Hi &lt;i&gt;Sam&lt;\/i&gt;/);
     assert.match(html, /Is &lt;x&gt; ok\?/);
     assert.match(html, /Yes &amp; &lt;y&gt;/);
 });
 
-test('every email carries the brand header and the footer', () => {
+test('every email has the same logo, button, footer and plain-text copy', () => {
     const emails = [
-        approvalEmailHtml({ title: 'Sale', footer: 'Footer' }),
-        rejectionEmailHtml({ title: 'Sale', reason: 'No', refunded: 0, footer: 'Footer' }),
-        editRefusedEmailHtml({ title: 'Sale', reason: 'No', footer: 'Footer' }),
-        contactResponseEmailHtml({ responseMessage: 'Yes', footer: 'Footer' }),
+        approvalEmailHtml({ title: 'Sale', saleId: 's1', siteUrl: 'https://example.com' }),
+        rejectionEmailHtml({ title: 'Sale', reason: 'No', refunded: 0, siteUrl: 'https://example.com' }),
+        editRefusedEmailHtml({ title: 'Sale', reason: 'No', siteUrl: 'https://example.com' }),
+        contactResponseEmailHtml({ responseMessage: 'Yes', siteUrl: 'https://example.com' }),
     ];
     for (const html of emails) {
-        assert.match(html, />Urban<\/span> <span[^>]*>Garage Sale</);
-        assert.match(html, /Footer/);
+        assert.match(html, /<img src="https:\/\/example\.com\/email-logo\.png"[^>]*alt="Urban Garage Sale"/);
+        assert.match(html, /bgcolor="#c2410c"/);
+        assert.match(html, /href="https:\/\/example\.com\/Privacy"/);
+        assert.match(html, /support@urbangaragesales\.com\.au/);
+        const text = emailText(html);
+        assert.doesNotMatch(text, /<|&nbsp;|&amp;/);
+        assert.match(text, /The Urban Garage Sale team/);
     }
+});
+
+test('emailText keeps link addresses and drops the hidden preview line', () => {
+    const text = emailText(approvalEmailHtml({ title: "Tom & Sue's sale", saleId: 's1', siteUrl: 'https://example.com' }));
+    assert.match(text, /^Urban Garage Sale \(https:\/\/example\.com\)\n\nYour garage sale is live!/);
+    assert.match(text, /Tom & Sue's sale/);
+    assert.match(text, /View your listing \(https:\/\/example\.com\/ListingDetails\?id=s1\)/);
+    assert.match(text, /- Share your listing/);
+    assert.doesNotMatch(text, /buyers can now find it\./);
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { firebase } from '@/api/firebaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,20 +14,38 @@ import {
 
 const RECAPTCHA_ID = 'recaptcha-container-2fa';
 
-// Loads reCAPTCHA as soon as the dialog's element is on the page, so Send code is quicker.
-const prepareRecaptcha = (element) => {
-    if (element) firebase.auth.prepareRecaptcha(RECAPTCHA_ID);
-};
-
 // Enrols the user's mobile as a Firebase multi-factor (SMS) second factor.
 // After this, Firebase requires the SMS code at every sign-in.
-export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone = '', onEnabled }) {
+//
+// `required` is the version Layout.jsx shows to every signed-in account without 2FA: it can't be
+// closed, only finished or left by signing out (`onSignOut`), and with `autoSend` it texts the
+// code to `defaultPhone` as soon as it opens, so the person only has to type the code in.
+export default function TwoFactorSetupDialog({
+    open, onOpenChange = () => {}, defaultPhone = '', onEnabled, required = false, autoSend = false, onSignOut = undefined,
+}) {
     const [step, setStep] = useState('phone'); // 'phone' | 'code' | 'verify-email'
     const [phone, setPhone] = useState(defaultPhone);
     const [code, setCode] = useState('');
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
     const [loading, setLoading] = useState(false);
+    // reCAPTCHA loading ahead of the first send. Sending before it's ready is what made the first
+    // code sometimes fail to arrive, so the automatic send waits for it. Kept in state as well as
+    // a ref so the automatic send runs once the dialog's contents (and so the element) are on the
+    // page, which can be a render after it opens.
+    const recaptchaRef = useRef(null);
+    const [recaptchaReady, setRecaptchaReady] = useState(null);
+    const autoSent = useRef(false);
+
+    // Loads reCAPTCHA as soon as the dialog's element is on the page, so Send code is quicker.
+    // Stable, so React calls it only when the element itself is added or removed.
+    const prepareRecaptcha = useCallback((element) => {
+        if (element && !recaptchaRef.current) {
+            recaptchaRef.current = Promise.resolve(firebase.auth.prepareRecaptcha(RECAPTCHA_ID)).catch(() => {});
+            setRecaptchaReady(recaptchaRef.current);
+        }
+        if (!element) recaptchaRef.current = null;
+    }, []);
 
     const reset = () => {
         setStep('phone');
@@ -48,6 +66,7 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
     }, [open]);
 
     const handleOpenChange = (next) => {
+        if (required) return;
         if (!next) reset();
         onOpenChange(next);
     };
@@ -72,6 +91,13 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
         }
     };
 
+    // The automatic first send, once reCAPTCHA has loaded.
+    useEffect(() => {
+        if (!open || !autoSend || !defaultPhone || !recaptchaReady || autoSent.current) return;
+        autoSent.current = true;
+        recaptchaReady.then(sendCode);
+    }, [open, autoSend, defaultPhone, recaptchaReady]);
+
     const resendVerificationEmail = async () => {
         setError('');
         setNotice('');
@@ -93,6 +119,8 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
         try {
             if (await firebase.auth.isEmailVerified()) {
                 setStep('phone');
+                // The text that couldn't go before the email was verified goes now.
+                if (autoSend && phone) await sendCode();
             } else {
                 setError('Your email is not verified yet. Click the link in the email we sent you, then try again.');
             }
@@ -114,20 +142,30 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
         try {
             const result = await firebase.auth.finishMfaEnrollment(code);
             reset();
-            onEnabled(result);
+            onEnabled({ ...result, phone });
         } catch (err) {
             setError(err.message);
             setLoading(false);
         }
     };
 
+    const changeNumber = () => {
+        setCode('');
+        setError('');
+        setStep('phone');
+    };
+
+    const keepOpen = (e) => { if (required) e.preventDefault(); };
+
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent>
+            <DialogContent hideClose={required} onEscapeKeyDown={keepOpen} onInteractOutside={keepOpen}>
                 <DialogHeader>
-                    <DialogTitle>Turn on two-factor authentication</DialogTitle>
+                    <DialogTitle>{required ? 'Turn on two-step sign-in' : 'Turn on two-factor authentication'}</DialogTitle>
                     <DialogDescription>
-                        Each time you sign in we'll text a code to your mobile. You need this to create listings and use Urban Pay.
+                        {required
+                            ? "To keep every account safe, each time you sign in we'll text a code to your mobile. Enter the code to finish setting up your account."
+                            : "Each time you sign in we'll text a code to your mobile. You need this to create listings and use Urban Pay."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -177,9 +215,14 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
                         <Button type="submit" disabled={loading} className="w-full bg-navy hover:bg-navy-dark">
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Turn on 2FA'}
                         </Button>
-                        <button type="button" onClick={sendCode} disabled={loading} className="w-full text-sm text-slate-600 hover:text-slate-800">
-                            Resend code
-                        </button>
+                        <div className="flex justify-between">
+                            <button type="button" onClick={sendCode} disabled={loading} className="text-sm text-slate-600 hover:text-slate-800">
+                                Resend code
+                            </button>
+                            <button type="button" onClick={changeNumber} disabled={loading} className="text-sm text-slate-600 hover:text-slate-800">
+                                Use a different number
+                            </button>
+                        </div>
                     </form>
                 )}
 
@@ -195,6 +238,12 @@ export default function TwoFactorSetupDialog({ open, onOpenChange, defaultPhone 
                             I've verified my email
                         </Button>
                     </div>
+                )}
+
+                {required && onSignOut && (
+                    <Button variant="ghost" onClick={onSignOut} disabled={loading} className="w-full">
+                        Sign out
+                    </Button>
                 )}
             </DialogContent>
         </Dialog>

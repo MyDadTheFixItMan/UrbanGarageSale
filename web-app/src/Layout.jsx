@@ -5,11 +5,47 @@ import { firebase } from '@/api/firebaseClient';
 import { Plus, Heart, User, Home, Shield, LogOut, Smartphone } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { BUSINESS_NAME, BUSINESS_ABN } from '@/lib/business';
-import { profileProblem } from '@/pages/login/loginForms';
+import { profileProblem, normalizePhone } from '@/pages/login/loginForms';
+import { toast } from 'sonner';
 
 // Loaded only for someone who needs it, so the address lookup isn't in every page's download.
 const CompleteProfileDialog = lazy(() => import('@/pages/profile/ProfileDialogs')
     .then((module) => ({ default: module.CompleteProfileDialog })));
+
+const TwoFactorSetupDialog = lazy(() => import('@/components/TwoFactorSetupDialog'));
+
+// Texting the 2FA code automatically is skipped if it was done in the last few minutes (say, before
+// a page refresh): repeated texts to one number make Google and carriers hold later ones.
+const AUTO_SEND_GAP_MS = 10 * 60 * 1000;
+function claimAutoSend(uid, now = Date.now()) {
+    const key = `twofa-autosent-${uid}`;
+    try {
+        if (now - Number(sessionStorage.getItem(key) || 0) < AUTO_SEND_GAP_MS) return false;
+        sessionStorage.setItem(key, String(now));
+    } catch {
+        // Storage blocked: send anyway; the Resend limit still applies.
+    }
+    return true;
+}
+
+// Every account needs 2FA, so a signed-in account without it gets this, after its profile is
+// complete (the code goes to the mobile in the profile). Mounted only while needed, so the
+// automatic send is decided once each time it appears.
+function RequiredTwoFactor({ user, onEnabled, onSignOut }) {
+    const [autoSend] = useState(() => claimAutoSend(user.id));
+    return (
+        <Suspense fallback={null}>
+            <TwoFactorSetupDialog
+                open
+                required
+                autoSend={autoSend}
+                defaultPhone={user.phone || ''}
+                onEnabled={onEnabled}
+                onSignOut={onSignOut}
+            />
+        </Suspense>
+    );
+}
 
 // Pages someone with an unfinished profile can still use: signing in and up (a new account's
 // details are saved just after it's created), resetting a password, and reading the Terms and
@@ -32,8 +68,40 @@ export default function Layout({ children, currentPageName }) {
         firebase.auth.me().then(setUser).catch(() => {});
     }, [currentPageName]);
 
-    const needsProfile = Boolean(user) && !user.profile_unavailable &&
-        !PROFILE_OPTIONAL_PAGES.includes(currentPageName) && Boolean(profileProblem(user));
+    // Whether the signed-in account has 2FA (null until known).
+    const [twoFAEnabled, setTwoFAEnabled] = useState(null);
+    useEffect(() => {
+        if (!user) {
+            setTwoFAEnabled(null);
+            return;
+        }
+        firebase.auth.is2FAEnabled().then(setTwoFAEnabled).catch(() => setTwoFAEnabled(null));
+    }, [user]);
+
+    const mustFinishAccount = Boolean(user) && !user.profile_unavailable &&
+        !PROFILE_OPTIONAL_PAGES.includes(currentPageName);
+    const needsProfile = mustFinishAccount && Boolean(profileProblem(user));
+    const needsTwoFactor = mustFinishAccount && !needsProfile && twoFAEnabled === false;
+
+    // Called once the mobile is enrolled as a Firebase second factor.
+    const handleTwoFactorEnabled = async ({ signInAgain, phone }) => {
+        setTwoFAEnabled(true);
+        // Someone who used a different number for 2FA keeps their profile in step with it.
+        const enrolled = normalizePhone(phone).phone;
+        if (enrolled && enrolled !== user?.phone) {
+            firebase.auth.updateProfile({ phone: enrolled })
+                .then(() => setUser((prev) => ({ ...prev, phone: enrolled })))
+                .catch((error) => console.warn('Profile phone not updated:', error.message));
+        }
+        if (signInAgain) {
+            // This session started before 2FA existed; a fresh sign-in (with the SMS code) is needed.
+            toast.success('Two-step sign-in is on. Please sign in again; we\'ll text you a code.');
+            await firebase.auth.logout();
+            window.location.href = '/login';
+            return;
+        }
+        toast.success('Two-step sign-in is on');
+    };
 
     const handleLogout = async () => {
         try {
@@ -178,6 +246,9 @@ export default function Layout({ children, currentPageName }) {
                         onSignOut={handleLogout}
                     />
                 </Suspense>
+            )}
+            {needsTwoFactor && (
+                <RequiredTwoFactor key={user.id} user={user} onEnabled={handleTwoFactorEnabled} onSignOut={handleLogout} />
             )}
         </div>
     );

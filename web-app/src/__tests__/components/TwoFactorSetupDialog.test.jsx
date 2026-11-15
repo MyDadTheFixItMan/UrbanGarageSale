@@ -81,3 +81,66 @@ describe('TwoFactorSetupDialog', () => {
     expect(await screen.findByText('Please wait a few minutes')).toBeInTheDocument();
   });
 });
+
+describe('TwoFactorSetupDialog when 2FA is required', () => {
+  const renderRequired = ({ autoSend = true, onEnabled = jest.fn(), onSignOut = jest.fn() } = {}) => {
+    render(
+      <TwoFactorSetupDialog open required autoSend={autoSend} defaultPhone="+61491570156"
+        onEnabled={onEnabled} onSignOut={onSignOut} />
+    );
+    return { onEnabled, onSignOut };
+  };
+
+  beforeEach(() => {
+    firebase.auth.isEmailVerified.mockResolvedValue(true);
+    firebase.auth.prepareRecaptcha.mockResolvedValue();
+    firebase.auth.startMfaEnrollment.mockResolvedValue();
+  });
+
+  it('texts the code to the profile mobile straight away, without asking for the number', async () => {
+    renderRequired();
+    expect(await screen.findByLabelText('Code sent to +61491570156')).toBeInTheDocument();
+    expect(firebase.auth.startMfaEnrollment).toHaveBeenCalledTimes(1);
+    expect(firebase.auth.startMfaEnrollment).toHaveBeenCalledWith('+61491570156', 'recaptcha-container-2fa');
+    expect(firebase.auth.prepareRecaptcha).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for the Send button when the code was just sent', async () => {
+    renderRequired({ autoSend: false });
+    expect(await screen.findByRole('button', { name: 'Send code' })).toBeInTheDocument();
+    expect(firebase.auth.startMfaEnrollment).not.toHaveBeenCalled();
+  });
+
+  it("can't be closed, only finished or left by signing out", async () => {
+    const { onSignOut } = renderRequired();
+    await screen.findByLabelText('Code sent to +61491570156');
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('dialog', { name: 'Turn on two-step sign-in' })).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(onSignOut).toHaveBeenCalled();
+  });
+
+  it('can use a different number', async () => {
+    const { onEnabled } = renderRequired();
+    await userEvent.click(await screen.findByRole('button', { name: 'Use a different number' }));
+    const number = screen.getByLabelText('Mobile number');
+    await userEvent.clear(number);
+    await userEvent.type(number, '0412345678');
+    await userEvent.click(screen.getByRole('button', { name: 'Send code' }));
+    expect(firebase.auth.startMfaEnrollment).toHaveBeenLastCalledWith('0412345678', 'recaptcha-container-2fa');
+
+    firebase.auth.finishMfaEnrollment.mockResolvedValue({ signInAgain: false });
+    await userEvent.type(await screen.findByLabelText('Code sent to 0412345678'), '123456');
+    await userEvent.click(screen.getByRole('button', { name: 'Turn on 2FA' }));
+    await waitFor(() => expect(onEnabled).toHaveBeenCalledWith({ signInAgain: false, phone: '0412345678' }));
+  });
+
+  it('sends the code once the email is verified, for accounts made with email and password', async () => {
+    firebase.auth.isEmailVerified.mockResolvedValueOnce(false).mockResolvedValue(true);
+    firebase.auth.startMfaEnrollment.mockRejectedValueOnce(Object.assign(new Error('verify'), { emailNotVerified: true }));
+    renderRequired();
+    await userEvent.click(await screen.findByRole('button', { name: VERIFIED_BUTTON }));
+    expect(await screen.findByLabelText('Code sent to +61491570156')).toBeInTheDocument();
+  });
+});

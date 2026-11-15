@@ -166,7 +166,8 @@ test('every email has the same logo, button, footer and plain-text copy', () => 
         assert.match(html, /<img src="https:\/\/example\.com\/email-logo\.png"[^>]*alt="Urban Garage Sale"/);
         assert.match(html, /bgcolor="#c2410c"/);
         assert.match(html, /href="https:\/\/example\.com\/Privacy"/);
-        assert.match(html, /support@urbangaragesales\.com\.au/);
+        assert.match(html, /admin@urbangaragesales\.com\.au/);
+        assert.doesNotMatch(html, /support@/);
         const text = emailText(html);
         assert.doesNotMatch(text, /<|&nbsp;|&amp;/);
         assert.match(text, /The Urban Garage Sale team/);

@@ -116,6 +116,7 @@ export default function ListingsTab({ stats }) {
                                 <div className="flex-1">
                                     <ListingRow
                                         listing={listing}
+                                        adminTab="listings"
                                         onDelete={setListingToDelete}
                                         overrideStatus={isPast ? 'completed' : null}
                                     />

@@ -37,7 +37,8 @@ const EMAIL_COLOURS = {
     line: '#e2e8f0',
 };
 const EMAIL_FONT = "'Nunito', 'Segoe UI', Arial, Helvetica, sans-serif";
-const SUPPORT_EMAIL = 'support@urbangaragesales.com.au';
+// Shown in every email's footer and used as the reply-to address.
+const SUPPORT_EMAIL = 'admin@urbangaragesales.com.au';
 const DEFAULT_SITE_URL = 'https://urbangaragesales.com.au';
 const EMAIL_SELLER_NOTE = 'You received this email because you listed a sale on Urban Garage Sale.';
 const EMAIL_CONTACT_NOTE = 'You received this email because you sent us a message through Urban Garage Sale.';
@@ -318,6 +319,7 @@ module.exports = {
     refundablePayments,
     EMAIL_COLOURS,
     EMAIL_ADMIN_NOTE,
+    SUPPORT_EMAIL,
     emailLayout,
     emailParagraph,
     emailList,

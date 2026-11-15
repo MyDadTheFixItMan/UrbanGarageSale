@@ -107,7 +107,7 @@ export default function SaleMap({ sales, center, zoom = 12 }) {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <MapPin className="w-3 h-3" />
-                                            <span className="truncate">{sale.address}</span>
+                                            <span className="truncate">{sale.address || sale.suburb}</span>
                                         </div>
                                     </div>
                                     <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)}>

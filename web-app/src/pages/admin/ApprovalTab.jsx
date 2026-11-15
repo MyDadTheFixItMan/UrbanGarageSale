@@ -191,6 +191,7 @@ export default function ApprovalTab() {
                         <ListingRow
                             key={listing.id}
                             listing={listing}
+                            adminTab="pending"
                             onApprove={(l) => approveMutation.mutate(l)}
                             onReject={setListingToReject}
                         />

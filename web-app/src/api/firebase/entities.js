@@ -47,6 +47,15 @@ function requireUser(message = 'Please sign in and try again.') {
   return user;
 }
 
+// Only signed-in users may read listings, which hold the street address. Visitors read
+// publicListings, copies of live listings with the suburb but no address and an approximate pin
+// (firestore.rules, web-app/functions/lib/publicListing.js). Waits for Firebase to restore a
+// saved sign-in, so a returning user isn't treated as a visitor while the page loads.
+async function listingsCollection() {
+  await auth.authStateReady();
+  return auth.currentUser ? 'garageSales' : 'publicListings';
+}
+
 // Equality filters for the given fields, skipping ones that are not set.
 function equalityConstraints(filters, fields) {
   return fields.filter((field) => filters[field]).map((field) => where(field, '==', filters[field]));
@@ -118,13 +127,18 @@ export const firebaseEntities = {
     },
 
     filter: async (filters = {}) => {
+      const collectionName = await listingsCollection();
       if (filters.id) {
-        const docSnap = await getDoc(doc(db, 'garageSales', filters.id));
+        const docSnap = await getDoc(doc(db, collectionName, filters.id));
         return docSnap.exists() ? [{ id: docSnap.id, ...docSnap.data() }] : [];
       }
 
-      const garageSalesRef = collection(db, 'garageSales');
-      const constraints = equalityConstraints(filters, ['user_id', 'status', 'postcode']);
+      // Public copies exist only for live listings and carry no seller, so a visitor's search for
+      // anything else finds nothing, and the status filter isn't needed.
+      const isPublic = collectionName === 'publicListings';
+      if (isPublic && (filters.user_id || filters.status !== LISTING_STATUS.ACTIVE)) return [];
+      const garageSalesRef = collection(db, collectionName);
+      const constraints = equalityConstraints(filters, isPublic ? ['postcode'] : ['user_id', 'status', 'postcode']);
       let results;
 
       if (filters.status === LISTING_STATUS.ACTIVE && hasLocationFilter(filters)) {

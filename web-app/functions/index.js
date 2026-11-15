@@ -14,9 +14,10 @@ const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
     isDocId, isRole, emailText, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, unusedPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
-    isUnpaidListing, isExpiredDraft, refundablePayments, storagePathFromUrl,
+    isUnpaidListing, isExpiredDraft, refundablePayments, storagePathFromUrl, SUPPORT_EMAIL,
 } = require('./lib/helpers');
 const listingReview = require('./lib/listingReview');
+const { publicListing } = require('./lib/publicListing');
 
 const REGION = 'australia-southeast1';
 const TIME_ZONE = 'Australia/Melbourne';
@@ -48,7 +49,7 @@ function getStripe() {
 
 // Returns false (and sends nothing) when SendGrid isn't configured. Secret Manager can't hold an
 // empty value, so projects without email (e.g. staging) set the secret to "not-configured".
-// Every email goes out from "Urban Garage Sale", replies go to support, and a plain-text copy is
+// Every email goes out from "Urban Garage Sale", replies go to SUPPORT_EMAIL, and a plain-text copy is
 // made from the HTML (lib/helpers.js emailLayout gives every email the same look).
 async function sendEmail(message) {
     const key = process.env.SENDGRID_API_KEY;
@@ -68,7 +69,6 @@ const LISTING_FEE_CENTS = 1000;
 // Public URL of the web app, used for Stripe redirects and email links (e.g. https://urbangaragesales.com.au).
 const APP_URL = process.env.APP_URL;
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'notification@urbangaragesales.com.au';
-const SUPPORT_EMAIL = 'support@urbangaragesales.com.au';
 
 // Automatic listing check by Claude, set by CLAUDE_REVIEW_MODE in functions/.env:
 //   off    - no check; the admin approves every listing as before
@@ -637,6 +637,19 @@ const reviewTrigger = (document, handler) => onDocumentWritten({
     timeoutSeconds: 300,
     memory: '512MiB',
 }, handler);
+
+// Keeps publicListings, the copy of live listings without the street address that visitors who
+// aren't signed in read (lib/publicListing.js), in step with garageSales. It copies the listing as
+// it is now rather than as this event saw it, so retried or out-of-order events can't leave an
+// old copy behind. scripts/sync-public-listings.mjs rebuilds the whole collection.
+exports.syncPublicListing = onDocumentWritten({ document: 'garageSales/{saleId}', region: DATABASE_REGION }, async (event) => {
+    const { saleId } = event.params;
+    const listing = await db.collection('garageSales').doc(saleId).get();
+    const copy = publicListing(listing.data());
+    const publicRef = db.collection('publicListings').doc(saleId);
+    if (copy) await publicRef.set(copy);
+    else await publicRef.delete();
+});
 
 // Checks a listing each time it reaches, or is edited while awaiting, approval.
 exports.reviewNewListing = reviewTrigger('garageSales/{saleId}', async (event) => {

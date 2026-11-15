@@ -141,16 +141,30 @@ test('admins cannot change roles directly (only via setUserRole)', async () => {
 
 // ---------- Listings ----------
 
-test('public reads see active listings only', async () => {
+test('signed-in users see active listings only; visitors see no listing, so no address', async () => {
   await seed('garageSales/live', listing({ status: 'active', payment_status: 'paid' }));
   await seed('garageSales/draft', listing());
   const anon = as.anon();
-  await assertSucceeds(getDoc(doc(anon, 'garageSales/live')));
+  await assertFails(getDoc(doc(anon, 'garageSales/live')));
   await assertFails(getDoc(doc(anon, 'garageSales/draft')));
-  await assertSucceeds(getDocs(query(collection(anon, 'garageSales'), where('status', '==', 'active'))));
-  await assertFails(getDocs(collection(anon, 'garageSales')));
+  await assertFails(getDocs(query(collection(anon, 'garageSales'), where('status', '==', 'active'))));
+  const bob = as.user('bob');
+  await assertSucceeds(getDoc(doc(bob, 'garageSales/live')));
+  await assertSucceeds(getDocs(query(collection(bob, 'garageSales'), where('status', '==', 'active'))));
+  await assertFails(getDocs(collection(bob, 'garageSales')));
   await assertSucceeds(getDoc(doc(as.user('alice'), 'garageSales/draft')));
-  await assertFails(getDoc(doc(as.user('bob'), 'garageSales/draft')));
+  await assertFails(getDoc(doc(bob, 'garageSales/draft')));
+});
+
+test('anyone can read the public copies of live listings, and nobody but the server can write them', async () => {
+  const copy = { title: 'Moving sale', suburb: 'Fitzroy', status: 'active', latitude: -37.81, longitude: 144.97 };
+  await seed('publicListings/live', copy);
+  await assertSucceeds(getDoc(doc(as.anon(), 'publicListings/live')));
+  await assertSucceeds(getDocs(collection(as.anon(), 'publicListings')));
+  await assertFails(setDoc(doc(as.anon(), 'publicListings/x'), copy));
+  await assertFails(setDoc(doc(as.seller('alice'), 'publicListings/x'), copy));
+  await assertFails(updateDoc(doc(as.admin(), 'publicListings/live'), { title: 'Changed' }));
+  await assertFails(deleteDoc(doc(as.seller('alice'), 'publicListings/live')));
 });
 
 test('creating a listing needs 2FA enabled and a second-factor session', async () => {
@@ -278,7 +292,7 @@ test('edits to a live listing wait privately, and only an admin can put them liv
   await assertFails(getDoc(doc(as.user('bob'), 'listingEdits/live')));
   await assertSucceeds(getDoc(doc(seller, 'listingEdits/live')));
   await assertSucceeds(getDoc(doc(as.admin(), 'listingEdits/live')));
-  const stillPublic = await getDoc(doc(as.anon(), 'garageSales/live'));
+  const stillPublic = await getDoc(doc(as.user('bob'), 'garageSales/live'));
   assert.equal(stillPublic.data().title, listing().title);
 
   // A new edit replaces a refused one, and the seller can withdraw it.
@@ -330,11 +344,11 @@ test('free listings wait for admin approval and stay private until then', async 
 
   await assertSucceeds(setDoc(doc(db, 'garageSales/waiting'), listing(free('pending_approval'))));
   await assertSucceeds(updateDoc(doc(db, 'garageSales/draft'), free('pending_approval')));
-  await assertFails(getDoc(doc(as.anon(), 'garageSales/waiting')));
+  await assertFails(getDoc(doc(as.user('bob'), 'garageSales/waiting')));
   await assertFails(updateDoc(doc(db, 'garageSales/waiting'), { status: 'active' }));
 
   await assertSucceeds(updateDoc(doc(as.admin(), 'garageSales/waiting'), { status: 'active' }));
-  await assertSucceeds(getDoc(doc(as.anon(), 'garageSales/waiting')));
+  await assertSucceeds(getDoc(doc(as.user('bob'), 'garageSales/waiting')));
 });
 
 test('other users cannot edit or delete a listing', async () => {

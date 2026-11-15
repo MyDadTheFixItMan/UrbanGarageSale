@@ -22,13 +22,33 @@ export function normalizePhone(raw) {
     return { phone };
 }
 
+const isBlank = (value) => !String(value ?? '').trim();
+
 // Returns the first problem with the sign-up form, or null if it can be submitted.
 export function signUpProblem({ fullName, address, email, phone, password, confirmPassword }) {
-    if (!fullName || !address || !email || !phone || !password || !confirmPassword) {
+    if ([fullName, address, email, phone, password, confirmPassword].some(isBlank)) {
         return 'Please fill in all fields';
     }
     if (password !== confirmPassword) return 'Passwords do not match';
     return passwordProblem(password) || normalizePhone(phone).problem || null;
+}
+
+// Every profile needs a name, a phone number and an address that resolved to a suburb, postcode and
+// state. Returns the first thing missing, or null. Sign-up, Edit Profile and Create Listing all
+// check this, since accounts made with Google, Facebook or Apple start without an address or phone.
+// `addressLookedUp: false` skips the suburb, postcode and state, for a form not yet saved.
+/**
+ * @param {{ full_name?: string, phone?: string, address?: string, suburb?: string, postcode?: string, state?: string }} [profile]
+ * @param {{ addressLookedUp?: boolean }} [options]
+ */
+export function profileProblem({ full_name, phone, address, suburb, postcode, state } = {}, { addressLookedUp = true } = {}) {
+    if (isBlank(full_name)) return 'Please enter your name';
+    if (isBlank(String(phone ?? '').replace(/^\+61/, ''))) return 'Please enter your phone number';
+    if (isBlank(address)) return 'Please enter your address';
+    if (addressLookedUp && [suburb, postcode, state].some(isBlank)) {
+        return "We couldn't find the suburb, postcode and state for your address. Please pick it from the suggestions.";
+    }
+    return null;
 }
 
 // Postcode and state from the chosen address, or read from typed text like "... VIC 3053".

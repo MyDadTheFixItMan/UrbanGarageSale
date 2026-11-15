@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { firebase } from '@/api/firebaseClient';
 import { compressImage, makeThumbnail } from '@/lib/imageOptimization';
 import { FormSection } from './ListingSections';
-import { MAX_PHOTOS, ALLOWED_PHOTO_TYPES, photoProblem } from './listingForm';
+import { MIN_PHOTOS, MAX_PHOTOS, ALLOWED_PHOTO_TYPES, photoProblem } from './listingForm';
 
 // Checks, compresses and uploads one photo and its thumbnail. Returns { url, thumbnail }
 // (thumbnail is null if it couldn't be made), or null if the photo was refused.
@@ -74,7 +74,7 @@ export default function PhotosSection({ photos, onChange, userId }) {
     }));
 
     return (
-        <FormSection title="Photos" icon={Image}>
+        <FormSection title="Photos *" icon={Image}>
             <div className="space-y-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {photos.map((photo, index) => (
@@ -114,7 +114,7 @@ export default function PhotosSection({ photos, onChange, userId }) {
                 </div>
 
                 <p className="text-sm text-slate-500">
-                    Upload up to {MAX_PHOTOS} images (JPEG, PNG, WEBP). Max 20MB each; large photos are resized automatically. First image will be the cover.
+                    Upload {MIN_PHOTOS} to {MAX_PHOTOS} photos of the items for sale (JPEG, PNG, WEBP). Max 20MB each; large photos are resized automatically. First image will be the cover.
                 </p>
             </div>
         </FormSection>

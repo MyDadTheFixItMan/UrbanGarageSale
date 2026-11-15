@@ -20,4 +20,11 @@ describe('SignUpForm', () => {
     expect(alert).toHaveTextContent('Please fill in all fields');
     expect(alert.nextElementSibling).toBe(button);
   });
+
+  it('offers Google sign-up only, while Facebook and Apple are off in Firebase', () => {
+    render(<MemoryRouter><SignUpForm onExistingEmail={() => {}} onSecondFactor={() => {}} /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: 'Google' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Facebook' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apple' })).not.toBeInTheDocument();
+  });
 });

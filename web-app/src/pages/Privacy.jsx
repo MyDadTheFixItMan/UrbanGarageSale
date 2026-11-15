@@ -65,7 +65,7 @@ export default function Privacy() {
                     <div>
                         <h1 className="text-3xl font-bold text-navy-dark mb-2">Privacy Policy</h1>
                         <p className="text-slate-600 mb-6">Urban Garage Sale</p>
-                        <p className="text-sm text-slate-500 mb-6">Last updated: October 2026</p>
+                        <p className="text-sm text-slate-500 mb-6">Last updated: November 2026</p>
 
                         <div className="prose prose-sm max-w-none text-slate-700 space-y-4">
                             <p className="italic">Urban Garage Sale values your privacy. This policy explains how we collect, use, disclose and protect your personal information in line with the Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs).</p>
@@ -87,7 +87,7 @@ export default function Privacy() {
                                 <p>We use your information to:</p>
                                 <ul className="list-disc list-inside space-y-1 ml-4">
                                     <li>create and secure your account, including SMS verification and two-factor authentication;</li>
-                                    <li>publish and show garage sale listings on the map and in search;</li>
+                                    <li>check listings against our Listing Rules before they go live, and publish and show them on the map and in search;</li>
                                     <li>process listing fees and Urban Pay card payments;</li>
                                     <li>respond to your enquiries and send service emails (such as listing approvals);</li>
                                     <li>prevent misuse of the platform and meet our legal obligations.</li>
@@ -102,6 +102,7 @@ export default function Privacy() {
                                     <li><strong>Google (Firebase and Google Maps)</strong> – account login, data storage, photo storage and address lookup;</li>
                                     <li><strong>Stripe</strong> – listing fee and card payment processing, and seller account verification;</li>
                                     <li><strong>Twilio SendGrid</strong> – sending service emails;</li>
+                                    <li><strong>Anthropic (Claude)</strong> – automatically checking the text and photos of listings against our Listing Rules before they go live;</li>
                                     <li><strong>Vercel</strong> – hosting our payment services.</li>
                                 </ul>
                                 <p className="mt-2">Listing details you choose to publish (including the sale address) are visible to the public.</p>

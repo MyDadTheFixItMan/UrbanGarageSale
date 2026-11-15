@@ -55,9 +55,32 @@ export function formatTimeAU(value) {
     return match[2] === '00' ? `${hour}${suffix}` : `${hour}:${match[2]}${suffix}`;
 }
 
-// The day a sale is on, as buyers think of it: "Today" (including multi-day sales already
-// running), "Tomorrow", a weekday within the next week ("Sat"), otherwise "Sat 27 Apr".
-export function saleDayLabel(start, end, now = new Date()) {
+// e.g. 2 -> "2nd", 11 -> "11th", 23 -> "23rd".
+function ordinal(day) {
+    const suffix = day % 100 >= 11 && day % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][day % 10] ?? 'th';
+    return `${day}${suffix}`;
+}
+
+// The days a sale is on: "Sat 14th Nov", or for multi-day sales "Fri 2nd to Sun 4th Jan"
+// (the month is only repeated when the sale runs across two months).
+export function saleDatesLabel(start, end) {
+    const startDate = toDate(start);
+    if (!startDate) return '';
+    const endDate = toDate(end) ?? startDate;
+    const weekday = (date) => date.toLocaleDateString(AU_LOCALE, { weekday: 'short' });
+    const month = (date) => date.toLocaleDateString(AU_LOCALE, { month: 'short' });
+    const day = (date) => `${weekday(date)} ${ordinal(date.getDate())}`;
+
+    if (endDate.toDateString() === startDate.toDateString() || endDate < startDate) {
+        return `${day(startDate)} ${month(startDate)}`;
+    }
+    const sameMonth = startDate.getMonth() === endDate.getMonth() && startDate.getFullYear() === endDate.getFullYear();
+    return `${day(startDate)}${sameMonth ? '' : ` ${month(startDate)}`} to ${day(endDate)} ${month(endDate)}`;
+}
+
+// "Today" for a sale on today (including multi-day sales already running), "Tomorrow" for
+// one starting tomorrow, otherwise nothing.
+export function saleSoonLabel(start, end, now = new Date()) {
     const startDate = toDate(start);
     if (!startDate) return '';
     const endDate = toDate(end) ?? startDate;
@@ -69,18 +92,17 @@ export function saleDayLabel(start, end, now = new Date()) {
     const startsIn = daysAway(startDate);
     if (startsIn <= 0 && daysAway(endDate) >= 0) return 'Today';
     if (startsIn === 1) return 'Tomorrow';
-    const weekday = startDate.toLocaleDateString(AU_LOCALE, { weekday: 'short' });
-    if (startsIn > 1 && startsIn < 7) return weekday;
-    return `${weekday} ${startDate.toLocaleDateString(AU_LOCALE, { day: 'numeric', month: 'short' })}`;
+    return '';
 }
 
-// e.g. "Today · 8am–3pm" for listing cards.
+// e.g. "Today · Sat 14th Nov · 8am–3pm" for listing cards.
 export function saleWhenLabel(sale, now = new Date()) {
-    const day = saleDayLabel(sale.start_date, sale.end_date, now);
+    const soon = saleSoonLabel(sale.start_date, sale.end_date, now);
+    const days = saleDatesLabel(sale.start_date, sale.end_date);
     const hours = sale.start_time && sale.end_time
         ? `${formatTimeAU(sale.start_time)}–${formatTimeAU(sale.end_time)}`
         : '';
-    return [day, hours].filter(Boolean).join(' · ');
+    return [soon, days, hours].filter(Boolean).join(' · ');
 }
 
 // e.g. 0.43 -> "0.4 km away", 9.97 -> "10 km away", 23.6 -> "24 km away".

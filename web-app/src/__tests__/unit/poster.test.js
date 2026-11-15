@@ -4,6 +4,7 @@ import {
   formatPosterTime,
   formatPosterDates,
   posterFontSize,
+  saleTypeLines,
   buildPosterHtml,
   posterListingUrl,
   printAfterDialogCloses,
@@ -50,24 +51,32 @@ describe('poster text', () => {
     expect(formatPosterTime(input)).toBe(expected);
   });
 
-  it('gives a single-day sale one day and the hours', () => {
+  it('gives a single-day sale one short day and the hours', () => {
     expect(formatPosterDates({ start_date: '2026-10-10', end_date: '2026-10-10', start_time: '08:00', end_time: '13:00' }))
-      .toEqual({ days: ['Saturday 10 October'], time: '8am - 1pm' });
+      .toEqual({ days: 'SAT 10 OCT', time: '8am – 1pm' });
   });
 
-  it('lists every day of a multi-day sale', () => {
-    expect(formatPosterDates({ start_date: '2026-10-10', end_date: '2026-10-12', start_time: '08:00', end_time: '13:00' }).days)
-      .toEqual(['Saturday 10 October', 'Sunday 11 October', 'Monday 12 October']);
+  it('puts a multi-day sale on one line', () => {
+    const days = (start, end) => formatPosterDates({ start_date: start, end_date: end }).days;
+
+    expect(days('2026-10-10', '2026-10-11')).toBe('SAT 10 & SUN 11 OCT');
+    expect(days('2026-10-10', '2026-10-12')).toBe('SAT 10 – MON 12 OCT');
+    expect(days('2026-10-31', '2026-11-02')).toBe('SAT 31 OCT – MON 2 NOV');
   });
 
   it('omits the hours when either end is missing', () => {
     expect(formatPosterDates({ start_date: '2026-10-10', end_date: '2026-10-10', start_time: '08:00' }).time).toBe('');
   });
 
+  it('puts SALE on its own line under the sale type', () => {
+    expect(saleTypeLines('MULTI-FAMILY SALE')).toEqual(['MULTI-FAMILY', 'SALE']);
+    expect(saleTypeLines('AUCTION')).toEqual(['AUCTION']);
+  });
+
   it('shrinks long text to fit and leaves short text at full size', () => {
-    expect(posterFontSize('GARAGE SALE', 340, 1, 0.76)).toBe(260);
-    expect(posterFontSize('YARD', 340)).toBe(340);
-    expect(posterFontSize('MULTI-FAMILY SALE', 340)).toBeLessThan(220);
+    expect(posterFontSize('MULTI-FAMILY', 470, 1, 0.5, 1960)).toBe(326);
+    expect(posterFontSize('YARD', 470, 1, 0.5, 1960)).toBe(470);
+    expect(posterFontSize('1234 Long Waterfront Boulevard', 180)).toBeLessThan(130);
   });
 });
 
@@ -86,6 +95,18 @@ describe('buildPosterHtml', () => {
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(html).toContain('<div class="poster-suburb">Fitzroy</div>');
+  });
+
+  it('shows the listing title as a hook, escaped', () => {
+    const html = buildPosterHtml({ ...listing, title: 'Tools & toys <b>' }, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x' });
+    expect(html).toContain('<div class="poster-hook">Tools &amp; toys &lt;b&gt;</div>');
+    expect(buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x' })).not.toContain('poster-hook"');
+  });
+
+  it('loads its fonts from the given address', () => {
+    const html = buildPosterHtml(listing, { logoUrl: '/logo.png', qrCodeDataUrl: 'data:x', fontsUrl: 'https://example.com/fonts' });
+    expect(html).toContain("url('https://example.com/fonts/anton-latin.woff2')");
+    expect(html).toContain("url('https://example.com/fonts/archivo-latin.woff2')");
   });
 
   it('includes the sale type, logo and QR code', () => {

@@ -18,6 +18,7 @@ const {
 } = require('./lib/helpers');
 const listingReview = require('./lib/listingReview');
 const { publicListing } = require('./lib/publicListing');
+const freeCodes = require('./lib/freeListingCodes');
 
 const REGION = 'australia-southeast1';
 const TIME_ZONE = 'Australia/Melbourne';
@@ -315,6 +316,188 @@ exports.stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHO
 });
 
 // ---------------------------------------------------------------------------
+// Free listing codes
+// ---------------------------------------------------------------------------
+// One-use codes an admin sends a person so they can publish one listing without paying
+// (lib/freeListingCodes.js). freeListingCodes/{code} is written only by these functions; admins
+// can read it (firestore.rules), so the Settings tab lists who was sent a code and whether it
+// was used.
+
+const freeCodeRef = (code) => db.collection('freeListingCodes').doc(code);
+
+// Firestore's ALREADY_EXISTS error code, which create() throws if the document is there.
+const ALREADY_EXISTS = 6;
+
+// Saves a new code under a fresh random value. A clash with an existing code is very unlikely,
+// and create() refuses one rather than overwrite it, so another value is tried.
+async function saveNewFreeCode(fields) {
+    for (let attempt = 1; ; attempt++) {
+        const code = freeCodes.newFreeListingCode();
+        try {
+            await freeCodeRef(code).create({ code, ...fields });
+            return code;
+        } catch (error) {
+            if (error.code !== ALREADY_EXISTS || attempt >= 5) throw error;
+        }
+    }
+}
+
+// Make a code, and email it to the person when an address is given (admin only). The code is
+// returned either way, so the admin can also copy it or text it.
+exports.createFreeListingCode = callable(['SENDGRID_API_KEY'], async (request) => {
+    const adminUid = requireAdmin(request);
+    await rateLimit(adminUid, 'createFreeListingCode', 20);
+    const input = freeCodes.freeListingCodeRequest(request.data, melbourneDate());
+    if (input.error) {
+        throw new HttpsError('invalid-argument', input.error);
+    }
+
+    const code = await saveNewFreeCode({
+        status: 'unused',
+        recipient_name: input.name,
+        recipient_email: input.email,
+        note: input.note,
+        expires_on: input.expiresOn,
+        created_by: adminUid,
+        created_at: FieldValue.serverTimestamp(),
+    });
+    // The person's details stay on the code only, where deleteUser can remove them.
+    await audit('createFreeListingCode', adminUid, { code });
+
+    // The code exists whether or not the email goes out, so a failed send isn't an error.
+    let emailed = false;
+    if (input.email) {
+        try {
+            emailed = await sendEmail({
+                to: input.email,
+                subject: 'Your free garage sale listing code',
+                html: freeCodes.freeListingCodeEmailHtml({ code, name: input.name, note: input.note, expiresOn: input.expiresOn, siteUrl: APP_URL }),
+            });
+            if (emailed) await freeCodeRef(code).update({ emailed_at: FieldValue.serverTimestamp() });
+            else logger.warn(`Free listing code ${code} not emailed (SendGrid not configured)`);
+        } catch (error) {
+            logger.error(`Free listing code email failed for ${code}: ${error.message}`);
+        }
+    }
+    return { code, emailed, expiresOn: input.expiresOn };
+});
+
+// Stop an unused code from working (admin only).
+exports.cancelFreeListingCode = callable([], async (request) => {
+    const adminUid = requireAdmin(request);
+    await rateLimit(adminUid, 'cancelFreeListingCode', 30);
+    const code = freeCodes.normaliseFreeListingCode(request.data?.code);
+    if (!code) {
+        throw new HttpsError('invalid-argument', 'A valid code is required');
+    }
+
+    await db.runTransaction(async (tx) => {
+        const snap = await tx.get(freeCodeRef(code));
+        if (!snap.exists) {
+            throw new HttpsError('not-found', 'Code not found');
+        }
+        if (snap.data().status !== 'unused') {
+            throw new HttpsError('failed-precondition', 'Only a code that has not been used can be cancelled');
+        }
+        tx.update(snap.ref, { status: 'cancelled', cancelled_by: adminUid, cancelled_at: FieldValue.serverTimestamp() });
+    });
+    await audit('cancelFreeListingCode', adminUid, { code });
+    return { success: true };
+});
+
+// Checks and redeeming share one per-user limit, so codes can't be guessed by trying many.
+const FREE_CODE_TRIES_PER_MINUTE = 10;
+
+// Whether a code can be used, so the listing form can say so before the listing is saved. Doesn't
+// use the code up.
+exports.checkFreeListingCode = callable([], async (request) => {
+    const { uid } = requireAuth(request);
+    await rateLimit(uid, 'freeListingCode', FREE_CODE_TRIES_PER_MINUTE);
+    const code = freeCodes.normaliseFreeListingCode(request.data?.code);
+    const snap = code ? await freeCodeRef(code).get() : null;
+    const problem = freeCodes.freeListingCodeProblem(snap?.exists ? snap.data() : null, melbourneDate());
+    if (problem) {
+        throw new HttpsError('failed-precondition', problem);
+    }
+    return { code, expiresOn: snap.data().expires_on ?? null };
+});
+
+// Publish one of the seller's unpaid listings with a code: the listing joins the approval queue
+// just as a paid one does, a $0 payment records the code, and the code can't be used again. All
+// three happen in one transaction, so one code can never publish two listings.
+exports.redeemFreeListingCode = callable([], async (request) => {
+    const { uid, token } = requireAuth(request);
+    // Publishing needs 2FA and a session that passed it, as creating a listing does (firestore.rules).
+    if (!token?.firebase?.sign_in_second_factor || token.two_fa_enabled !== true) {
+        throw new HttpsError('permission-denied', 'Sign in with two-factor authentication to publish a listing');
+    }
+    await rateLimit(uid, 'freeListingCode', FREE_CODE_TRIES_PER_MINUTE);
+    const saleId = requireDocId(request.data?.saleId, 'sale ID');
+    const code = freeCodes.normaliseFreeListingCode(request.data?.code);
+    if (!code) {
+        throw new HttpsError('failed-precondition', freeCodes.freeListingCodeProblem(null, melbourneDate()));
+    }
+
+    const listingRef = db.collection('garageSales').doc(saleId);
+    const paymentRef = db.collection('payments').doc();
+    await db.runTransaction(async (tx) => {
+        const [codeSnap, listing] = await Promise.all([tx.get(freeCodeRef(code)), tx.get(listingRef)]);
+        const problem = freeCodes.freeListingCodeProblem(codeSnap.exists ? codeSnap.data() : null, melbourneDate());
+        if (problem) {
+            throw new HttpsError('failed-precondition', problem);
+        }
+        if (!listing.exists || listing.data().user_id !== uid) {
+            throw new HttpsError('permission-denied', 'Listing not found');
+        }
+        if (!isUnpaidListing(listing.data())) {
+            throw new HttpsError('failed-precondition', 'This listing has already been paid for or has ended');
+        }
+        // The nightly job ends a sale by its end date, so a listing without dates can't go live.
+        if (!listing.data().start_date || !listing.data().end_date) {
+            throw new HttpsError('failed-precondition', 'Please add your sale dates before publishing');
+        }
+
+        tx.update(codeSnap.ref, { status: 'used', used_by: uid, used_for: saleId, used_at: FieldValue.serverTimestamp() });
+        tx.update(listingRef, { status: 'pending_approval', payment_status: 'completed', draft_expires_at: null });
+        tx.set(paymentRef, {
+            garage_sale_id: saleId,
+            user_id: uid,
+            user_email: token.email || null,
+            amount: 0,
+            currency: 'AUD',
+            status: 'completed',
+            payment_method: 'free_code',
+            free_listing_code: code,
+            created_at: FieldValue.serverTimestamp(),
+        });
+    });
+    return { success: true };
+});
+
+// Makes the code a rejected listing used good for another listing, as rejecting a paid listing
+// refunds its fee. Returns the code, or null if the listing didn't use one (or it was already
+// given back).
+async function returnFreeCode(payment, saleId) {
+    const code = payment.free_listing_code;
+    if (payment.payment_method !== 'free_code' || payment.status !== 'completed' || typeof code !== 'string' || !isDocId(code)) {
+        return null;
+    }
+    return db.runTransaction(async (tx) => {
+        const snap = await tx.get(freeCodeRef(code));
+        if (!snap.exists || snap.data().status !== 'used' || snap.data().used_for !== saleId) return null;
+        tx.update(snap.ref, {
+            status: 'unused',
+            used_by: FieldValue.delete(),
+            used_for: FieldValue.delete(),
+            used_at: FieldValue.delete(),
+            returned_at: FieldValue.serverTimestamp(),
+        });
+        tx.update(db.collection('payments').doc(payment.id), { status: 'refunded', refunded_at: FieldValue.serverTimestamp() });
+        return code;
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Admin actions
 // ---------------------------------------------------------------------------
 
@@ -357,7 +540,8 @@ exports.sendApprovalEmail = callable(['SENDGRID_API_KEY'], async (request) => {
 
 // Tells the seller why their listing was rejected. Returns whether the email went out. Never
 // throws: the rejection and any refund have already happened, and the reason is on their profile.
-async function emailRejection(saleId, listing, reason, refunded) {
+// `freeCode` is the free listing code the listing used, which the rejection gave back.
+async function emailRejection(saleId, listing, reason, refunded, freeCode) {
     try {
         const to = listing.user_id ? await sellerEmail(listing.user_id) : null;
         if (!to) {
@@ -367,7 +551,7 @@ async function emailRejection(saleId, listing, reason, refunded) {
         const sent = await sendEmail({
             to,
             subject: "Your garage sale listing wasn't approved",
-            html: rejectionEmailHtml({ title: listing.title, reason, refunded, siteUrl: APP_URL }),
+            html: rejectionEmailHtml({ title: listing.title, reason, refunded, freeCode, siteUrl: APP_URL }),
         });
         if (!sent) logger.warn(`Email not sent (SendGrid not configured). Rejection of listing ${saleId}`);
         return sent;
@@ -405,17 +589,19 @@ exports.rejectListing = callable(['STRIPE_SECRET_KEY', 'SENDGRID_API_KEY'], asyn
         const refund = await refundPayment(payment.id, payment.transaction_id, saleId);
         refunds.push({ paymentId: payment.id, refundId: refund.id, amount: payment.amount });
     }
+    // A listing published with a free listing code gets the code back instead.
+    const returnedCodes = (await Promise.all(payments.map((payment) => returnFreeCode(payment, saleId)))).filter(Boolean);
 
     await listingRef.update({
         status: 'rejected',
         rejection_reason: reason,
-        ...(refunds.length ? { payment_status: 'refunded' } : {}),
+        ...(refunds.length || returnedCodes.length ? { payment_status: 'refunded' } : {}),
     });
-    await audit('rejectListing', adminUid, { saleId, reason, refunds });
+    await audit('rejectListing', adminUid, { saleId, reason, refunds, returnedCodes });
 
     const refunded = refunds.reduce((total, r) => total + (r.amount || 0), 0);
-    const emailed = await emailRejection(saleId, listing.data(), reason, refunded);
-    return { success: true, refunded, emailed };
+    const emailed = await emailRejection(saleId, listing.data(), reason, refunded, returnedCodes[0]);
+    return { success: true, refunded, returnedCodes, emailed };
 });
 
 // Refuse a seller's changes to their live listing and tell them why (admin only). The listing
@@ -808,6 +994,18 @@ exports.deleteUser = callable([], async (request) => {
     const payments = await db.collection('payments').where('user_id', '==', userId).get();
     const batch = db.batch();
     payments.docs.forEach((doc) => batch.update(doc.ref, { user_id: 'deleted-user', user_email: null }));
+
+    // Free listing codes they used or were sent keep their history, but not who it was.
+    const codeSnaps = await Promise.all([
+        db.collection('freeListingCodes').where('used_by', '==', userId).get(),
+        ...(email ? [db.collection('freeListingCodes').where('recipient_email', '==', email).get()] : []),
+    ]);
+    const codes = new Map(codeSnaps.flatMap((snap) => snap.docs).map((doc) => [doc.id, doc]));
+    codes.forEach((doc) => batch.update(doc.ref, {
+        recipient_name: null,
+        recipient_email: null,
+        ...(doc.get('used_by') === userId ? { used_by: 'deleted-user' } : {}),
+    }));
     batch.delete(db.collection('sellerStats').doc(userId));
     batch.delete(db.collection('contactRateLimits').doc(userId));
     batch.delete(db.collection('users').doc(userId));

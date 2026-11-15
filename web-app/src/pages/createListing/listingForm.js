@@ -125,13 +125,21 @@ function toDateString(value) {
     return date.toISOString().split('T')[0];
 }
 
-// True if the admin's free period is on and the sale starts inside it (same test as
-// isFreeListing() in firestore.rules, which has the final say).
-export function isInFreePeriod(settings, startDate) {
-    if (!settings?.is_active || !startDate) return false;
-    const from = toDateString(settings.free_listing_start);
-    const to = toDateString(settings.free_listing_end);
+// One free period, shaped { is_active, free_listing_start, free_listing_end }: the settings
+// document itself (all of Australia) or one of settings.free_listing_states (one state).
+function startsInPeriod(period, startDate) {
+    if (!period?.is_active || !startDate) return false;
+    const from = toDateString(period.free_listing_start);
+    const to = toDateString(period.free_listing_end);
     return Boolean(from && to) && startDate >= from && startDate <= to;
+}
+
+// True if the sale starts inside a free period that is on: the one for all of Australia, or the
+// one for the listing's state (same test as isFreeListing() in firestore.rules, which has the
+// final say).
+export function isInFreePeriod(settings, startDate, state = '') {
+    return startsInPeriod(settings, startDate) ||
+        Boolean(state && startsInPeriod(settings?.free_listing_states?.[state], startDate));
 }
 
 // The editable part of a paid or approved listing, to save or to compare.

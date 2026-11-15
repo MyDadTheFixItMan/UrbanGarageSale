@@ -8,7 +8,7 @@ Live at **https://www.urbangaragesales.com.au**.
 | Folder | What it is | Deployed to |
 |---|---|---|
 | `web-app/` | React + Vite website | Vercel project `web-app` |
-| `web-app/functions/` | Firebase Cloud Functions (listing fee checkout, Stripe webhook, admin emails, user deletion) | Firebase |
+| `web-app/functions/` | Firebase Cloud Functions (listing fee checkout, Stripe webhook, free listing codes, admin emails, user deletion) | Firebase |
 | `api/` | Serverless API for Urban Pay, Stripe Connect and 2FA (`api/_shared/` holds shared helpers) | Vercel project `urban-garage-sale` |
 | `public/` | Holding page for the API domain | Vercel project `urban-garage-sale` |
 | `lib/`, `android/`, `ios/`, … | Flutter mobile app (Urban Pay, Tap to Pay) | App stores |

@@ -333,6 +333,47 @@ test('free listings are allowed only inside the free period', async () => {
   await assertFails(setDoc(doc(db, 'garageSales/off'), free('2026-11-14')));
 });
 
+test('a state free period makes listings in that state free, and only that state', async () => {
+  await seed('appSettings/default', {
+    is_active: false, free_listing_start: '2026-11-01', free_listing_end: '2026-11-30',
+    free_listing_states: {
+      VIC: { is_active: true, free_listing_start: '2026-12-01', free_listing_end: '2026-12-10' },
+      NSW: { is_active: false, free_listing_start: '2026-12-01', free_listing_end: '2026-12-10' },
+    },
+  });
+  const db = as.seller('alice');
+  const free = (state, start) => listing({ state, status: 'pending_approval', payment_status: 'completed', start_date: start, end_date: start });
+
+  await assertSucceeds(setDoc(doc(db, 'garageSales/vic-first-day'), free('VIC', '2026-12-01')));
+  await assertSucceeds(setDoc(doc(db, 'garageSales/vic-last-day'), free('VIC', '2026-12-10')));
+  await assertFails(setDoc(doc(db, 'garageSales/vic-after'), free('VIC', '2026-12-11')));
+  await assertFails(setDoc(doc(db, 'garageSales/nsw-switched-off'), free('NSW', '2026-12-05')));
+  await assertFails(setDoc(doc(db, 'garageSales/qld-no-period'), free('QLD', '2026-12-05')));
+  // The all-of-Australia period is switched off, so its dates make nothing free.
+  await assertFails(setDoc(doc(db, 'garageSales/vic-national-dates'), free('VIC', '2026-11-14')));
+});
+
+test('the all-of-Australia free period covers every state', async () => {
+  await seed('appSettings/default', {
+    is_active: true, free_listing_start: '2026-11-01', free_listing_end: '2026-11-30',
+    free_listing_states: { VIC: { is_active: false, free_listing_start: '', free_listing_end: '' } },
+  });
+  const db = as.seller('alice');
+  const free = (state) => listing({ state, status: 'pending_approval', payment_status: 'completed', start_date: '2026-11-14', end_date: '2026-11-14' });
+  await assertSucceeds(setDoc(doc(db, 'garageSales/vic'), free('VIC')));
+  await assertSucceeds(setDoc(doc(db, 'garageSales/qld'), free('QLD')));
+});
+
+test('a seller can submit a draft for free during their state free period', async () => {
+  await seed('appSettings/default', {
+    is_active: false,
+    free_listing_states: { WA: { is_active: true, free_listing_start: '2026-12-01', free_listing_end: '2026-12-10' } },
+  });
+  await seed('garageSales/draft', listing({ state: 'WA', start_date: '2026-12-05', end_date: '2026-12-05' }));
+  const db = as.seller('alice');
+  await assertSucceeds(updateDoc(doc(db, 'garageSales/draft'), { status: 'pending_approval', payment_status: 'completed' }));
+});
+
 test('free listings wait for admin approval and stay private until then', async () => {
   await seed('appSettings/default', { is_active: true, free_listing_start: '2026-11-01', free_listing_end: '2026-11-30' });
   await seed('garageSales/draft', listing({ start_date: '2026-11-14', end_date: '2026-11-14' }));
@@ -436,6 +477,32 @@ test('contact messages are readable by admins only', async () => {
   await seed('contactMessages/m', { user_id: 'alice', message: 'Hi' });
   await assertFails(getDoc(doc(as.user('alice'), 'contactMessages/m')));
   await assertSucceeds(getDoc(doc(as.admin(), 'contactMessages/m')));
+});
+
+// ---------- Free listing codes ----------
+
+test('free listing codes are readable by 2FA admins only and written only by Cloud Functions', async () => {
+  await seed('freeListingCodes/FREE-AAAA-BBBB', { code: 'FREE-AAAA-BBBB', status: 'unused', expires_on: '2099-01-31' });
+  await assertSucceeds(getDoc(doc(as.admin(), 'freeListingCodes/FREE-AAAA-BBBB')));
+  await assertSucceeds(getDocs(collection(as.admin(), 'freeListingCodes')));
+  await assertFails(getDoc(doc(as.adminNo2fa(), 'freeListingCodes/FREE-AAAA-BBBB')));
+  await assertFails(getDoc(doc(as.seller('alice'), 'freeListingCodes/FREE-AAAA-BBBB')));
+  await assertFails(getDocs(collection(as.seller('alice'), 'freeListingCodes')));
+  await assertFails(getDoc(doc(as.anon(), 'freeListingCodes/FREE-AAAA-BBBB')));
+
+  await assertFails(setDoc(doc(as.admin(), 'freeListingCodes/FREE-CCCC-DDDD'), { code: 'FREE-CCCC-DDDD', status: 'unused' }));
+  await assertFails(updateDoc(doc(as.admin(), 'freeListingCodes/FREE-AAAA-BBBB'), { status: 'used' }));
+  await assertFails(updateDoc(doc(as.seller('alice'), 'freeListingCodes/FREE-AAAA-BBBB'), { status: 'unused' }));
+  await assertFails(deleteDoc(doc(as.admin(), 'freeListingCodes/FREE-AAAA-BBBB')));
+});
+
+test('sellers cannot record a free-code payment or publish with a code from the browser', async () => {
+  await seed('garageSales/unpaid', listing({ status: 'pending_payment' }));
+  const db = as.seller('alice');
+  await assertFails(setDoc(doc(db, 'payments/code'), {
+    garage_sale_id: 'unpaid', user_id: 'alice', amount: 0, payment_method: 'free_code', status: 'completed',
+  }));
+  await assertFails(updateDoc(doc(db, 'garageSales/unpaid'), { status: 'pending_approval', payment_status: 'completed' }));
 });
 
 // ---------- Server-only collections ----------

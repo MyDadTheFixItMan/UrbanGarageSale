@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 
 export default function Payment() {
     const queryClient = useQueryClient();
@@ -22,6 +23,10 @@ export default function Payment() {
     const [processingPayment, setProcessingPayment] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [promoIndex, setPromoIndex] = useState(0);
+    // A free listing code publishes the listing instead of paying.
+    const [freeCode, setFreeCode] = useState('');
+    const [usingCode, setUsingCode] = useState(false);
+    const [usedCode, setUsedCode] = useState(false);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -67,6 +72,27 @@ export default function Payment() {
             console.error('Checkout error:', error);
             toast.error('Failed to start payment: ' + error.message);
             setProcessingPayment(false);
+        }
+    };
+
+    const handleUseCode = async () => {
+        if (!freeCode.trim()) {
+            toast.error('Please enter your free listing code');
+            return;
+        }
+        setUsingCode(true);
+        try {
+            await firebase.entities.FreeListingCode.redeem(saleId, freeCode);
+            await queryClient.invalidateQueries({ queryKey: ['admin'] });
+            await queryClient.invalidateQueries({ queryKey: ['userListings'] });
+            setUsedCode(true);
+            setPaymentSuccess(true);
+            toast.success('Free listing code used! Your listing is pending approval.');
+        } catch (error) {
+            console.error('Free listing code error:', error);
+            toast.error(error.message);
+        } finally {
+            setUsingCode(false);
         }
     };
 
@@ -181,7 +207,7 @@ export default function Payment() {
                             <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <Check className="w-8 h-8 text-white" />
                             </div>
-                            <CardTitle className="text-2xl text-green-900">Payment Successful!</CardTitle>
+                            <CardTitle className="text-2xl text-green-900">{usedCode ? 'Free Listing Code Used!' : 'Payment Successful!'}</CardTitle>
                             <CardDescription className="text-green-700">
                                 Your listing has been submitted for review
                             </CardDescription>
@@ -277,6 +303,34 @@ export default function Payment() {
                                     {processingPayment && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                     {processingPayment ? 'Processing...' : `Pay ${formatAud(LISTING_FEE_AUD, { withCode: true })} with Stripe`}
                                 </Button>
+                            )}
+                            {sale && (
+                                <div className="border-t border-slate-200 pt-4 space-y-2">
+                                    <label htmlFor="free-listing-code" className="block text-sm font-medium text-slate-700">
+                                        Have a free listing code?
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            id="free-listing-code"
+                                            value={freeCode}
+                                            onChange={(e) => setFreeCode(e.target.value)}
+                                            placeholder="FREE-XXXX-XXXX"
+                                            autoComplete="off"
+                                            autoCapitalize="characters"
+                                            spellCheck={false}
+                                            className="flex-1 uppercase"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={handleUseCode}
+                                            disabled={usingCode || processingPayment}
+                                        >
+                                            {usingCode && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                            Use code
+                                        </Button>
+                                    </div>
+                                </div>
                             )}
                             <Link to={createPageUrl('Profile')}>
                                 <Button variant="outline" className="w-full">

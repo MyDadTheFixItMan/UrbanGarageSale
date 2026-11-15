@@ -15,6 +15,7 @@ import { geocode } from '@/lib/geocode';
 import { profileProblem } from './login/loginForms';
 import { BasicInfoSection, LocationSection, DateTimeSection } from './createListing/ListingSections';
 import PhotosSection from './createListing/PhotosSection';
+import FreeCodeSection from './createListing/FreeCodeSection';
 import {
     EMPTY_FORM, formFromListing, isPaidOrApproved, listingFormProblem, isInFreePeriod, buildSaleData, liveEditData,
 } from './createListing/listingForm';
@@ -74,6 +75,8 @@ export default function CreateListing() {
     const [openedForm, setOpenedForm] = useState(EMPTY_FORM);
     const [promoIndex, setPromoIndex] = useState(0);
     const [formData, setFormData] = useState(EMPTY_FORM);
+    // A free listing code the seller applied (checked, not yet used up), e.g. FREE-7KQ3-MZ2P.
+    const [freeCode, setFreeCode] = useState(null);
 
     const allPromotions = usePromotions();
 
@@ -174,7 +177,7 @@ export default function CreateListing() {
     };
 
     const createMutation = useMutation({
-        mutationFn: async ({ asDraft, isFree }) => {
+        mutationFn: async ({ asDraft, isFree, code }) => {
             if (isActiveEdit) {
                 const changes = liveEditData(formData);
                 if (JSON.stringify(changes) === JSON.stringify(liveEditData(openedForm))) {
@@ -197,12 +200,12 @@ export default function CreateListing() {
 
             if (editId) {
                 await firebase.entities.GarageSale.update(editId, saleData);
-                return { id: editId, asDraft, isFree };
+                return { id: editId, asDraft, isFree, code };
             }
             const result = await firebase.entities.GarageSale.create(saleData);
-            return { id: result.id, asDraft, isFree };
+            return { id: result.id, asDraft, isFree, code };
         },
-        onSuccess: async ({ id, asDraft, isFree, liveEdit: liveEditResult }) => {
+        onSuccess: async ({ id, asDraft, isFree, code, liveEdit: liveEditResult }) => {
             saved.current = true;
             queryClient.invalidateQueries({ queryKey: ['userListings'] });
 
@@ -234,6 +237,17 @@ export default function CreateListing() {
                     console.error('Error creating payment record:', error);
                     toast.error(`Error finalizing free listing: ${error.message}`);
                 }
+            } else if (code) {
+                // The listing is saved unpaid; the code publishes it (redeemFreeListingCode).
+                try {
+                    await firebase.entities.FreeListingCode.redeem(id, code);
+                    toast.success("🎉 Free listing code used! Your listing is pending approval. You'll receive an email once it's live.");
+                    setTimeout(goToProfile, 1500);
+                } catch (error) {
+                    console.error('Error using free listing code:', error);
+                    toast.error(`${error.message} Your listing is saved: press Pay on it in My Listings to pay or use a code.`);
+                    goToProfile();
+                }
             } else {
                 // Retrying here would save the listing a second time, so a failed start goes to the profile.
                 if (!(await startCheckout(id))) goToProfile();
@@ -245,7 +259,10 @@ export default function CreateListing() {
         }
     });
 
-    const freePeriod = !isActiveEdit && isInFreePeriod(appSettings, formData.start_date);
+    const freePeriod = !isActiveEdit && isInFreePeriod(appSettings, formData.start_date, formData.state);
+    // A free period needs no code, so an applied code is kept for another listing.
+    const codeToUse = !isActiveEdit && !freePeriod ? freeCode : null;
+    const publishFree = freePeriod || Boolean(codeToUse);
 
     const handleSubmit = (asDraft) => {
         if (saving.current) return;
@@ -255,7 +272,7 @@ export default function CreateListing() {
             return;
         }
         saving.current = true;
-        createMutation.mutate({ asDraft, isFree: !asDraft && freePeriod }, {
+        createMutation.mutate({ asDraft, isFree: !asDraft && freePeriod, code: asDraft ? null : codeToUse }, {
             onError: () => { saving.current = false; },
         });
     };
@@ -365,6 +382,10 @@ export default function CreateListing() {
                         </Alert>
                     )}
 
+                    {!isActiveEdit && !freePeriod && (
+                        <FreeCodeSection applied={freeCode} onApply={setFreeCode} onRemove={() => setFreeCode(null)} />
+                    )}
+
                     {/* Actions */}
                     <div className="flex flex-col sm:flex-row gap-3">
                         {!isActiveEdit && (
@@ -381,7 +402,7 @@ export default function CreateListing() {
                         <Button
                             onClick={() => handleSubmit(false)}
                             disabled={createMutation.isPending}
-                            className={`flex-1 h-12 gap-2 ${freePeriod ? 'bg-green-600 hover:bg-green-700' : 'bg-navy hover:bg-navy-dark'}`}
+                            className={`flex-1 h-12 gap-2 ${publishFree ? 'bg-green-600 hover:bg-green-700' : 'bg-navy hover:bg-navy-dark'}`}
                         >
                             {createMutation.isPending ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -393,7 +414,7 @@ export default function CreateListing() {
                             ) : (
                                 <>
                                     <Send className="w-5 h-5" />
-                                    {freePeriod ? 'Publish FREE' : 'Publish my Sale'}
+                                    {publishFree ? 'Publish FREE' : 'Publish my Sale'}
                                 </>
                             )}
                         </Button>

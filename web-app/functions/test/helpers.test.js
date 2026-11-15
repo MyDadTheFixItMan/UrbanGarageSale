@@ -140,6 +140,12 @@ test('rejectionEmailHtml only mentions a refund when there was one', () => {
     assert.doesNotMatch(email(0), /refund/i);
 });
 
+test('rejectionEmailHtml tells the seller a free listing code they used works again', () => {
+    const html = rejectionEmailHtml({ title: 'Sale', reason: 'No', refunded: 0, freeCode: 'FREE-7KQ3-MZ2P' });
+    assert.match(html, /free listing code <strong>FREE-7KQ3-MZ2P<\/strong> can be used again/);
+    assert.doesNotMatch(rejectionEmailHtml({ title: 'Sale', reason: 'No', refunded: 0 }), /listing code/);
+});
+
 test('approvalEmailHtml names the listing and escapes its title', () => {
     const html = approvalEmailHtml({ title: '<b>Sale</b>', saleId: 'abc123', siteUrl: 'https://example.com/' });
     assert.match(html, /has been approved/);

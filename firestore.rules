@@ -161,16 +161,26 @@ service cloud.firestore {
     }
 
     // ---------- Garage sale listings ----------
-    // A listing qualifies as free when the admin's free period is on and the sale starts inside it.
-    // Free listings wait for admin approval like paid ones, so sellers can never publish directly.
+    // One free listing period: { is_active, free_listing_start, free_listing_end }, dates as
+    // YYYY-MM-DD. The settings document itself is the period for all of Australia, and
+    // free_listing_states holds one per state, keyed by its code (VIC, NSW, ...).
+    function inFreePeriod(period, startDate) {
+      return period.get('is_active', false) == true &&
+             startDate >= period.get('free_listing_start', '9999') &&
+             startDate <= period.get('free_listing_end', '');
+    }
+
+    // A listing qualifies as free when the sale starts inside a free period that is on, either the
+    // one for all of Australia or the one for the listing's state. Free listings wait for admin
+    // approval like paid ones, so sellers can never publish directly. Listings made free with a
+    // free listing code are published by the redeemFreeListingCode function, not by this rule.
     function isFreeListing(data) {
       let settings = get(/databases/$(database)/documents/appSettings/default).data;
       return data.get('status', '') == 'pending_approval' &&
              data.get('payment_status', '') == 'completed' &&
-             settings.get('is_active', false) == true &&
              data.get('start_date', '') is string &&
-             data.start_date >= settings.get('free_listing_start', '9999') &&
-             data.start_date <= settings.get('free_listing_end', '');
+             (inFreePeriod(settings, data.start_date) ||
+              inFreePeriod(settings.get('free_listing_states', {}).get(data.get('state', ''), {}), data.start_date));
     }
 
     // Once a listing is paid for or approved, the seller can change only what buyers read and see,
@@ -297,6 +307,16 @@ service cloud.firestore {
                         get(/databases/$(database)/documents/garageSales/$(request.resource.data.garage_sale_id)).data.payment_status == 'completed');
 
       allow update, delete: if isAdmin();
+    }
+
+    // ---------- Free listing codes ----------
+    // One-use codes an admin sends a person so they can publish one listing without paying.
+    // Cloud Functions create, cancel and redeem them (createFreeListingCode, cancelFreeListingCode,
+    // redeemFreeListingCode), so nobody can make or reuse a code from the browser. Admins read
+    // them to see who has been sent a code and whether it has been used.
+    match /freeListingCodes/{code} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // ---------- Contact messages ----------

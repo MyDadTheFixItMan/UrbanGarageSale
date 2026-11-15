@@ -7,6 +7,11 @@ import {
   filterPayments,
   paymentListingValues,
   isFreePeriodActive,
+  freePeriodsFromSettings,
+  freePeriodsToSettings,
+  freePeriodProblem,
+  freeCodeStatus,
+  defaultFreeCodeExpiry,
   nextPromoSequence,
   reorderPromotions,
   filterMessages
@@ -114,6 +119,64 @@ describe('admin dashboard helpers', () => {
       expect(isFreePeriodActive(period, new Date(2026, 8, 30))).toBe(false);
       expect(isFreePeriodActive({ ...period, active: false }, NOW)).toBe(false);
       expect(isFreePeriodActive({ ...period, end: '' }, NOW)).toBe(false);
+    });
+  });
+
+  describe('free listing periods by state', () => {
+    const STATES = ['NSW', 'VIC'];
+    const settings = {
+      is_active: true,
+      free_listing_start: '2026-11-01',
+      free_listing_end: '2026-11-30',
+      free_listing_states: { VIC: { is_active: true, free_listing_start: '2026-12-01', free_listing_end: '2026-12-10' } },
+    };
+
+    it('reads the all-of-Australia period and each state, with missing states switched off', () => {
+      expect(freePeriodsFromSettings(settings, STATES)).toEqual({
+        ALL: { active: true, start: '2026-11-01', end: '2026-11-30' },
+        NSW: { active: false, start: '', end: '' },
+        VIC: { active: true, start: '2026-12-01', end: '2026-12-10' },
+      });
+      expect(freePeriodsFromSettings({}, STATES).ALL).toEqual({ active: false, start: '', end: '' });
+      expect(freePeriodsFromSettings(null, STATES).VIC).toEqual({ active: false, start: '', end: '' });
+    });
+
+    it('reads dates stored as Firestore Timestamps by older settings', () => {
+      const stored = { is_active: true, free_listing_start: { toDate: () => new Date(2026, 10, 1) }, free_listing_end: { toDate: () => new Date(2026, 10, 30) } };
+      expect(freePeriodsFromSettings(stored, STATES).ALL).toEqual({ active: true, start: '2026-11-01', end: '2026-11-30' });
+    });
+
+    it('saves the fields firestore.rules reads, writing every state', () => {
+      const periods = freePeriodsFromSettings(settings, STATES);
+      expect(freePeriodsToSettings({ ...periods, VIC: { ...periods.VIC, active: false } }, STATES)).toEqual({
+        is_active: true,
+        free_listing_start: '2026-11-01',
+        free_listing_end: '2026-11-30',
+        free_listing_states: {
+          NSW: { is_active: false, free_listing_start: '', free_listing_end: '' },
+          VIC: { is_active: false, free_listing_start: '2026-12-01', free_listing_end: '2026-12-10' },
+        },
+      });
+    });
+
+    it('needs both dates, in order, only for periods that are switched on', () => {
+      expect(freePeriodProblem({ active: false, start: '', end: '' })).toBeNull();
+      expect(freePeriodProblem({ active: true, start: '2026-12-01', end: '' })).toMatch(/start and an end date/);
+      expect(freePeriodProblem({ active: true, start: '2026-12-10', end: '2026-12-01' })).toMatch(/ends before it starts/);
+      expect(freePeriodProblem({ active: true, start: '2026-12-01', end: '2026-12-01' })).toBeNull();
+    });
+  });
+
+  describe('free listing codes', () => {
+    it('shows an unused code past its last day as expired', () => {
+      expect(freeCodeStatus({ status: 'unused', expires_on: '2026-10-09' }, NOW)).toBe('unused');
+      expect(freeCodeStatus({ status: 'unused', expires_on: '2026-10-08' }, NOW)).toBe('expired');
+      expect(freeCodeStatus({ status: 'used', expires_on: '2026-10-08' }, NOW)).toBe('used');
+      expect(freeCodeStatus({ status: 'cancelled', expires_on: '2026-12-01' }, NOW)).toBe('cancelled');
+    });
+
+    it('gives new codes 90 days', () => {
+      expect(defaultFreeCodeExpiry(NOW)).toBe('2027-01-07');
     });
   });
 

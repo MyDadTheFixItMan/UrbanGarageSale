@@ -317,6 +317,25 @@ export default function Home() {
                         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div>
+                                    <div className="flex items-baseline justify-between mb-2">
+                                        <label htmlFor="search-date" className="block text-slate-800 text-sm font-medium">Date</label>
+                                        {filters.saleDate && (
+                                            <button type="button" onClick={() => setFilters({ ...filters, saleDate: '' })} className="text-xs text-slate-600 underline hover:text-slate-800">
+                                                Any date
+                                            </button>
+                                        )}
+                                    </div>
+                                    <input
+                                        id="search-date"
+                                        type="date"
+                                        min={toLocalIsoDate(new Date())}
+                                        className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-800"
+                                        value={filters.saleDate || ''}
+                                        onChange={(e) => setFilters({ ...filters, saleDate: e.target.value })}
+                                    />
+                                </div>
+
+                                <div>
                                     <label htmlFor="search-location" className="block text-slate-800 text-sm font-medium mb-2">Suburb or Postcode</label>
                                     <input
                                         id="search-location"
@@ -361,25 +380,6 @@ export default function Home() {
                                             <SelectItem value="200">200 km</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                </div>
-
-                                <div>
-                                    <div className="flex items-baseline justify-between mb-2">
-                                        <label htmlFor="search-date" className="block text-slate-800 text-sm font-medium">Date</label>
-                                        {filters.saleDate && (
-                                            <button type="button" onClick={() => setFilters({ ...filters, saleDate: '' })} className="text-xs text-slate-600 underline hover:text-slate-800">
-                                                Any date
-                                            </button>
-                                        )}
-                                    </div>
-                                    <input
-                                        id="search-date"
-                                        type="date"
-                                        min={toLocalIsoDate(new Date())}
-                                        className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-800"
-                                        value={filters.saleDate || ''}
-                                        onChange={(e) => setFilters({ ...filters, saleDate: e.target.value })}
-                                    />
                                 </div>
                             </div>
 

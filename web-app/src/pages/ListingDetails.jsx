@@ -19,6 +19,7 @@ import { printAfterDialogCloses, paperSizes } from '../utils/printGarageSaleSign
 import { AU_WEEKDAY_DATE, formatTimeAU } from '@/lib/format';
 import { useToggleSaved } from '@/lib/useToggleSaved';
 import { directionsUrl, saleLocation } from '@/lib/route';
+import { ADMIN_TABS } from './admin/tabs';
 import {
     Dialog,
     DialogContent,
@@ -30,6 +31,9 @@ import {
 export default function ListingDetails() {
     const urlParams = new URLSearchParams(window.location.search);
     const saleId = urlParams.get('id');
+    // Opened from the admin dashboard: go back to the tab it was opened from.
+    const adminTab = ADMIN_TABS.includes(urlParams.get('adminTab')) ? urlParams.get('adminTab') : null;
+    const backUrl = adminTab ? createPageUrl(`AdminDashboard?tab=${adminTab}`) : createPageUrl('Home');
 
     const [user, setUser] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -106,8 +110,11 @@ export default function ListingDetails() {
         }
     };
 
+    // Only the seller prints signs for their sale.
+    const isOwner = Boolean(user?.id) && user.id === sale?.user_id;
+
     const handlePrintSignConfirm = () => {
-        if (sale) {
+        if (sale && isOwner) {
             setPrintDialogOpen(false);
             printAfterDialogCloses(sale, selectedPrintSize);
             setSelectedPrintSize('A4');
@@ -164,23 +171,36 @@ export default function ListingDetails() {
                 <Share2 className="w-5 h-5" />
             </Button>
 
-            <Button
-                variant="outline"
-                onClick={() => setPrintDialogOpen(true)}
-                className="flex-shrink-0 bg-white"
-                aria-label="Print garage sale sign"
-                title="Print this garage sale sign"
-            >
-                <Printer className="w-5 h-5" />
-            </Button>
+            {isOwner && (
+                <Button
+                    variant="outline"
+                    onClick={() => setPrintDialogOpen(true)}
+                    className="flex-shrink-0 bg-white"
+                    aria-label="Print garage sale sign"
+                    title="Print this garage sale sign"
+                >
+                    <Printer className="w-5 h-5" />
+                </Button>
+            )}
 
-            <Button
-                onClick={handleGetDirections}
-                className="flex-1 bg-navy hover:bg-navy-dark gap-2"
-            >
-                <Navigation className="w-5 h-5" />
-                Get Directions
-            </Button>
+            {/* Visitors only have the suburb (the public copy has no address), so directions
+                need signing in. */}
+            {isAuthenticated ? (
+                <Button
+                    onClick={handleGetDirections}
+                    className="flex-1 bg-navy hover:bg-navy-dark gap-2"
+                >
+                    <Navigation className="w-5 h-5" />
+                    Get Directions
+                </Button>
+            ) : (
+                <Link to={createPageUrl('Login')} className="flex-1">
+                    <Button className="w-full bg-navy hover:bg-navy-dark gap-2">
+                        <Navigation className="w-5 h-5" />
+                        Sign in for directions
+                    </Button>
+                </Link>
+            )}
         </div>
     );
 
@@ -223,7 +243,7 @@ export default function ListingDetails() {
             {/* Back Button & Save */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-56 md:pt-16 relative z-10 py-4">
                 <div className="flex items-center justify-between">
-                    <Link to={createPageUrl('Home')}>
+                    <Link to={backUrl}>
                         <Button variant="ghost" className="gap-2 text-slate-600 hover:text-navy">
                             <ChevronLeft className="w-4 h-4" />
                             Back to listings
@@ -339,25 +359,39 @@ export default function ListingDetails() {
                                 <div className="w-10 h-10 rounded-xl bg-navy/10 flex items-center justify-center flex-shrink-0">
                                     <MapPin className="w-5 h-5 text-navy" />
                                 </div>
-                                <div>
-                                    <p className="font-medium text-navy">{sale.address}</p>
-                                    {sale.suburb && (
-                                        <p className="text-sm text-slate-600">{sale.suburb}</p>
-                                    )}
-                                    {sale.postcode && (
-                                        <p className="text-sm text-slate-500">{sale.postcode}</p>
-                                    )}
-                                </div>
+                                {sale.address ? (
+                                    <div>
+                                        <p className="font-medium text-navy">{sale.address}</p>
+                                        {sale.suburb && (
+                                            <p className="text-sm text-slate-600">{sale.suburb}</p>
+                                        )}
+                                        {sale.postcode && (
+                                            <p className="text-sm text-slate-500">{sale.postcode}</p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="font-medium text-navy">
+                                            {[sale.suburb, sale.state, sale.postcode].filter(Boolean).join(' ')}
+                                        </p>
+                                        <p className="text-sm text-slate-500">
+                                            <Link to={createPageUrl('Login')} className="text-navy underline">Sign in</Link> to see the street address.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-                            
+
                             {sale.latitude && sale.longitude && (
                                 <div className="h-48 rounded-xl overflow-hidden">
                                     <SaleMap
                                         sales={[sale]}
                                         center={[sale.latitude, sale.longitude]}
-                                        zoom={15}
+                                        zoom={sale.approximate_location ? 13 : 15}
                                     />
                                 </div>
+                            )}
+                            {sale.approximate_location && (
+                                <p className="text-xs text-slate-500 mt-2">The map shows the area, not the house.</p>
                             )}
                         </div>
 

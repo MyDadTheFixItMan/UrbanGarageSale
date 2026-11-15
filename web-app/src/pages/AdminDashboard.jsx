@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { createPageUrl } from '../utils';
 import { formatAud } from '@/lib/format';
 import { ADMIN_KEY } from './admin/usePagedQuery';
+import { ADMIN_TABS } from './admin/tabs';
 import ListingsTab from './admin/ListingsTab';
 import ApprovalTab from './admin/ApprovalTab';
 import AnalyticsTab from './admin/AnalyticsTab';
@@ -86,7 +87,11 @@ function usePromoRotation(count) {
 export default function AdminDashboard() {
     const user = useAdminUser();
     const isAdmin = user?.role === 'admin';
-    const [activeTab, setActiveTab] = useState('listings');
+    // ?tab= opens a given tab, e.g. coming back from a listing opened on the Pending tab.
+    const [activeTab, setActiveTab] = useState(() => {
+        const tab = new URLSearchParams(window.location.search).get('tab');
+        return ADMIN_TABS.includes(tab) ? tab : 'listings';
+    });
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],

@@ -49,7 +49,7 @@ jest.mock('firebase/storage', () => ({
   deleteObject: jest.fn(async () => {}),
 }));
 jest.mock('@/api/firebase/app', () => ({
-  auth: { currentUser: null },
+  auth: { currentUser: null, authStateReady: async () => {} },
   db: {},
   functions: {},
 }));
@@ -114,6 +114,35 @@ describe('GarageSale.filter', () => {
       expect(limitOf(q)).toBe(100);
     });
     expect(results.map((r) => r.id)).toEqual(['near']);
+  });
+
+  it('gives visitors who are not signed in the public copies, which have no address', async () => {
+    auth.currentUser = null;
+    store.getDoc.mockResolvedValue(docSnap({ id: 'sale-9', title: 'Big sale' }));
+    await firebaseEntities.GarageSale.filter({ id: 'sale-9' });
+    expect(store.getDoc.mock.calls[0][0].path).toEqual(['publicListings', 'sale-9']);
+
+    await firebaseEntities.GarageSale.filter({ status: 'active', postcode: '3226' });
+    expect(store.queries[0].collection).toBe('publicListings');
+    expect(wheres(store.queries[0])).toEqual(['postcode==3226']);
+    expect(limitOf(store.queries[0])).toBe(200);
+
+    await firebaseEntities.GarageSale.filter({ status: 'active', distance: '10', userLatitude: -37.8136, userLongitude: 144.9631 });
+    expect(store.queries.slice(1).every((q) => q.collection === 'publicListings' && wheres(q).length === 0)).toBe(true);
+  });
+
+  it("finds nothing for a visitor asking for drafts or a seller's listings", async () => {
+    auth.currentUser = null;
+    await expect(firebaseEntities.GarageSale.filter({ status: 'draft' })).resolves.toEqual([]);
+    await expect(firebaseEntities.GarageSale.filter({ status: 'active', user_id: 'user-1' })).resolves.toEqual([]);
+    expect(store.queries).toHaveLength(0);
+  });
+
+  it('gives signed-in users the listings themselves', async () => {
+    await firebaseEntities.GarageSale.filter({ id: 'sale-9' });
+    expect(store.getDoc.mock.calls[0][0].path).toEqual(['garageSales', 'sale-9']);
+    await firebaseEntities.GarageSale.filter({ status: 'active' });
+    expect(store.queries[0].collection).toBe('garageSales');
   });
 
   it('hides listings that have ended unless includePast is set', async () => {

@@ -36,12 +36,14 @@ function stopAnd(handler) {
     };
 }
 
-export default function ListingRow({ listing, overrideStatus = null, onApprove, onReject, onDelete }) {
+// `adminTab` is the dashboard tab the row is on, so the listing page's back link returns there.
+export default function ListingRow({ listing, adminTab, overrideStatus = null, onApprove, onReject, onDelete }) {
     const displayStatus = overrideStatus || listing.status;
     const handleApprove = useSingleClick(() => onApprove(listing));
     const handleReject = useSingleClick(() => onReject(listing));
     const handleView = stopAnd(() => {
-        window.location.href = createPageUrl(`ListingDetails?id=${listing.id}`);
+        const from = adminTab ? `&adminTab=${encodeURIComponent(adminTab)}` : '';
+        window.location.href = createPageUrl(`ListingDetails?id=${listing.id}${from}`);
     });
 
     return (

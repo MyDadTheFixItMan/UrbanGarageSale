@@ -196,9 +196,11 @@ service cloud.firestore {
     }
 
     match /garageSales/{saleId} {
-      // The public sees live listings only. Drafts, unpaid, pending and rejected listings are
-      // visible to their owner and admins. Public queries must filter on status == 'active'.
-      allow read: if resource.data.get('status', '') == 'active' ||
+      // Signed-in users see live listings, street address included. Visitors who aren't signed in
+      // read publicListings instead, which has no address. Drafts, unpaid, pending and rejected
+      // listings are visible to their owner and admins. Queries by other users must filter on
+      // status == 'active'.
+      allow read: if (signedIn() && resource.data.get('status', '') == 'active') ||
                      (signedIn() && request.auth.uid == resource.data.get('user_id', '')) ||
                      isAdmin();
 
@@ -226,6 +228,14 @@ service cloud.firestore {
                         ));
 
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == resource.data.user_id);
+    }
+
+    // ---------- Public copies of live listings ----------
+    // Written only by the syncPublicListing Cloud Function: suburb but no street address, and an
+    // approximate pin (web-app/functions/lib/publicListing.js).
+    match /publicListings/{saleId} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // ---------- Changes to live listings ----------

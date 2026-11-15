@@ -81,10 +81,12 @@ test('adminReviewEmailHtml escapes seller text and lists problems', () => {
         listing: { ...listing, title: '<script>x</script>' },
         verdict: { decision: 'review', problems: [{ rule: 'weapons', reason: 'Photo 2 shows a rifle.' }] },
         adminUrl: 'https://urbangaragesales.com.au/AdminDashboard',
-        footer: 'footer',
+        siteUrl: 'https://urbangaragesales.com.au',
     });
     assert.doesNotMatch(html, /<script>/);
     assert.match(html, /&lt;script&gt;/);
     assert.match(html, /Photo 2 shows a rifle\./);
     assert.match(html, /Claude did not approve it/);
+    assert.match(html, /email-logo\.png/);
+    assert.match(html, /href="https:\/\/urbangaragesales\.com\.au\/AdminDashboard"/);
 });

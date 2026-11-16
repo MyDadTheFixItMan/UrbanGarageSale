@@ -40,6 +40,9 @@ const EMAIL_FONT = "'Nunito', 'Segoe UI', Arial, Helvetica, sans-serif";
 // Shown in every email's footer and used as the reply-to address.
 const SUPPORT_EMAIL = 'admin@urbangaragesales.com.au';
 const DEFAULT_SITE_URL = 'https://urbangaragesales.com.au';
+// The logo always comes from the live site (www, which skips the redirect from the bare
+// domain), so emails sent from staging or a local build show it too.
+const EMAIL_LOGO_URL = 'https://www.urbangaragesales.com.au/email-logo.png';
 const EMAIL_SELLER_NOTE = 'You received this email because you listed a sale on Urban Garage Sale.';
 const EMAIL_CONTACT_NOTE = 'You received this email because you sent us a message through Urban Garage Sale.';
 const EMAIL_ADMIN_NOTE = 'You received this email because you are an Urban Garage Sale admin.';
@@ -58,23 +61,34 @@ function emailList(items) {
     return `<ul style="margin:0 0 16px;padding-left:22px;">${items.map((item) => `<li style="margin:0 0 6px;">${item}</li>`).join('')}</ul>`;
 }
 
-// A labelled block of typed text. The text is escaped and its line breaks are kept.
+// A labelled block of typed text. The text is escaped and its line breaks are kept. The space
+// below is a padded cell, not a margin, because Outlook ignores margins on tables.
 function emailBox(label, text, colour) {
     return `
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">
-                    <tr><td style="background:${EMAIL_COLOURS.cream};border-left:4px solid ${colour};border-radius:4px;padding:14px 16px;">
-                        <p style="margin:0 0 6px;font-weight:bold;color:${EMAIL_COLOURS.navy};">${label}</p>
-                        <p style="margin:0;white-space:pre-line;">${escapeHtml(text)}</p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr><td style="padding:0 0 16px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr><td bgcolor="${EMAIL_COLOURS.cream}" style="background:${EMAIL_COLOURS.cream};border-left:4px solid ${colour};border-radius:4px;padding:14px 16px;">
+                                <p style="margin:0 0 6px;font-weight:bold;color:${EMAIL_COLOURS.navy};">${label}</p>
+                                <p style="margin:0;white-space:pre-line;">${escapeHtml(text)}</p>
+                            </td></tr>
+                        </table>
                     </td></tr>
                 </table>`;
 }
 
 // The call-to-action button. A table cell rather than a styled link, so Outlook draws it too.
+// Outlook ignores padding on links and margins on tables, so it gets its padding on the cell
+// (mso-padding-alt, which only Outlook reads) and the space around comes from a padded cell.
 function emailButton(label, url) {
     return `
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
-                    <tr><td align="center" bgcolor="${EMAIL_COLOURS.orangeDark}" style="border-radius:8px;">
-                        <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;font-family:${EMAIL_FONT};font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">${label}</a>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr><td style="padding:8px 0 28px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr><td align="center" bgcolor="${EMAIL_COLOURS.orangeDark}" style="border-radius:8px;mso-padding-alt:14px 32px;">
+                                <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 32px;mso-padding-alt:0;font-family:${EMAIL_FONT};font-size:17px;line-height:20px;font-weight:bold;letter-spacing:0.3px;color:#ffffff;text-decoration:none;border-radius:8px;">${label}</a>
+                            </td></tr>
+                        </table>
                     </td></tr>
                 </table>`;
 }
@@ -119,7 +133,7 @@ function emailLayout({ siteUrl, preheader, heading, body, button, signoff = true
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:${EMAIL_FONT};">
             <tr><td height="6" bgcolor="${c.orange}" style="height:6px;line-height:6px;font-size:0;background:${c.orange};background-image:linear-gradient(90deg, ${c.orange}, ${c.teal});">&nbsp;</td></tr>
             <tr><td class="ugs-pad" style="padding:24px 32px 8px;">
-                <a href="${escapeHtml(site)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;"><img src="${escapeHtml(site)}/email-logo.png" width="170" height="78" alt="Urban Garage Sale" style="display:block;border:0;width:170px;height:78px;font-family:${EMAIL_FONT};font-size:24px;font-weight:bold;color:${c.orangeDark};"></a>
+                <a href="${escapeHtml(site)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;"><img src="${EMAIL_LOGO_URL}" width="170" height="78" alt="Urban Garage Sale" style="display:block;border:0;width:170px;height:78px;font-family:${EMAIL_FONT};font-size:24px;font-weight:bold;color:${c.orangeDark};"></a>
             </td></tr>
             <tr><td class="ugs-pad" style="padding:16px 32px 8px;color:${c.text};font-size:16px;line-height:1.6;">
                 <h1 class="ugs-heading" style="margin:0 0 16px;color:${c.navy};font-size:26px;line-height:1.25;font-weight:800;">${heading}</h1>

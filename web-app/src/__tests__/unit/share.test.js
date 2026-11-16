@@ -115,8 +115,8 @@ describe('share links', () => {
 
 describe('flyerFileName', () => {
   it('names the file after the sale', () => {
-    expect(flyerFileName(listing)).toBe('moving-sale-brunswick.png');
-    expect(flyerFileName({ suburb: "St Kilda's East" })).toBe('garage-sale-st-kilda-s-east.png');
+    expect(flyerFileName(listing)).toBe('moving-sale-brunswick.jpg');
+    expect(flyerFileName({ suburb: "St Kilda's East" })).toBe('garage-sale-st-kilda-s-east.jpg');
   });
 });
 

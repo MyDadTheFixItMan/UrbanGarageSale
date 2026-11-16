@@ -28,7 +28,7 @@ const listing = {
   end_time: '14:00',
 };
 const linkFor = (channel) => `http://localhost/ListingDetails?id=sale-1&utm_source=${channel}&utm_medium=share`;
-const flyerFile = new File(['png'], 'moving-sale-brunswick.png', { type: 'image/png' });
+const flyerFile = new File(['jpg'], 'moving-sale-brunswick.jpg', { type: 'image/jpeg' });
 
 const setNavigator = (key, value) => Object.defineProperty(navigator, key, { value, configurable: true, writable: true });
 const renderDialog = (props = {}) => render(<ShareListingDialog listing={listing} open onOpenChange={() => {}} {...props} />);
@@ -121,7 +121,7 @@ describe('ShareListingDialog for sellers', () => {
     setNavigator('canShare', jest.fn(() => true));
     renderDialog({ promote: true });
     await userEvent.click(await screen.findByRole('button', { name: 'Share image' }));
-    expect(navigator.share).toHaveBeenCalledWith({ files: [flyerFile], title: 'Huge moving sale' });
+    expect(navigator.share).toHaveBeenCalledWith({ files: [flyerFile] });
   });
 
   it('lets the flyer be saved where the device can only share links', async () => {
@@ -130,7 +130,7 @@ describe('ShareListingDialog for sellers', () => {
     renderDialog({ promote: true });
     const save = await screen.findByRole('link', { name: /save image/i });
     expect(save).toHaveAttribute('href', 'blob:flyer');
-    expect(save).toHaveAttribute('download', 'moving-sale-brunswick.png');
+    expect(save).toHaveAttribute('download', 'moving-sale-brunswick.jpg');
     expect(screen.queryByRole('button', { name: 'Share image' })).not.toBeInTheDocument();
   });
 

@@ -82,7 +82,9 @@ export default function ShareListingDialog({ listing, open, onOpenChange, promot
     };
 
     const shareFlyer = async () => {
-        const result = await openShareSheet({ files: [flyer.file], title: sale.title });
+        // The image on its own: with a title or text alongside it, iPhones leave Instagram out of the
+        // share sheet.
+        const result = await openShareSheet({ files: [flyer.file] });
         if (result === 'unavailable') toast.error("This browser can't share the image. Save it, then post it from your photos.");
     };
 

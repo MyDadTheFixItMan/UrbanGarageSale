@@ -87,10 +87,10 @@ export function emailShareUrl(listing, url) {
     return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(listingPostText(listing, url))}`;
 }
 
-// A file name for the listing's flyer: "garage-sale-brunswick.png".
+// A file name for the listing's flyer: "garage-sale-brunswick.jpg".
 export function flyerFileName(listing) {
     const words = `${saleTypeName(listing)} ${listing?.suburb || ''}`.toLowerCase().match(/[a-z0-9]+/g) || ['garage', 'sale'];
-    return `${words.join('-')}.png`;
+    return `${words.join('-')}.jpg`;
 }
 
 /**

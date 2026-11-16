@@ -270,6 +270,7 @@ export async function createShareFlyer(listing) {
     drawBody(ctx, content, scale, true);
     drawFooter(ctx, logo);
 
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    return blob ? new File([blob], flyerFileName(listing), { type: 'image/png' }) : null;
+    // JPEG: Instagram's share option handles it more reliably than PNG.
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    return blob ? new File([blob], flyerFileName(listing), { type: 'image/jpeg' }) : null;
 }

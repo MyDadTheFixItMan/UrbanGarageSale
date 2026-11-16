@@ -241,7 +241,7 @@ export default function ListingDetails() {
             )}
             
             {/* Back Button & Save */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-56 md:pt-16 relative z-10 py-4">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-24 md:pt-16 pb-4 relative z-10">
                 <div className="flex items-center justify-between">
                     <Link to={backUrl}>
                         <Button variant="ghost" className="gap-2 text-slate-600 hover:text-navy">
@@ -299,6 +299,13 @@ export default function ListingDetails() {
                                         />
                                     </button>
                                 ))}
+                            </div>
+                        )}
+                        {/* Description, under the photos */}
+                        {sale.description && (
+                            <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+                                <h3 className="font-semibold text-navy mb-3">About This Sale</h3>
+                                <p className="text-slate-600 whitespace-pre-wrap">{sale.description}</p>
                             </div>
                         )}
                     </div>
@@ -395,13 +402,6 @@ export default function ListingDetails() {
                             )}
                         </div>
 
-                        {/* Description */}
-                        {sale.description && (
-                            <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-                                <h3 className="font-semibold text-navy mb-3">About This Sale</h3>
-                                <p className="text-slate-600 whitespace-pre-wrap">{sale.description}</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>

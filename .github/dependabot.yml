@@ -8,6 +8,11 @@ updates:
     groups:
       api-minor:
         update-types: [minor, patch]
+    ignore:
+      # firebase-admin 14 brings jwks-rsa 4, which require()s the ES module jose. Vercel's
+      # function runtime rejects that (ERR_REQUIRE_ESM) and every API function fails to start.
+      - dependency-name: firebase-admin
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: npm
     directory: /web-app

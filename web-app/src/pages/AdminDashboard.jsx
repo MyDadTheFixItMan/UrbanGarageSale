@@ -17,6 +17,7 @@ import UsersTab from './admin/UsersTab';
 import PaymentsTab from './admin/PaymentsTab';
 import PromotionsCard from './admin/PromotionsCard';
 import FreeListingCard from './admin/FreeListingCard';
+import FreeListingCodesCard from './admin/FreeListingCodesCard';
 import MessagesTab from './admin/MessagesTab';
 
 function StatCard({ title, value, icon: Icon, color = "bg-navy" }) {
@@ -219,6 +220,7 @@ export default function AdminDashboard() {
                         <TabsContent value="settings" className="space-y-4">
                             <PromotionsCard promotions={allPromotions} />
                             <FreeListingCard appSettings={appSettings} />
+                            <FreeListingCodesCard />
                         </TabsContent>
                         <TabsContent value="messages" className="space-y-4">
                             <MessagesTab currentUserEmail={user.email} />

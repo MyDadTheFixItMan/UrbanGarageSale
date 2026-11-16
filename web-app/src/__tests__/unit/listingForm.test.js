@@ -100,6 +100,38 @@ describe('isInFreePeriod', () => {
     const stored = { is_active: true, free_listing_start: timestamp('2026-11-01T00:00:00Z'), free_listing_end: timestamp('2026-11-30T00:00:00Z') };
     expect(isInFreePeriod(stored, '2026-11-15')).toBe(true);
   });
+
+  describe('by state', () => {
+    const byState = {
+      is_active: false,
+      free_listing_start: '2026-11-01',
+      free_listing_end: '2026-11-30',
+      free_listing_states: {
+        VIC: { is_active: true, free_listing_start: '2026-12-01', free_listing_end: '2026-12-10' },
+        NSW: { is_active: false, free_listing_start: '2026-12-01', free_listing_end: '2026-12-10' },
+      },
+    };
+
+    it("uses the period for the listing's state", () => {
+      expect(isInFreePeriod(byState, '2026-12-01', 'VIC')).toBe(true);
+      expect(isInFreePeriod(byState, '2026-12-10', 'VIC')).toBe(true);
+      expect(isInFreePeriod(byState, '2026-12-11', 'VIC')).toBe(false);
+    });
+
+    it("ignores other states' periods, ones switched off, and listings with no state yet", () => {
+      expect(isInFreePeriod(byState, '2026-12-05', 'NSW')).toBe(false);
+      expect(isInFreePeriod(byState, '2026-12-05', 'QLD')).toBe(false);
+      expect(isInFreePeriod(byState, '2026-12-05', '')).toBe(false);
+      expect(isInFreePeriod(byState, '2026-12-05')).toBe(false);
+    });
+
+    it('still makes every state free during the all-of-Australia period', () => {
+      const everywhere = { ...byState, is_active: true };
+      expect(isInFreePeriod(everywhere, '2026-11-15', 'QLD')).toBe(true);
+      expect(isInFreePeriod(everywhere, '2026-11-15', 'NSW')).toBe(true);
+      expect(isInFreePeriod(everywhere, '2026-11-15')).toBe(true);
+    });
+  });
 });
 
 describe('buildSaleData', () => {

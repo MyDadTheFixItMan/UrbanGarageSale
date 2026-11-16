@@ -200,10 +200,14 @@ function approvalEmailHtml({ title, saleId, siteUrl }) {
 }
 
 // The email telling a seller their listing was rejected. Title and reason are escaped.
-function rejectionEmailHtml({ title, reason, refunded, siteUrl }) {
-    const refundLine = refunded > 0
-        ? emailParagraph(`Your listing fee of <strong>A$${refunded.toFixed(2)}</strong> has been refunded to the card you paid with. Refunds usually appear within 5–10 business days.`)
-        : '';
+// `freeCode` is the free listing code the listing used, which rejecting gives back.
+function rejectionEmailHtml({ title, reason, refunded, freeCode, siteUrl }) {
+    let refundLine = '';
+    if (refunded > 0) {
+        refundLine = emailParagraph(`Your listing fee of <strong>A$${refunded.toFixed(2)}</strong> has been refunded to the card you paid with. Refunds usually appear within 5–10 business days.`);
+    } else if (freeCode) {
+        refundLine = emailParagraph(`Your free listing code <strong>${escapeHtml(freeCode)}</strong> can be used again for your new listing.`);
+    }
     return emailLayout({
         siteUrl,
         preheader: "Here's why, and how to list your sale again.",
@@ -332,11 +336,14 @@ module.exports = {
     isExpiredDraft,
     refundablePayments,
     EMAIL_COLOURS,
+    EMAIL_FONT,
     EMAIL_ADMIN_NOTE,
     SUPPORT_EMAIL,
+    siteBase,
     emailLayout,
     emailParagraph,
     emailList,
+    emailBox,
     emailText,
     approvalEmailHtml,
     rejectionEmailHtml,

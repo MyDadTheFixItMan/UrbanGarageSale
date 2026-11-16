@@ -26,7 +26,7 @@ import { geohashQueryBounds } from 'geofire-common';
 import { ref, deleteObject } from 'firebase/storage';
 import { auth, db, functions, storage } from './app';
 import { LISTING_STATUS, PAYMENT_STATUS, photosNoLongerUsed } from '@/lib/listings';
-import { AppError } from '@/lib/appError';
+import { AppError, toAppError } from '@/lib/appError';
 import {
   MAX_LISTINGS_PER_CELL,
   MAX_LISTINGS_UNLOCATED,
@@ -102,6 +102,16 @@ const sumOf = async (collectionName, field, ...constraints) =>
 function localIsoDate(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// Calls a Cloud Function and resolves to its result. A failure becomes an AppError that keeps the
+// server's message, which callable functions write for users (HttpsError).
+async function callFunction(name, data) {
+  try {
+    return (await httpsCallable(functions, name)(data)).data;
+  } catch (error) {
+    throw toAppError(error, 'That request failed. Please try again.');
+  }
 }
 
 // The seller's listings and waiting edits other than listing `exceptId`.
@@ -416,6 +426,37 @@ export const firebaseEntities = {
       const data = /** @type {{ postcodes?: Array<{ name: string, count: number }> }} */ (result.data);
       return data.postcodes || [];
     }
+  },
+
+  // One-use codes an admin sends a person so they can publish one listing without paying. Cloud
+  // Functions make, cancel and redeem them; only admins can read them (firestore.rules).
+  FreeListingCode: {
+    // Admin: the 50 newest codes.
+    recent: async () => toRecords(await getDocs(query(
+      collection(db, 'freeListingCodes'), orderBy('created_at', 'desc'), limit(50)
+    ))),
+
+    // Admin: makes a code, and emails it when an email address is given. Resolves to
+    // { code, emailed, expiresOn }.
+    /** @param {{ name?: string, email?: string, note?: string, expiresOn: string }} details */
+    create: (details) => callFunction('createFreeListingCode', details),
+
+    // Admin: stops an unused code from working.
+    /** @param {string} code */
+    cancel: (code) => callFunction('cancelFreeListingCode', { code }),
+
+    // Seller: whether a code can be used, without using it up. Resolves to { code, expiresOn },
+    // with the code written the standard way; rejects with the reason it can't be used.
+    /** @param {string} code */
+    check: (code) => callFunction('checkFreeListingCode', { code }),
+
+    // Seller: publishes their unpaid listing with the code. It then waits for approval like a
+    // paid listing, and the code can't be used again.
+    /**
+     * @param {string} saleId
+     * @param {string} code
+     */
+    redeem: (saleId, code) => callFunction('redeemFreeListingCode', { saleId, code }),
   },
 
   // App Settings (single document store)

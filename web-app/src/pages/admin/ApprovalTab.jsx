@@ -114,9 +114,10 @@ export default function ApprovalTab() {
         mutationFn: ({ listingId, reason }) => firebase.entities.GarageSale.reject(listingId, reason),
         onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: [ADMIN_KEY] });
-            toast.success(result?.refunded
-                ? `Listing rejected and ${formatAud(result.refunded, { withCode: true })} refunded`
-                : 'Listing rejected');
+            let message = 'Listing rejected';
+            if (result?.refunded) message = `Listing rejected and ${formatAud(result.refunded, { withCode: true })} refunded`;
+            else if (result?.returnedCodes?.length) message = 'Listing rejected. Their free listing code can be used again.';
+            toast.success(message);
             if (!result?.emailed) {
                 toast.warning("The seller couldn't be emailed. They can still see the reason on their profile.");
             }
@@ -203,7 +204,7 @@ export default function ApprovalTab() {
             <ReasonDialog
                 open={!!listingToReject}
                 title="Reject Listing"
-                description="Provide a reason for rejecting this listing. The seller sees this reason by email and on their profile. Any listing fee paid is refunded to them automatically."
+                description="Provide a reason for rejecting this listing. The seller sees this reason by email and on their profile. Any listing fee paid is refunded to them automatically, and a free listing code they used can be used again."
                 subjectLabel="Rejecting"
                 subject={listingToReject?.title}
                 confirmLabel="Reject"

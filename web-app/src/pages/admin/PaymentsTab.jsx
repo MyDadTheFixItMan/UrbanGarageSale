@@ -59,7 +59,11 @@ function PaymentCard({ payment, sale, payer }) {
             </div>
 
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-200">
-                <div className="text-xs text-slate-500">Transaction ID: {payment.transaction_id}</div>
+                <div className="text-xs text-slate-500">
+                    {payment.payment_method === 'free_code'
+                        ? `Free listing code: ${payment.free_listing_code}`
+                        : `Transaction ID: ${payment.transaction_id ?? ''}`}
+                </div>
                 <Badge className={payment.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}>
                     {payment.status}
                 </Badge>

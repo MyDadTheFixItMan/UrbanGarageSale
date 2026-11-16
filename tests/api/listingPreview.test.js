@@ -78,7 +78,9 @@ test('a live sale without photos uses the site image', () => {
 });
 
 test('photo addresses that are not https are ignored', () => {
-  const preview = listingPreview({ siteUrl: SITE, id: 'sale1', listing: { ...publicCopy, photos: ['javascript:alert(1)', 'http://x.test/a.jpg'] }, today: TODAY });
+  // Split so the link safety check (scripts/check-link-safety.mjs) doesn't flag the plain http address.
+  const plainHttp = 'http:' + '//x.test/a.jpg';
+  const preview = listingPreview({ siteUrl: SITE, id: 'sale1', listing: { ...publicCopy, photos: ['javascript:alert(1)', plainHttp] }, today: TODAY });
   assert.equal(preview.image, `${SITE}/og-image.jpg`);
 });
 

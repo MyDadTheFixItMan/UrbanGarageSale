@@ -204,6 +204,23 @@ export default function ListingDetails() {
         </div>
     );
 
+    // Sale type and title. Shown above the photos on mobile, and at the top of the
+    // details column on desktop.
+    const saleHeader = (
+        <>
+            <div className="flex items-center gap-2 mb-3">
+                {sale.sale_type && (
+                    <Badge className="bg-navy text-white">
+                        {SALE_TYPE_LABELS[sale.sale_type]}
+                    </Badge>
+                )}
+            </div>
+            <h1 className="text-3xl font-bold text-navy mb-2">
+                {sale.title}
+            </h1>
+        </>
+    );
+
     const startDate = parseISO(sale.start_date);
     const endDate = parseISO(sale.end_date);
     const durationDays = differenceInDays(endDate, startDate) + 1;
@@ -269,6 +286,7 @@ export default function ListingDetails() {
                     {/* Image Gallery. On desktop both columns stretch to the same height, and the
                         description and Where boxes grow so their bottoms line up. */}
                     <div className="flex flex-col gap-4">
+                        <div className="lg:hidden">{saleHeader}</div>
                         <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
                             {sale.photos && sale.photos.length > 0 ? (
                                 <img
@@ -313,19 +331,10 @@ export default function ListingDetails() {
 
                     {/* Details */}
                     <div className="flex flex-col gap-6">
-                        {/* Header */}
-                        <div>
-                            <div className="flex items-center gap-2 mb-3">
-                                {sale.sale_type && (
-                                    <Badge className="bg-navy text-white">
-                                        {SALE_TYPE_LABELS[sale.sale_type]}
-                                    </Badge>
-                                )}
-                            </div>
-                            <h1 className="text-3xl font-bold text-navy mb-2">
-                                {sale.title}
-                            </h1>
-                            <div className="hidden lg:block mt-4">{actionButtons}</div>
+                        {/* Header (desktop; on mobile it sits above the photos) */}
+                        <div className="hidden lg:block">
+                            {saleHeader}
+                            <div className="mt-4">{actionButtons}</div>
                         </div>
 
                         {/* Date & Time */}

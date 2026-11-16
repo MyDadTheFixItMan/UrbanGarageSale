@@ -40,6 +40,14 @@ export const isUnpaidDraft = (listing) =>
 export const canBeSaved = (listing, today = format(new Date(), 'yyyy-MM-dd')) =>
     listing.status === LISTING_STATUS.ACTIVE && (!listing.end_date || listing.end_date >= today);
 
+// The same sales can be shared: visitors who open a shared link can only see approved sales, and a
+// finished one is no use to them.
+export const canBeShared = (listing, today) => canBeSaved(listing, today);
+
+// Finished: marked completed, or its last day has passed and the nightly job hasn't marked it yet.
+export const hasFinished = (listing, today = format(new Date(), 'yyyy-MM-dd')) =>
+    listing.status === LISTING_STATUS.COMPLETED || Boolean(listing.end_date && listing.end_date < today);
+
 // The photo URLs `before` used that none of `stillUsed` do, so they can be deleted from Storage.
 export function photosNoLongerUsed(before, ...stillUsed) {
     const urls = (listing) => [...(listing?.photos ?? []), ...(listing?.thumbnails ?? [])].filter(Boolean);

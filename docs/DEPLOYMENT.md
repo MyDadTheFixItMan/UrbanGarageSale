@@ -28,6 +28,20 @@ override `web-app/.env.production` at build time:
 | `VITE_BUSINESS_ABN` | Optional. Shown in the footer and Terms when set. |
 | other `VITE_FIREBASE_*`, `VITE_API_BASE_URL` | From `web-app/.env.production` — see `web-app/.env.example` |
 
+### Link previews for shared listings
+
+Facebook, WhatsApp, iMessage and other apps show a photo and details under a shared link by
+reading the page's Open Graph tags, but their preview bots don't run JavaScript, so they can't
+read the website's listing pages. `web-app/vercel.json` rewrites `/ListingDetails?id=…` requests
+from those bots (matched by user agent) to the API's `/api/listingPreview`, which returns the
+tags for that sale. People, and search engines, still get the website. The rewrite points at the
+production API, so deploy the API first (the order above already does). Other pages use the
+site-wide tags in `web-app/index.html` and `web-app/public/og-image.jpg`.
+
+To check a listing's preview after deploying, paste its link into Facebook's
+[Sharing Debugger](https://developers.facebook.com/tools/debug/); "Scrape Again" refreshes
+Facebook's copy after a change.
+
 ## 2. API (Vercel project `urban-garage-sale`)
 
 ```bash

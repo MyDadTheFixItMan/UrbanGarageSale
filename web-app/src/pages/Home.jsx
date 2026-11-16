@@ -14,6 +14,13 @@ import { calculateDistance, toLocalIsoDate } from '@/api/firebase/listingSearch'
 import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
 import { useToggleSaved } from '@/lib/useToggleSaved';
 
+const DEFAULT_FILTERS = {
+    postcode: '',
+    distance: '25',
+    saleType: 'all',
+    saleDate: '',
+};
+
 export default function Home() {
     const [, startTransition] = useTransition();
     const [viewMode, setViewMode] = useState('list');
@@ -27,17 +34,28 @@ export default function Home() {
     const [promoIndex, setPromoIndex] = useState(0);
     const [saleTypeIndex, setSaleTypeIndex] = useState(0);
     const saleTypeLabels = ['Garage', 'Clearing', 'Street', 'Yard', 'Estate', 'Moving'];
-    const [filters, setFilters] = useState({
-        postcode: '',
-        distance: '25',
-        saleType: 'all',
-        saleDate: '',
-    });
+    const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
     // Restore the last search's filters and search again, so a sale that has since been deleted,
     // rejected or changed never shows. Results used to be saved here too; clear any left behind.
     useEffect(() => {
         localStorage.removeItem('homeSearchResults');
+
+        // A link can ask for sales near a suburb or postcode (?near=Brunswick, ?near=3056), or near
+        // the visitor with ?near=me, which asks for their location. The page of a finished sale
+        // links here that way.
+        const params = new URLSearchParams(window.location.search);
+        const near = params.get('near')?.trim().slice(0, 60);
+        if (near) {
+            params.delete('near');
+            const rest = params.toString();
+            window.history.replaceState(window.history.state, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
+            const nearFilters = { ...DEFAULT_FILTERS, postcode: near.toLowerCase() === 'me' ? '' : near };
+            setFilters(nearFilters);
+            runSearch(nearFilters);
+            return;
+        }
+
         const savedFilters = localStorage.getItem('homeSearchFilters');
         if (!savedFilters) return;
         try {

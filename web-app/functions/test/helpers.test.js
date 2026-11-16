@@ -149,7 +149,8 @@ test('rejectionEmailHtml tells the seller a free listing code they used works ag
 test('approvalEmailHtml names the listing and escapes its title', () => {
     const html = approvalEmailHtml({ title: '<b>Sale</b>', saleId: 'abc123', siteUrl: 'https://example.com/' });
     assert.match(html, /has been approved/);
-    assert.match(html, /href="https:\/\/example\.com\/ListingDetails\?id=abc123"/);
+    // Opens the listing with its share options showing.
+    assert.match(html, /href="https:\/\/example\.com\/ListingDetails\?id=abc123&amp;share=1"[^>]*>View and share your listing</);
     assert.match(html, /&lt;b&gt;Sale&lt;\/b&gt;/);
     assert.doesNotMatch(html, /<b>Sale<\/b>/);
 });
@@ -184,7 +185,7 @@ test('emailText keeps link addresses and drops the hidden preview line', () => {
     const text = emailText(approvalEmailHtml({ title: "Tom & Sue's sale", saleId: 's1', siteUrl: 'https://example.com' }));
     assert.match(text, /^Urban Garage Sale \(https:\/\/example\.com\)\n\nYour garage sale is live!/);
     assert.match(text, /Tom & Sue's sale/);
-    assert.match(text, /View your listing \(https:\/\/example\.com\/ListingDetails\?id=s1\)/);
-    assert.match(text, /- Share your listing/);
+    assert.match(text, /View and share your listing \(https:\/\/example\.com\/ListingDetails\?id=s1&share=1\)/);
+    assert.match(text, /- Share it in local buy, swap and sell groups/);
     assert.doesNotMatch(text, /buyers can now find it\./);
 });

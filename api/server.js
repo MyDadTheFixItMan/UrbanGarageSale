@@ -31,6 +31,7 @@ app.use(express.json({ limit: '1mb' }));
 
 // Route path -> handler module (relative to this folder)
 const routes = {
+  '/api/listingPreview': './listingPreview.js',
   '/api/setUserClaims': './setUserClaims.ts',
   '/api/stripeTerminal/createConnectionToken': './stripeTerminal/createConnectionToken.js',
   '/api/urbanPayment/createPaymentIntent': './urbanPayment/createPaymentIntent.js',

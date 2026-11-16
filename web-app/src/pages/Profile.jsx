@@ -14,6 +14,7 @@ import { displayAddress } from '@/lib/addressDetails';
 import { groupProfileListings } from './profile/profileListings';
 import { useCardPayments } from './profile/useCardPayments';
 import ProfileListingCard from './profile/ProfileListingCard';
+import ShareListingDialog from '@/components/listings/ShareListingDialog';
 import { EditProfileDialog, ChangePasswordDialog, PrintSignDialog, StripeSetupDialog } from './profile/ProfileDialogs';
 
 const DONE_BUTTON = 'bg-green-100 border border-green-300 text-green-700 hover:bg-green-100 cursor-not-allowed opacity-75';
@@ -43,7 +44,7 @@ function DetailItem({ icon: Icon, label, value }) {
     );
 }
 
-function ListingGrid({ loading, listings, edits = [], empty, onDelete, onPrint }) {
+function ListingGrid({ loading, listings, edits = [], empty, onDelete, onPrint, onShare }) {
     if (loading) {
         return (
             <div className="flex justify-center py-12">
@@ -63,6 +64,7 @@ function ListingGrid({ loading, listings, edits = [], empty, onDelete, onPrint }
                     edit={edits.find((edit) => edit.id === listing.id)}
                     onDelete={onDelete}
                     onPrint={onPrint}
+                    onShare={onShare}
                 />
             ))}
         </div>
@@ -76,6 +78,7 @@ export default function Profile() {
     const [twoFADialogOpen, setTwoFADialogOpen] = useState(false);
     const [stripeDialogOpen, setStripeDialogOpen] = useState(false);
     const [printingListing, setPrintingListing] = useState(null);
+    const [sharingListing, setSharingListing] = useState(null);
     const cardPayments = useCardPayments(user, setUser);
 
     useEffect(() => {
@@ -161,6 +164,12 @@ export default function Profile() {
     return (
         <div className="min-h-screen bg-brand-cream overflow-hidden pb-24 md:pb-0">
             <PrintSignDialog listing={printingListing} onClose={() => setPrintingListing(null)} onPrint={handlePrint} />
+            <ShareListingDialog
+                listing={sharingListing}
+                open={Boolean(sharingListing)}
+                onOpenChange={(open) => !open && setSharingListing(null)}
+                promote
+            />
 
             {/* Watermark */}
             <style>{`
@@ -307,6 +316,7 @@ export default function Profile() {
                                 edits={listingEdits}
                                 onDelete={deleteMutation.mutate}
                                 onPrint={setPrintingListing}
+                                onShare={setSharingListing}
                                 empty={(
                                     <>
                                         <Tag className="w-12 h-12 text-slate-300 mx-auto mb-4" />

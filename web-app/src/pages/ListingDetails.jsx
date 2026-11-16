@@ -266,8 +266,9 @@ export default function ListingDetails() {
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Image Gallery */}
-                    <div className="space-y-4">
+                    {/* Image Gallery. On desktop both columns stretch to the same height, and the
+                        description and Where boxes grow so their bottoms line up. */}
+                    <div className="flex flex-col gap-4">
                         <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
                             {sale.photos && sale.photos.length > 0 ? (
                                 <img
@@ -303,7 +304,7 @@ export default function ListingDetails() {
                         )}
                         {/* Description, under the photos */}
                         {sale.description && (
-                            <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+                            <div className="lg:flex-1 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
                                 <h3 className="font-semibold text-navy mb-3">About This Sale</h3>
                                 <p className="text-slate-600 whitespace-pre-wrap">{sale.description}</p>
                             </div>
@@ -311,7 +312,7 @@ export default function ListingDetails() {
                     </div>
 
                     {/* Details */}
-                    <div className="space-y-6">
+                    <div className="flex flex-col gap-6">
                         {/* Header */}
                         <div>
                             <div className="flex items-center gap-2 mb-3">
@@ -360,7 +361,7 @@ export default function ListingDetails() {
                         </div>
 
                         {/* Location */}
-                        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+                        <div className="lg:flex-1 flex flex-col bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
                             <h3 className="font-semibold text-navy mb-4">Where</h3>
                             <div className="flex items-start gap-3 mb-4">
                                 <div className="w-10 h-10 rounded-xl bg-navy/10 flex items-center justify-center flex-shrink-0">
@@ -389,12 +390,15 @@ export default function ListingDetails() {
                             </div>
 
                             {sale.latitude && sale.longitude && (
-                                <div className="h-48 rounded-xl overflow-hidden">
-                                    <SaleMap
-                                        sales={[sale]}
-                                        center={[sale.latitude, sale.longitude]}
-                                        zoom={sale.approximate_location ? 13 : 15}
-                                    />
+                                // The map fills the box's spare height on desktop, never shorter than on phones.
+                                <div className="relative h-48 lg:h-auto lg:min-h-64 lg:flex-1 rounded-xl overflow-hidden">
+                                    <div className="absolute inset-0">
+                                        <SaleMap
+                                            sales={[sale]}
+                                            center={[sale.latitude, sale.longitude]}
+                                            zoom={sale.approximate_location ? 13 : 15}
+                                        />
+                                    </div>
                                 </div>
                             )}
                             {sale.approximate_location && (

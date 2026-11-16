@@ -1,74 +1,50 @@
+// Removes favourites (savedListings) whose listing is gone or no longer live: deleted, ended,
+// rejected or unpublished. The removeEndedFavourites Cloud Function does this as listings stop
+// being live; this clears ones left from before it existed.
+//
+//   node scripts/cleanup-orphaned-saved-listings.js          dry run: counts what it would delete
+//   node scripts/cleanup-orphaned-saved-listings.js --go     deletes them
 import 'dotenv/config';
 import { getFirebaseAdmin } from '../api/_shared/firebase-admin.js';
 
+const GO = process.argv.includes('--go');
+
 async function cleanupOrphanedSavedListings() {
-  const admin = getFirebaseAdmin();
-  const db = admin.firestore();
+  const db = getFirebaseAdmin().firestore();
 
-  const [savedSnapshot, salesSnapshot] = await Promise.all([
-    db.collection('savedListings').get(),
-    db.collection('garageSales').get(),
-  ]);
+  const saved = (await db.collection('savedListings').get()).docs;
+  const saleIds = [...new Set(saved.map((doc) => doc.data().garage_sale_id).filter(Boolean))];
+  const sales = saleIds.length ? await db.getAll(...saleIds.map((id) => db.collection('garageSales').doc(id))) : [];
+  const liveIds = new Set(sales.filter((s) => s.exists && s.data().status === 'active').map((s) => s.id));
 
-  const existingSaleIds = new Set(salesSnapshot.docs.map((doc) => doc.id));
-
-  let deleted = 0;
-  let missingGarageSaleId = 0;
-  let totalSaved = savedSnapshot.size;
-
-  let batch = db.batch();
-  let opsInBatch = 0;
-
-  for (const doc of savedSnapshot.docs) {
-    const data = doc.data();
-    const saleId = data.garage_sale_id;
-
-    // Invalid record shape is treated as orphaned for consistency.
-    if (!saleId) {
-      batch.delete(doc.ref);
-      missingGarageSaleId++;
-      deleted++;
-      opsInBatch++;
-    } else if (!existingSaleIds.has(saleId)) {
-      batch.delete(doc.ref);
-      deleted++;
-      opsInBatch++;
-    }
-
-    if (opsInBatch >= 450) {
-      await batch.commit();
-      batch = db.batch();
-      opsInBatch = 0;
-    }
+  // A record without a listing ID is treated as orphaned too.
+  const orphans = saved.filter((doc) => !liveIds.has(doc.data().garage_sale_id));
+  const reasons = {};
+  for (const doc of orphans) {
+    const sale = sales.find((s) => s.id === doc.data().garage_sale_id);
+    const reason = !doc.data().garage_sale_id ? 'no listing ID' : sale?.exists ? sale.data().status || 'no status' : 'listing deleted';
+    reasons[reason] = (reasons[reason] || 0) + 1;
   }
 
-  if (opsInBatch > 0) {
+  console.log(JSON.stringify({ project: process.env.FIREBASE_PROJECT_ID || 'urbangaragesale', totalSaved: saved.length, orphaned: orphans.length, reasons }, null, 2));
+  if (!GO) {
+    console.log('Dry run: nothing deleted. Add --go to delete.');
+    return;
+  }
+
+  for (let i = 0; i < orphans.length; i += 400) {
+    const batch = db.batch();
+    orphans.slice(i, i + 400).forEach((doc) => batch.delete(doc.ref));
     await batch.commit();
   }
 
-  const verifySavedSnapshot = await db.collection('savedListings').get();
-  let remainingOrphans = 0;
-
-  for (const doc of verifySavedSnapshot.docs) {
-    const saleId = doc.data().garage_sale_id;
-    if (!saleId || !existingSaleIds.has(saleId)) {
-      remainingOrphans++;
-    }
-  }
-
-  console.log(JSON.stringify({
-    collection: 'savedListings',
-    totalScanned: totalSaved,
-    deletedOrphanedSavedListings: deleted,
-    deletedMissingGarageSaleId: missingGarageSaleId,
-    remainingTotal: verifySavedSnapshot.size,
-    remainingOrphanedSavedListings: remainingOrphans,
-  }, null, 2));
+  const remaining = await db.collection('savedListings').count().get();
+  console.log(`Deleted ${orphans.length}. ${remaining.data().count} favourite(s) remain.`);
 }
 
 cleanupOrphanedSavedListings()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error('Failed to cleanup orphaned saved listings:', error.message);
+    console.error('Failed to clean up orphaned saved listings:', error.message);
     process.exit(1);
   });

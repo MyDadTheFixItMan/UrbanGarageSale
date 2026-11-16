@@ -837,6 +837,18 @@ exports.syncPublicListing = onDocumentWritten({ document: 'garageSales/{saleId}'
     else await publicRef.delete();
 });
 
+// Removes buyers' favourites of a listing once it stops being live: ended (by the seller or by
+// expireListings), unpublished by an admin, or deleted. Only live listings can be saved, so a
+// listing that was never live has none. Deleting is safe to repeat, so failed runs are retried.
+// scripts/cleanup-orphaned-saved-listings.js clears ones left from before this existed.
+exports.removeEndedFavourites = onDocumentWritten({ document: 'garageSales/{saleId}', region: DATABASE_REGION, retry: true }, async (event) => {
+    const wasLive = event.data?.before?.data()?.status === 'active';
+    const isLive = event.data?.after?.data()?.status === 'active';
+    if (!wasLive || isLive) return;
+    const removed = await deleteQueryInBatches(db.collection('savedListings').where('garage_sale_id', '==', event.params.saleId));
+    if (removed) logger.info(`Removed ${removed} favourite(s) of ended listing ${event.params.saleId}`);
+});
+
 // Checks a listing each time it reaches, or is edited while awaiting, approval.
 exports.reviewNewListing = reviewTrigger('garageSales/{saleId}', async (event) => {
     if (REVIEW_MODE === 'off') return;

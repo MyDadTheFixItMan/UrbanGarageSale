@@ -184,7 +184,8 @@ function adminReviewEmailHtml({ kind, listing, verdict, adminUrl, siteUrl }) {
         body: [
             emailParagraph(outcome),
             problems,
-            `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 0 16px;font-size:15px;">${rows}</table>`,
+            // The space below is a padded cell, not a margin, because Outlook ignores margins on tables.
+            `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="padding:0 0 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:15px;">${rows}</table></td></tr></table>`,
         ].join('\n'),
         button: { label: 'Open the Approval tab', url: adminUrl },
         signoff: false,

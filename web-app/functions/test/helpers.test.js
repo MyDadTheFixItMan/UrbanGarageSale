@@ -169,7 +169,7 @@ test('every email has the same logo, button, footer and plain-text copy', () => 
         contactResponseEmailHtml({ responseMessage: 'Yes', siteUrl: 'https://example.com' }),
     ];
     for (const html of emails) {
-        assert.match(html, /<img src="https:\/\/example\.com\/email-logo\.png"[^>]*alt="Urban Garage Sale"/);
+        assert.match(html, /<img src="https:\/\/www\.urbangaragesales\.com\.au\/email-logo\.png"[^>]*alt="Urban Garage Sale"/);
         assert.match(html, /bgcolor="#c2410c"/);
         assert.match(html, /href="https:\/\/example\.com\/Privacy"/);
         assert.match(html, /admin@urbangaragesales\.com\.au/);

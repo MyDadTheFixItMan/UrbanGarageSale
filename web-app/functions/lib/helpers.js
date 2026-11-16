@@ -189,12 +189,13 @@ function approvalEmailHtml({ title, saleId, siteUrl }) {
             emailParagraph(`Great news! ${listingName(title)} has been approved and is now live on Urban Garage Sale, so buyers near you can find it.`),
             emailParagraph('<strong>A few tips for a great sale:</strong>'),
             emailList([
-                'Share your listing with friends, family and local community groups.',
+                'Share it in local buy, swap and sell groups, on Instagram and with friends. The Share button on your listing has its link, a flyer image and words for your post.',
                 'Put up signs on the day so passers-by can find you.',
                 'Price items clearly and have some change ready.',
             ]),
         ].join('\n'),
-        button: { label: 'View your listing', url: saleId ? `${site}/ListingDetails?id=${encodeURIComponent(saleId)}` : `${site}/Profile` },
+        // share=1 opens the listing's share options as soon as it loads.
+        button: { label: 'View and share your listing', url: saleId ? `${site}/ListingDetails?id=${encodeURIComponent(saleId)}&share=1` : `${site}/Profile` },
         note: EMAIL_SELLER_NOTE,
     });
 }

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { firebase } from '@/api/firebaseClient';
 import { useQuery } from '@tanstack/react-query';
-import { canBeSaved, SALE_TYPE_LABELS } from '@/lib/listings';
+import { canBeSaved, canBeShared, hasFinished, SALE_TYPE_LABELS } from '@/lib/listings';
+import { listingShareUrl, openShareSheet, shareSheetData, SHARE_CHANNELS } from '@/lib/share';
 import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
+import ShareListingDialog from '@/components/listings/ShareListingDialog';
 import { usePromotions } from '@/lib/usePromotions';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
@@ -28,12 +30,17 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 
+// The home page searches near the visitor (it asks for their location) with ?near=me.
+const NEARBY_SALES_URL = `${createPageUrl('Home')}?near=me`;
+
 export default function ListingDetails() {
     const urlParams = new URLSearchParams(window.location.search);
     const saleId = urlParams.get('id');
     // Opened from the admin dashboard: go back to the tab it was opened from.
     const adminTab = ADMIN_TABS.includes(urlParams.get('adminTab')) ? urlParams.get('adminTab') : null;
     const backUrl = adminTab ? createPageUrl(`AdminDashboard?tab=${adminTab}`) : createPageUrl('Home');
+    // The seller's "your sale is live" email links here with ?share=1, to open the share options.
+    const shareRequested = urlParams.get('share') === '1';
 
     const [user, setUser] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -41,6 +48,8 @@ export default function ListingDetails() {
     const [promoIndex, setPromoIndex] = useState(0);
     const [printDialogOpen, setPrintDialogOpen] = useState(false);
     const [selectedPrintSize, setSelectedPrintSize] = useState('A4');
+    const [shareOpen, setShareOpen] = useState(false);
+    const [sharingFromEmail, setSharingFromEmail] = useState(false);
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -73,7 +82,9 @@ export default function ListingDetails() {
         queryKey: ['sale', saleId],
         queryFn: async () => {
             const sales = await firebase.entities.GarageSale.filter({ id: saleId });
-            return sales[0];
+            // null, not undefined: React Query treats undefined as a failure and tries again,
+            // which kept people from an old link waiting before the "finished" page showed.
+            return sales[0] ?? null;
         },
         enabled: !!saleId,
     });
@@ -87,31 +98,36 @@ export default function ListingDetails() {
     const isSaved = savedListings.some(s => s.garage_sale_id === saleId);
     const saveMutation = useToggleSaved();
 
+    // Opens the share options once the sale has loaded, then takes ?share=1 out of the address so
+    // a reload, or a copy of the address, doesn't open them again.
+    useEffect(() => {
+        if (!shareRequested || !sale || !canBeShared(sale)) return;
+        setSharingFromEmail(true);
+        setShareOpen(true);
+        const params = new URLSearchParams(window.location.search);
+        params.delete('share');
+        window.history.replaceState(window.history.state, '', `${window.location.pathname}?${params}`);
+    }, [shareRequested, sale]);
+
     // Same links as Route to All: Apple Maps on Apple devices, Google Maps elsewhere.
     const handleGetDirections = () => {
         const location = saleLocation(sale);
         if (location) window.open(directionsUrl(undefined, [location]), '_blank');
     };
 
-    const handleShare = async () => {
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: sale?.title,
-                    text: `Check out this garage sale: ${sale?.title}`,
-                    url: window.location.href,
-                });
-            } catch {
-                // User cancelled
-            }
-        } else {
-            navigator.clipboard.writeText(window.location.href);
-            toast.success('Link copied to clipboard');
-        }
-    };
-
-    // Only the seller prints signs for their sale.
+    // Only the seller prints signs for their sale, and gets the flyer and post text for sharing it.
     const isOwner = Boolean(user?.id) && user.id === sale?.user_id;
+
+    // Sellers get every way to share. Visitors go straight to their device's share sheet, or get
+    // the share options where there isn't one.
+    const handleShare = async () => {
+        if (isOwner) {
+            setShareOpen(true);
+            return;
+        }
+        const url = listingShareUrl(window.location.origin, sale.id, SHARE_CHANNELS.SHARE_SHEET);
+        if (await openShareSheet(shareSheetData(sale, url)) === 'unavailable') setShareOpen(true);
+    };
 
     const handlePrintSignConfirm = () => {
         if (sale && isOwner) {
@@ -130,17 +146,29 @@ export default function ListingDetails() {
         );
     }
 
+    // Usually an old shared link to a sale that has since finished (finished sales are no longer
+    // public), so point people at the sales that are on instead.
     if (!sale) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center p-4">
+            <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center">
                 <Tag className="w-16 h-16 text-slate-300 mb-4" />
-                <h1 className="text-2xl font-semibold text-navy mb-2">Listing Not Found</h1>
-                <p className="text-slate-500 mb-6">This listing may have been removed or expired.</p>
-                <Link to={createPageUrl('Home')}>
-                    <Button className="bg-navy hover:bg-navy-dark">
-                        Back to Home
-                    </Button>
-                </Link>
+                <h1 className="text-2xl font-semibold text-navy mb-2">This sale has finished</h1>
+                <p className="text-slate-500 mb-6 max-w-sm">
+                    It's over or has been taken down, but there are other sales on near you.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <Link to={NEARBY_SALES_URL}>
+                        <Button className="w-full bg-navy hover:bg-navy-dark gap-2">
+                            <MapPin className="w-4 h-4" />
+                            Find sales near you
+                        </Button>
+                    </Link>
+                    <Link to={createPageUrl('CreateListing')}>
+                        <Button variant="outline" className="w-full">
+                            List your own sale
+                        </Button>
+                    </Link>
+                </div>
             </div>
         );
     }
@@ -159,17 +187,23 @@ export default function ListingDetails() {
         );
     }
 
+    // Only sales buyers can see are worth sharing: not ones awaiting approval or finished.
+    const shareable = canBeShared(sale);
+    const finished = hasFinished(sale);
+
     // Shown under the title on wide screens, and pinned to the bottom of the screen otherwise.
     const actionButtons = (
         <div className="flex gap-3">
-            <Button
-                variant="outline"
-                onClick={handleShare}
-                className="flex-shrink-0 bg-white"
-                aria-label="Share this listing"
-            >
-                <Share2 className="w-5 h-5" />
-            </Button>
+            {shareable && (
+                <Button
+                    variant="outline"
+                    onClick={handleShare}
+                    className="flex-shrink-0 bg-white"
+                    aria-label="Share this listing"
+                >
+                    <Share2 className="w-5 h-5" />
+                </Button>
+            )}
 
             {isOwner && (
                 <Button
@@ -202,23 +236,6 @@ export default function ListingDetails() {
                 </Link>
             )}
         </div>
-    );
-
-    // Sale type and title. Shown above the photos on mobile, and at the top of the
-    // details column on desktop.
-    const saleHeader = (
-        <>
-            <div className="flex items-center gap-2 mb-3">
-                {sale.sale_type && (
-                    <Badge className="bg-navy text-white">
-                        {SALE_TYPE_LABELS[sale.sale_type]}
-                    </Badge>
-                )}
-            </div>
-            <h1 className="text-3xl font-bold text-navy mb-2">
-                {sale.title}
-            </h1>
-        </>
     );
 
     const startDate = parseISO(sale.start_date);
@@ -281,12 +298,44 @@ export default function ListingDetails() {
                 </div>
             </div>
 
+            {/* A sale that's over: its seller or an admin looking back at it, or anyone before the
+                nightly job takes it down. */}
+            {finished && (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 mb-6">
+                    <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <p className="font-medium text-navy">This sale has finished.</p>
+                        <Link to={NEARBY_SALES_URL}>
+                            <Button variant="outline" className="gap-2">
+                                <MapPin className="w-4 h-4" />
+                                Find sales near you
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+            )}
+
             <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* The header is in the page once: above the photos on phones, and at the top of the
+                    right-hand column on desktop, where the photos span both rows beside it. */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-[auto_1fr] gap-4 lg:gap-x-8 lg:gap-y-6">
+                    {/* Header */}
+                    <div className="lg:col-start-2 lg:row-start-1">
+                        <div className="flex items-center gap-2 mb-3">
+                            {sale.sale_type && (
+                                <Badge className="bg-navy text-white">
+                                    {SALE_TYPE_LABELS[sale.sale_type]}
+                                </Badge>
+                            )}
+                        </div>
+                        <h1 className="text-3xl font-bold text-navy mb-2">
+                            {sale.title}
+                        </h1>
+                        <div className="hidden lg:block mt-4">{actionButtons}</div>
+                    </div>
+
                     {/* Image Gallery. On desktop both columns stretch to the same height, and the
                         description and Where boxes grow so their bottoms line up. */}
-                    <div className="flex flex-col gap-4">
-                        <div className="lg:hidden">{saleHeader}</div>
+                    <div className="flex flex-col gap-4 lg:col-start-1 lg:row-start-1 lg:row-span-2">
                         <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
                             {sale.photos && sale.photos.length > 0 ? (
                                 <img
@@ -330,13 +379,7 @@ export default function ListingDetails() {
                     </div>
 
                     {/* Details */}
-                    <div className="flex flex-col gap-6">
-                        {/* Header (desktop; on mobile it sits above the photos) */}
-                        <div className="hidden lg:block">
-                            {saleHeader}
-                            <div className="mt-4">{actionButtons}</div>
-                        </div>
-
+                    <div className="flex flex-col gap-6 mt-4 lg:mt-0 lg:col-start-2 lg:row-start-2">
                         {/* Date & Time */}
                         <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
                             <h3 className="font-semibold text-navy mb-4">When</h3>
@@ -424,6 +467,13 @@ export default function ListingDetails() {
             <div className="sticky bottom-20 md:bottom-0 z-30 mt-8 bg-white border-t p-4 lg:hidden">
                 <div className="max-w-7xl mx-auto">{actionButtons}</div>
             </div>
+
+            <ShareListingDialog
+                listing={sale}
+                open={shareOpen}
+                onOpenChange={setShareOpen}
+                promote={isOwner || sharingFromEmail}
+            />
 
             {/* Print Size Selection Dialog */}
             <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
-import { Trash2, Eye, Pencil, Printer } from 'lucide-react';
+import { Trash2, Eye, Pencil, Printer, Share2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -30,7 +30,7 @@ const statusConfig = {
     rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700' },
 };
 
-export default function ProfileListingCard({ listing, edit, onDelete, onPrint }) {
+export default function ProfileListingCard({ listing, edit, onDelete, onPrint, onShare }) {
     const status = statusConfig[listing.status] || statusConfig.draft;
     const actions = listingActions(listing);
 
@@ -82,6 +82,17 @@ export default function ProfileListingCard({ listing, edit, onDelete, onPrint })
                         <p className="whitespace-pre-line break-words">{edit.refusal_reason}</p>
                         <p className="mt-1">Your listing is still live as it was.</p>
                     </div>
+                )}
+
+                {actions.share && onShare && (
+                    <Button
+                        size="sm"
+                        className="w-full h-9 mb-3 text-sm font-medium bg-navy hover:bg-navy-dark"
+                        onClick={() => onShare(listing)}
+                    >
+                        <Share2 className="w-4 h-4 mr-1.5" />
+                        Share your sale
+                    </Button>
                 )}
 
                 <div className="flex gap-3">

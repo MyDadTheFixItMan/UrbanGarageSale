@@ -4,6 +4,22 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/ListingDetails",
+      "has": [
+        {
+          "type": "query",
+          "key": "id",
+          "value": "(?<id>[A-Za-z0-9_-]{1,128})"
+        },
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|WhatsApp|Slackbot|LinkedInBot|TelegramBot|Discordbot|Pinterestbot|Pinterest/0\\.|SkypeUriPreview|redditbot|Snap URL Preview|Mastodon/|Cardyb|Embedly|Iframely).*"
+        }
+      ],
+      "destination": "https://urban-garage-sale.vercel.app/api/listingPreview?id=:id"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }

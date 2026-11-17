@@ -3,16 +3,10 @@ import { firebase } from '@/api/firebaseClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import {
-    Heart, Loader2, MapPin, Clock, Route
-} from 'lucide-react';
+import { Heart, Loader2, Route } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { format, parseISO, isToday, isTomorrow } from 'date-fns';
-import { coverImage } from '@/lib/listings';
-import { formatTimeAU } from '@/lib/format';
-import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
+import ListingCard from '@/components/listings/ListingCard';
 import { geocode } from '@/lib/geocode';
 import { directionsUrl, fullHomeAddress, orderStopsFrom, saleLocation } from '@/lib/route';
 import {
@@ -131,13 +125,6 @@ export default function SavedListings() {
         window.open(directionsUrl(homeAddress, stops.map(saleLocation)), '_blank');
     };
 
-    const getDateLabel = (sale) => {
-        const startDate = parseISO(sale.start_date);
-        if (isToday(startDate)) return 'Today';
-        if (isTomorrow(startDate)) return 'Tomorrow';
-        return format(startDate, 'EEE, MMM d');
-    };
-
     if (loading || savedLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -181,7 +168,7 @@ export default function SavedListings() {
             )}
 
             <section className="relative bg-brand-cream py-16 px-4 sm:px-6 overflow-hidden">
-            <div className="max-w-4xl mx-auto pt-2 md:pt-4 relative z-10">
+            <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
@@ -226,105 +213,61 @@ export default function SavedListings() {
                         </Link>
                     </div>
                 ) : (
-                    <div className="space-y-4 relative z-20">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 relative z-20">
                         {savedSales.map((sale) => {
                             const savedRecord = savedListings.find(s => s.garage_sale_id === sale.id);
-                            
+
                             return (
-                                <div
+                                <ListingCard
                                     key={savedRecord?.id || sale.id}
-                                    className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-all duration-300"
-                                >
-                                    <div className="flex flex-col sm:flex-row">
-                                        {/* Image */}
-                                        <Link
-                                            to={createPageUrl(`ListingDetails?id=${sale.id}`)}
-                                            className="w-full sm:w-48 h-48 sm:h-auto flex-shrink-0 bg-slate-100"
-                                        >
-                                            {coverImage(sale) ? (
-                                                <img
-                                                    src={coverImage(sale)}
-                                                    alt={sale.title}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <ListingPlaceholder saleType={sale.sale_type} />
-                                            )}
-                                        </Link>
-
-                                        {/* Content */}
-                                        <div className="flex-1 p-6">
-                                            <div className="flex items-start justify-between mb-3">
-                                                <div>
-                                                    <Badge className="bg-navy/10 text-navy mb-2">
-                                                        {getDateLabel(sale)}
-                                                    </Badge>
-                                                    <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)}>
-                                                        <h3 className="text-lg font-semibold text-navy hover:text-navy-light transition-colors">
-                                                            {sale.title}
-                                                        </h3>
-                                                    </Link>
-                                                </div>
-
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="text-red-400 hover:text-red-500 hover:bg-red-50"
-                                                        >
-                                                            <Heart className="w-5 h-5 fill-current" />
-                                                        </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Remove from Favourites?</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                               This will remove the listing from your favourites.
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction
-                                                                onClick={() => removeMutation.mutate(savedRecord.id)}
-                                                                className="bg-red-500 hover:bg-red-600"
-                                                            >
-                                                                Remove
-                                                            </AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                            </div>
-
-                                            <div className="space-y-2 text-sm text-slate-500 mb-4">
-                                                <div className="flex items-center gap-2">
-                                                    <MapPin className="w-4 h-4 text-slate-400" />
-                                                    <span>{sale.address}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Clock className="w-4 h-4 text-slate-400" />
-                                                    <span>{formatTimeAU(sale.start_time)}–{formatTimeAU(sale.end_time)}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex gap-3">
-                                                <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)}>
-                                                    <Button variant="outline" size="sm">
-                                                        View Details
-                                                    </Button>
-                                                </Link>
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() => handleGetDirections(sale)}
-                                                    className="bg-navy hover:bg-navy-dark gap-2"
+                                    sale={sale}
+                                    action={(
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    className="bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-shadow"
+                                                    aria-label="Remove from favourites"
                                                 >
-                                                    <Route className="w-4 h-4" />
-                                                    Route
-                                                </Button>
-                                            </div>
-                                        </div>
+                                                    <Heart className="w-5 h-5 fill-red-500 text-red-500" />
+                                                </button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Remove from Favourites?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                       This will remove the listing from your favourites.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        onClick={() => removeMutation.mutate(savedRecord.id)}
+                                                        className="bg-red-500 hover:bg-red-600"
+                                                    >
+                                                        Remove
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    )}
+                                >
+                                    <div className="flex gap-3">
+                                        <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)} className="flex-1">
+                                            <Button variant="outline" size="sm" className="w-full">
+                                                View Details
+                                            </Button>
+                                        </Link>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => handleGetDirections(sale)}
+                                            className="flex-1 bg-navy hover:bg-navy-dark gap-2"
+                                        >
+                                            <Route className="w-4 h-4" />
+                                            Route
+                                        </Button>
                                     </div>
-                                </div>
+                                </ListingCard>
                             );
                         })}
                     </div>

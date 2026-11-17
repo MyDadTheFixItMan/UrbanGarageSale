@@ -1,17 +1,14 @@
 import React, { useState, useEffect, useTransition } from 'react';
 import { firebase, getSuburbCoordinates } from '@/api/firebaseClient';
-import { Map, List, Tag, Search, Loader2, Heart, MapPin, CalendarClock } from 'lucide-react';
+import { Map, List, Tag, Search, Loader2, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Link } from 'react-router-dom';
-import { createPageUrl } from '../utils';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import SaleMap from '../components/map/SaleMap';
-import { saleWhenLabel, formatDistanceKm } from '@/lib/format';
-import { coverImage, SALE_TYPE_LABELS } from '@/lib/listings';
+import { formatDistanceKm } from '@/lib/format';
 import { calculateDistance, toLocalIsoDate } from '@/api/firebase/listingSearch';
-import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
+import ListingCard from '@/components/listings/ListingCard';
 import { useToggleSaved } from '@/lib/useToggleSaved';
 
 const DEFAULT_FILTERS = {
@@ -309,11 +306,11 @@ export default function Home() {
             )}
 
             {/* Hero Section */}
-            {/* Extra top space when the fixed promo strip is showing, so a two-line message on a phone doesn't cover the heading. */}
-            <section className={`relative bg-brand-cream pb-16 px-4 sm:px-6 overflow-hidden ${allPromotions.length > 0 ? 'pt-24' : 'pt-16'}`}>
+            {/* Extra top space when the fixed promo strip is showing, so a two-line message on a phone doesn't cover the heading. Phones get less, so the whole search box fits on screen. */}
+            <section className={`relative bg-brand-cream pb-16 px-4 sm:px-6 overflow-hidden ${allPromotions.length > 0 ? 'pt-16 md:pt-24' : 'pt-8 md:pt-16'}`}>
                 <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
-                    <div className="text-center mb-8">
-                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-navy-dark mb-4">
+                    <div className="text-center mb-4 md:mb-8">
+                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-navy-dark md:mb-4">
                             Discover Local{' '}
                             {/* Every label sits in the same grid cell, so the space is always as wide as the longest and the line doesn't shift. */}
                             <span className="inline-grid text-center text-brand-orange-dark">
@@ -333,10 +330,11 @@ export default function Home() {
 
                     {/* Search Box */}
                     <div className="max-w-4xl mx-auto relative z-20">
-                        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div>
-                                    <div className="flex items-baseline justify-between mb-2">
+                        <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm">
+                            {/* On phones, Sale Type and Distance share a row so the whole box fits on screen. */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                <div className="col-span-2 sm:col-span-1 min-w-0">
+                                    <div className="flex items-baseline justify-between mb-1 sm:mb-2">
                                         <label htmlFor="search-date" className="block text-slate-800 text-sm font-medium">Date</label>
                                         {filters.saleDate && (
                                             <button type="button" onClick={() => setFilters({ ...filters, saleDate: '' })} className="text-xs text-slate-600 underline hover:text-slate-800">
@@ -348,14 +346,14 @@ export default function Home() {
                                         id="search-date"
                                         type="date"
                                         min={toLocalIsoDate(new Date())}
-                                        className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-800"
+                                        className="block w-full min-w-0 min-h-[42px] appearance-none px-4 py-2 text-left [&::-webkit-date-and-time-value]:text-left bg-white border border-slate-300 rounded-lg text-slate-800"
                                         value={filters.saleDate || ''}
                                         onChange={(e) => setFilters({ ...filters, saleDate: e.target.value })}
                                     />
                                 </div>
 
-                                <div>
-                                    <label htmlFor="search-location" className="block text-slate-800 text-sm font-medium mb-2">Suburb or Postcode</label>
+                                <div className="col-span-2 sm:col-span-1">
+                                    <label htmlFor="search-location" className="block text-slate-800 text-sm font-medium mb-1 sm:mb-2">Suburb or Postcode</label>
                                     <input
                                         id="search-location"
                                         type="text"
@@ -366,8 +364,8 @@ export default function Home() {
                                     />
                                 </div>
 
-                                <div>
-                                    <label htmlFor="search-sale-type" className="block text-slate-800 text-sm font-medium mb-2">Sale Type</label>
+                                <div className="min-w-0">
+                                    <label htmlFor="search-sale-type" className="block text-slate-800 text-sm font-medium mb-1 sm:mb-2">Sale Type</label>
                                     <Select value={filters.saleType} onValueChange={(value) => startTransition(() => setFilters({ ...filters, saleType: value }))}>
                                         <SelectTrigger id="search-sale-type" className="bg-white border-slate-300">
                                             <SelectValue placeholder="All Types" />
@@ -385,8 +383,8 @@ export default function Home() {
                                     </Select>
                                 </div>
 
-                                <div>
-                                    <label htmlFor="search-distance" className="block text-slate-800 text-sm font-medium mb-2">Distance</label>
+                                <div className="min-w-0">
+                                    <label htmlFor="search-distance" className="block text-slate-800 text-sm font-medium mb-1 sm:mb-2">Distance</label>
                                     <Select value={filters.distance} onValueChange={(value) => startTransition(() => setFilters({ ...filters, distance: value }))}>
                                         <SelectTrigger id="search-distance" className="bg-white border-slate-300">
                                             <SelectValue placeholder="Distance" />
@@ -491,47 +489,19 @@ export default function Home() {
                             })
                             .map((sale) => {
                             const isSaved = savedListings.some(s => s.garage_sale_id === sale.id);
-                            const when = saleWhenLabel(sale);
                             const distance = searchOrigin && sale.latitude && sale.longitude
                                 ? formatDistanceKm(calculateDistance(searchOrigin.latitude, searchOrigin.longitude, sale.latitude, sale.longitude))
                                 : '';
                             return (
-                                <div key={sale.id} className="relative">
-                                    <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)} className="block h-full">
-                                        <div className="h-full bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow overflow-hidden cursor-pointer">
-                                            <div className="aspect-video relative">
-                                                {coverImage(sale) ? (
-                                                    <img src={coverImage(sale)} alt={sale.title} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <ListingPlaceholder />
-                                                )}
-                                                <span className="absolute bottom-3 left-3 text-xs font-semibold bg-white/95 text-navy px-3 py-1 rounded-full shadow-sm">
-                                                    {SALE_TYPE_LABELS[sale.sale_type] ?? 'Sale'}
-                                                </span>
-                                            </div>
-                                            <div className="p-4">
-                                                {when && (
-                                                    <p className="flex items-center gap-1.5 text-sm font-bold text-brand-orange-dark mb-1">
-                                                        <CalendarClock className="w-4 h-4 flex-shrink-0" />
-                                                        {when}
-                                                    </p>
-                                                )}
-                                                <h3 className="text-lg font-bold text-navy leading-snug mb-1 line-clamp-2">{sale.title}</h3>
-                                                <p className="flex items-center gap-1.5 text-sm text-slate-600">
-                                                    <MapPin className="w-4 h-4 flex-shrink-0 text-slate-400" />
-                                                    <span>
-                                                        <span className="font-semibold">{sale.suburb || sale.postcode}</span>
-                                                        {distance && <span> · {distance}</span>}
-                                                    </span>
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                    {isAuthenticated && (
+                                <ListingCard
+                                    key={sale.id}
+                                    sale={sale}
+                                    distance={distance}
+                                    action={isAuthenticated && (
                                         <button
                                             type="button"
                                             onClick={() => saveFavoriteMutation.mutate(sale.id)}
-                                            className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-shadow z-40"
+                                            className="bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-shadow"
                                             aria-label={isSaved ? 'Remove from favourites' : 'Save to favourites'}
                                             disabled={saveFavoriteMutation.isPending}
                                         >
@@ -540,7 +510,7 @@ export default function Home() {
                                             />
                                         </button>
                                     )}
-                                </div>
+                                />
                             );
                         })}
                     </div>

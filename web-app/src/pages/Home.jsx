@@ -325,7 +325,8 @@ export default function Home() {
                             </span>{' '}
                             Sales
                         </h1>
-                        <p className="text-lg text-slate-700 max-w-2xl mx-auto">
+                        {/* Left off phones, so the search box sits higher. */}
+                        <p className="hidden md:block text-lg text-slate-700 max-w-2xl mx-auto">
                             Find unique treasures in your neighbourhood.
                         </p>
                     </div>

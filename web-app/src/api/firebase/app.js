@@ -44,7 +44,7 @@ if (isDevelopment) {
 const ENTERPRISE_SCRIPT = 'script[src*="recaptcha/enterprise.js"]';
 
 function enterpriseScriptReady(timeoutMs = 10000) {
-  return new Promise((resolve) => {
+  return /** @type {Promise<void>} */ (new Promise((resolve) => {
     const started = Date.now();
     (function check() {
       const loading = document.querySelector(ENTERPRISE_SCRIPT);
@@ -54,7 +54,7 @@ function enterpriseScriptReady(timeoutMs = 10000) {
       }
       setTimeout(check, 100);
     })();
-  });
+  }));
 }
 
 // Resolves once Auth's reCAPTCHA settings are known (and its script loaded, if the project uses

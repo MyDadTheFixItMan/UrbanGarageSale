@@ -111,3 +111,25 @@ describe('Route to All', () => {
     expect(query.get('destination')).toBe('-38.108,144.335');
   });
 });
+
+describe('favourite cards', () => {
+  it('look like the home page cards and keep View Details, Route and the remove heart', async () => {
+    firebase.auth.me.mockResolvedValue({ email: 'a@b.test', address: '' });
+    firebase.entities.GarageSale.getByIds.mockResolvedValue([{ ...sales[0], suburb: 'Bell Park', sale_type: 'moving_sale' }]);
+    firebase.entities.SavedListing.mine.mockResolvedValue([{ id: 'saved-bell-park', garage_sale_id: 'bell-park' }]);
+
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'bell-park' })).toBeInTheDocument();
+    expect(screen.getByText('Moving Sale')).toBeInTheDocument();
+    expect(screen.getByText('Bell Park')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View Details' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /^route$/i }));
+    expect(window.open.mock.calls[0][0]).toContain('-38.108');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove from favourites' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(firebase.entities.SavedListing.delete).toHaveBeenCalledWith('saved-bell-park'));
+  });
+});

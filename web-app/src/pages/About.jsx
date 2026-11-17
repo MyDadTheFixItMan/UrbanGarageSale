@@ -12,7 +12,7 @@ export default function About() {
 
     // Add default promotion if none exist
     const promotions = allPromotions.length > 0 ? allPromotions : [
-        { id: 'default', message: '🎉 Welcome to Urban Garage Sale! Find amazing deals near you!' }
+        { id: 'default', message: '🎉 Welcome to Urban Garage Sales! Find amazing deals near you!' }
     ];
 
     // Rotate promotional messages every 5 seconds
@@ -62,17 +62,17 @@ export default function About() {
             <section className="max-w-4xl mx-auto px-4 sm:px-6 pt-24 pb-12 relative z-10">
                 <div className="bg-white rounded-lg shadow-md p-8">
                     <h1 className="text-4xl font-bold text-navy-dark mb-2">About Us</h1>
-                    <p className="text-slate-600 mb-8 text-lg">Urban Garage Sale</p>
+                    <p className="text-slate-600 mb-8 text-lg">Urban Garage Sales</p>
 
                     <div className="prose prose-sm max-w-none text-slate-700 space-y-6">
                         <p>
-                            Urban Garage Sale was created with one simple idea in mind: to make it easier for people to find and promote garage sales in their local area. What started as a small community concept has grown into a user-friendly online platform that connects sellers and bargain hunters across towns, suburbs, and neighbourhoods.
+                            Urban Garage Sales was created with one simple idea in mind: to make it easier for people to find and promote garage sales in their local area. What started as a small community concept has grown into a user-friendly online platform that connects sellers and bargain hunters across towns, suburbs, and neighbourhoods.
                         </p>
 
                         <div>
                             <h2 className="text-2xl font-bold text-navy-dark mb-3">Our Mission</h2>
                             <p>
-                                To bring communities together by making garage sales more accessible, visible, and easy to discover. Whether you're clearing out unwanted items, fundraising, or simply giving things a second life, Urban Garage Sale helps you reach more people with less effort.
+                                To bring communities together by making garage sales more accessible, visible, and easy to discover. Whether you're clearing out unwanted items, fundraising, or simply giving things a second life, Urban Garage Sales helps you reach more people with less effort.
                             </p>
                         </div>
 
@@ -89,7 +89,7 @@ export default function About() {
                         <div>
                             <h2 className="text-2xl font-bold text-navy-dark mb-3">Why We Exist</h2>
                             <p>
-                                Traditional garage sales rely on word of mouth, hand-drawn signs, and luck. Urban Garage Sale brings this timeless community activity into the digital world by making it easy for people to connect, declutter, and find great deals while reducing waste.
+                                Traditional garage sales rely on word of mouth, hand-drawn signs, and luck. Urban Garage Sales brings this timeless community activity into the digital world by making it easy for people to connect, declutter, and find great deals while reducing waste.
                             </p>
                         </div>
 
@@ -105,7 +105,7 @@ export default function About() {
 
                         <div>
                             <h2 className="text-2xl font-bold text-navy-dark mb-3">Who We Serve</h2>
-                            <p className="font-semibold mb-2">Urban Garage Sale is for:</p>
+                            <p className="font-semibold mb-2">Urban Garage Sales is for:</p>
                             <ul className="list-disc list-inside space-y-2 ml-2">
                                 <li>Individuals hosting a garage or yard sale</li>
                                 <li>People looking for second-hand bargains</li>

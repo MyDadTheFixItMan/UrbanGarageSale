@@ -67,6 +67,6 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Urban Garage Sale API running at http://localhost:${PORT}`);
+  console.log(`Urban Garage Sales API running at http://localhost:${PORT}`);
   console.log('Routes:\n  ' + Object.keys(routes).join('\n  '));
 });

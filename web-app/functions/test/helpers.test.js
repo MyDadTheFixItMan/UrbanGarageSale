@@ -170,20 +170,20 @@ test('every email has the same logo, button, footer and plain-text copy', () => 
         contactResponseEmailHtml({ responseMessage: 'Yes', siteUrl: 'https://example.com' }),
     ];
     for (const html of emails) {
-        assert.match(html, /<img src="https:\/\/www\.urbangaragesales\.com\.au\/email-logo\.png"[^>]*alt="Urban Garage Sale"/);
+        assert.match(html, /<img src="https:\/\/www\.urbangaragesales\.com\.au\/email-logo\.png"[^>]*alt="Urban Garage Sales"/);
         assert.match(html, /bgcolor="#c2410c"/);
         assert.match(html, /href="https:\/\/example\.com\/Privacy"/);
         assert.match(html, /admin@urbangaragesales\.com\.au/);
         assert.doesNotMatch(html, /support@/);
         const text = emailText(html);
         assert.doesNotMatch(text, /<|&nbsp;|&amp;/);
-        assert.match(text, /The Urban Garage Sale team/);
+        assert.match(text, /The Urban Garage Sales team/);
     }
 });
 
 test('emailText keeps link addresses and drops the hidden preview line', () => {
     const text = emailText(approvalEmailHtml({ title: "Tom & Sue's sale", saleId: 's1', siteUrl: 'https://example.com' }));
-    assert.match(text, /^Urban Garage Sale \(https:\/\/example\.com\)\n\nYour garage sale is live!/);
+    assert.match(text, /^Urban Garage Sales \(https:\/\/example\.com\)\n\nYour garage sale is live!/);
     assert.match(text, /Tom & Sue's sale/);
     assert.match(text, /View and share your listing \(https:\/\/example\.com\/ListingDetails\?id=s1&share=1\)/);
     assert.match(text, /- Share it in local buy, swap and sell groups/);

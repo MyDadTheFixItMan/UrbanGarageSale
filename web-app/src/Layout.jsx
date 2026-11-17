@@ -139,7 +139,7 @@ export default function Layout({ children, currentPageName }) {
                     <Link to={createPageUrl('Home')} className="justify-self-start flex-shrink-0">
                         <img
                             src="/logo-header.webp"
-                            alt="Urban Garage Sale"
+                            alt="Urban Garage Sales"
                             width="383"
                             height="176"
                             className="h-12 md:h-14 w-auto"

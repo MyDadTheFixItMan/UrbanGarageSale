@@ -9,7 +9,7 @@ const { escapeHtml, EMAIL_COLOURS, EMAIL_ADMIN_NOTE, emailLayout, emailParagraph
 const LISTING_RULES = [
     ['weapons', 'Includes firearms, ammunition, weapons, explosives or fireworks.'],
     ['drugs_alcohol_tobacco', 'Includes drugs, drug paraphernalia, prescription medicines, alcohol, tobacco or vapes (vapes are prescription-only in Australia).'],
-    ['single_item', 'Is only selling a single item. Urban Garage Sale is for sales of many items, not single-item ads.'],
+    ['single_item', 'Is only selling a single item. Urban Garage Sales is for sales of many items, not single-item ads.'],
     ['no_photos', 'Has fewer than two photos uploaded.'],
     ['missing_fields', 'Has fields that are not filled out.'],
     ['live_animals', 'Includes live animals.'],
@@ -77,7 +77,7 @@ function reviewFingerprint(listing) {
     return crypto.createHash('sha256').update(JSON.stringify(reviewed)).digest('hex');
 }
 
-const SYSTEM_PROMPT = `You check garage sale listings for Urban Garage Sale, an Australian website where people advertise their garage sales, yard sales, estate sales and similar sales.
+const SYSTEM_PROMPT = `You check garage sale listings for Urban Garage Sales, an Australian website where people advertise their garage sales, yard sales, estate sales and similar sales.
 
 A listing is approved and published only if it breaks none of the rules below. If it breaks a rule, or you can't tell whether it does, send it to a person for review. A person will look at everything you send for review, so when in doubt, send it. Never reject a listing; you only approve it or send it for review.
 

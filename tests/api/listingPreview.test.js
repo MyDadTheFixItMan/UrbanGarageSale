@@ -87,7 +87,7 @@ test('photo addresses that are not https are ignored', () => {
 test('a finished sale says so, with its suburb and no details', () => {
   const ended = listingPreview({ siteUrl: SITE, id: 'sale1', listing: { status: 'completed', suburb: 'Brunswick', state: 'VIC' }, today: TODAY });
   assert.equal(ended.title, 'This garage sale in Brunswick VIC has finished');
-  assert.equal(ended.description, 'Find more garage sales near Brunswick on Urban Garage Sale.');
+  assert.equal(ended.description, 'Find more garage sales near Brunswick on Urban Garage Sales.');
   assert.equal(ended.image, `${SITE}/og-image.jpg`);
 
   // Still live, but its last day has passed and the nightly job hasn't marked it yet.
@@ -98,7 +98,7 @@ test('a finished sale says so, with its suburb and no details', () => {
 
 test('a missing sale gets the site preview', () => {
   const preview = listingPreview({ siteUrl: SITE, id: 'gone', listing: null, today: TODAY });
-  assert.equal(preview.title, 'Urban Garage Sale');
+  assert.equal(preview.title, 'Urban Garage Sales');
   assert.equal(preview.url, `${SITE}/ListingDetails?id=gone`);
   assert.equal(listingPreview({ siteUrl: SITE, today: TODAY }).url, SITE);
 });
@@ -111,13 +111,13 @@ test('listingPreviewHtml has the Open Graph tags, with the seller\'s text escape
   assert.match(html, /<meta property="og:title" content="&lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt; &amp; more">/);
   assert.match(html, /<meta property="og:image" content="https:\/\/firebasestorage\.googleapis\.com\/[^"]+&amp;token=t">/);
   assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
-  assert.match(html, /<title>&lt;script&gt;.* \| Urban Garage Sale<\/title>/);
+  assert.match(html, /<title>&lt;script&gt;.* \| Urban Garage Sales<\/title>/);
   assert.doesNotMatch(html, /<script>/);
 });
 
 test('listingPreviewHtml gives the site image\'s size', () => {
   const html = listingPreviewHtml(listingPreview({ siteUrl: SITE, today: TODAY }));
-  assert.match(html, /<title>Urban Garage Sale<\/title>/);
+  assert.match(html, /<title>Urban Garage Sales<\/title>/);
   assert.match(html, /<meta property="og:image:width" content="1200">/);
   assert.match(html, /<meta property="og:image:height" content="630">/);
 });

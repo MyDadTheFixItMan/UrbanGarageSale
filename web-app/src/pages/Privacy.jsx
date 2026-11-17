@@ -12,7 +12,7 @@ export default function Privacy() {
 
     // Add default promotion if none exist
     const promotions = allPromotions.length > 0 ? allPromotions : [
-        { id: 'default', message: '🎉 Welcome to Urban Garage Sale! Find amazing deals near you!' }
+        { id: 'default', message: '🎉 Welcome to Urban Garage Sales! Find amazing deals near you!' }
     ];
 
     // Rotate promotional messages every 5 seconds
@@ -64,11 +64,11 @@ export default function Privacy() {
                     {/* Privacy Policy */}
                     <div>
                         <h1 className="text-3xl font-bold text-navy-dark mb-2">Privacy Policy</h1>
-                        <p className="text-slate-600 mb-6">Urban Garage Sale</p>
+                        <p className="text-slate-600 mb-6">Urban Garage Sales</p>
                         <p className="text-sm text-slate-500 mb-6">Last updated: November 2026</p>
 
                         <div className="prose prose-sm max-w-none text-slate-700 space-y-4">
-                            <p className="italic">Urban Garage Sale values your privacy. This policy explains how we collect, use, disclose and protect your personal information in line with the Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs).</p>
+                            <p className="italic">Urban Garage Sales values your privacy. This policy explains how we collect, use, disclose and protect your personal information in line with the Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs).</p>
 
                             <div>
                                 <h3 className="font-bold text-navy-dark mt-6 mb-2">1. Information We Collect</h3>
@@ -132,12 +132,12 @@ export default function Privacy() {
 
                             <div>
                                 <h3 className="font-bold text-navy-dark mt-6 mb-2">7. Cookies</h3>
-                                <p>Urban Garage Sale uses cookies and similar browser storage to keep you signed in and remember your preferences. You can disable cookies in your browser settings, but some features may stop working.</p>
+                                <p>Urban Garage Sales uses cookies and similar browser storage to keep you signed in and remember your preferences. You can disable cookies in your browser settings, but some features may stop working.</p>
                             </div>
 
                             <div>
                                 <h3 className="font-bold text-navy-dark mt-6 mb-2">8. Complaints and Contact</h3>
-                                <p>To request access or correction of personal information, or to make a privacy complaint, contact Urban Garage Sale at support@urbangaragesales.com.au.</p>
+                                <p>To request access or correction of personal information, or to make a privacy complaint, contact Urban Garage Sales at support@urbangaragesales.com.au.</p>
                                 <p className="mt-2">We aim to respond within 30 days. If you are not satisfied with our response, you may contact the Office of the Australian Information Commissioner (OAIC) at www.oaic.gov.au or on 1300 363 992.</p>
                             </div>
                         </div>

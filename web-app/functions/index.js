@@ -50,14 +50,14 @@ function getStripe() {
 
 // Returns false (and sends nothing) when SendGrid isn't configured. Secret Manager can't hold an
 // empty value, so projects without email (e.g. staging) set the secret to "not-configured".
-// Every email goes out from "Urban Garage Sale", replies go to SUPPORT_EMAIL, and a plain-text copy is
+// Every email goes out from "Urban Garage Sales", replies go to SUPPORT_EMAIL, and a plain-text copy is
 // made from the HTML (lib/helpers.js emailLayout gives every email the same look).
 async function sendEmail(message) {
     const key = process.env.SENDGRID_API_KEY;
     if (!key || key === 'not-configured') return false;
     sgMail.setApiKey(key);
     await sgMail.send({
-        from: { email: FROM_EMAIL, name: 'Urban Garage Sale' },
+        from: { email: FROM_EMAIL, name: 'Urban Garage Sales' },
         replyTo: SUPPORT_EMAIL,
         text: emailText(message.html),
         ...message,
@@ -237,7 +237,7 @@ exports.createStripeCheckout = callable(['STRIPE_SECRET_KEY'], async (request) =
                         currency: 'aud',
                         product_data: {
                             name: `Garage sale listing: ${(listingData.title || 'Untitled').slice(0, 80)}`,
-                            description: 'Publish your garage sale on Urban Garage Sale. Price includes GST.',
+                            description: 'Publish your garage sale on Urban Garage Sales. Price includes GST.',
                         },
                         unit_amount: LISTING_FEE_CENTS,
                     },
@@ -948,7 +948,7 @@ exports.sendContactResponseEmail = callable(['SENDGRID_API_KEY'], async (request
 
     const sent = await sendEmail({
         to: userEmail,
-        subject: 'Re: Your Urban Garage Sale enquiry',
+        subject: 'Re: Your Urban Garage Sales enquiry',
         html: contactResponseEmailHtml({ userName, originalMessage, responseMessage, siteUrl: APP_URL }),
     });
     return { success: true, message: sent ? 'Response email sent' : 'Email service not configured' };

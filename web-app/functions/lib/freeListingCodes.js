@@ -93,7 +93,7 @@ function codeBlock(code) {
                 </table>`;
 }
 
-const EMAIL_CODE_NOTE = 'You received this email because the Urban Garage Sale team sent you a free listing code.';
+const EMAIL_CODE_NOTE = 'You received this email because the Urban Garage Sales team sent you a free listing code.';
 
 // The email that sends a person their code. The admin types the name and note, so both are escaped.
 function freeListingCodeEmailHtml({ code, name, note, expiresOn, siteUrl }) {
@@ -103,7 +103,7 @@ function freeListingCodeEmailHtml({ code, name, note, expiresOn, siteUrl }) {
         heading: 'Your free garage sale listing',
         body: [
             emailParagraph(`Hi ${escapeHtml(name || 'there')},`),
-            emailParagraph("Here's a code to list your next garage sale on Urban Garage Sale for free:"),
+            emailParagraph("Here's a code to list your next garage sale on Urban Garage Sales for free:"),
             codeBlock(code),
             note ? emailBox('A note from us', note, EMAIL_COLOURS.teal) : '',
             emailParagraph('<strong>How to use it:</strong>'),

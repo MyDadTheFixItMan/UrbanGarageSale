@@ -28,7 +28,7 @@ export default function Contact() {
 
     // Add default promotion if none exist
     const promotions = allPromotions.length > 0 ? allPromotions : [
-        { id: 'default', message: '🎉 Welcome to Urban Garage Sale! Find amazing deals near you!' }
+        { id: 'default', message: '🎉 Welcome to Urban Garage Sales! Find amazing deals near you!' }
     ];
 
     useEffect(() => {

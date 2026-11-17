@@ -4,7 +4,7 @@
 // to api/listingPreview.js instead. Pure helpers: no Firebase, so they are unit tested directly
 // (tests/api/listingPreview.test.js).
 
-const SITE_NAME = 'Urban Garage Sale';
+const SITE_NAME = 'Urban Garage Sales';
 
 // The site's own share image (web-app/public/og-image.jpg), for sales without a photo and for
 // sales that have finished.
@@ -123,7 +123,7 @@ export function listingPreview({ siteUrl, id, listing, today = melbourneToday() 
     return {
       url,
       title: place ? `This garage sale in ${place} has finished` : 'This garage sale has finished',
-      description: `Find more garage sales near ${listing.suburb || 'you'} on Urban Garage Sale.`,
+      description: `Find more garage sales near ${listing.suburb || 'you'} on Urban Garage Sales.`,
       ...defaultImage,
     };
   }

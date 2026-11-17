@@ -1,7 +1,7 @@
 // Pure helpers for the log in / sign up page. No React or Firebase, so they are unit tested directly.
 import { passwordProblem } from '@/lib/password';
 
-// Urban Garage Sale is an Australian service, so phone numbers start with +61.
+// Urban Garage Sales is an Australian service, so phone numbers start with +61.
 export const PHONE_PREFIX = '+61 ';
 export const PHONE_PLACEHOLDER = '+61 412 345 678';
 

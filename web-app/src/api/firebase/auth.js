@@ -99,12 +99,8 @@ function clearRecaptchaElement(element) {
 
 // The current invisible reCAPTCHA verifier for SMS codes (one per page).
 let recaptchaVerifier = null;
-// A verifier loaded ahead of time by prepareRecaptcha, waiting for its first send:
-// { elementId, element, verifier }.
-let preparedRecaptcha = null;
 
 function clearRecaptchaVerifier() {
-  preparedRecaptcha = null;
   if (recaptchaVerifier) {
     try {
       recaptchaVerifier.clear();
@@ -115,15 +111,11 @@ function clearRecaptchaVerifier() {
   }
 }
 
-// The verifier prepareRecaptcha loaded for this element, if it's still unused and on the page;
-// otherwise a fresh one. Each is used for one send only (see setupRecaptcha).
+// A fresh verifier for every send, the first one included. Reusing the one prepareRecaptcha
+// rendered when the page opened made the first code fail to arrive on phones while Resend,
+// which always got a fresh one, worked. Google's script is already loaded by then, so this is
+// still quick.
 function recaptchaFor(elementId) {
-  const prepared = preparedRecaptcha;
-  preparedRecaptcha = null;
-  if (prepared && prepared.elementId === elementId && prepared.verifier === recaptchaVerifier
-      && prepared.element?.isConnected && document.getElementById(elementId) === prepared.element) {
-    return Promise.resolve(prepared.verifier);
-  }
   return firebaseAuth.setupRecaptcha(elementId);
 }
 
@@ -360,17 +352,13 @@ export const firebaseAuth = {
     });
   },
 
-  // Loads Google's reCAPTCHA before it's needed, so pressing Send doesn't wait for it to
-  // download. Call once the element is on the page. A failure here is ignored: the send then
-  // sets up its own verifier.
+  // Loads Google's reCAPTCHA script before it's needed, so pressing Send doesn't wait for it to
+  // download. Call once the element is on the page. The verifier rendered here only loads the
+  // script; each send sets up its own (recaptchaFor). A failure here is ignored.
   prepareRecaptcha: async (elementId) => {
     try {
       const verifier = await firebaseAuth.setupRecaptcha(elementId);
       await verifier.render();
-      // A send may have replaced it while it loaded.
-      if (recaptchaVerifier === verifier) {
-        preparedRecaptcha = { elementId, element: document.getElementById(elementId), verifier };
-      }
     } catch (error) {
       console.log('ℹ reCAPTCHA not loaded ahead:', error.message);
     }

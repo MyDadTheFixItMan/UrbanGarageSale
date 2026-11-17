@@ -110,7 +110,7 @@ describe('password sign-in', () => {
     expect(sdk.RecaptchaVerifier.mock.results[0].value.clear).toHaveBeenCalled();
   });
 
-  it('uses the reCAPTCHA loaded ahead for the first send, and a fresh one after that', async () => {
+  it('gives the first send a fresh reCAPTCHA, not the one loaded ahead (its first code never arrived on phones)', async () => {
     const resolver = { hints: [{ factorId: 'phone' }], session: 's' };
     sdk.signInWithEmailAndPassword.mockRejectedValue(authError('auth/multi-factor-auth-required'));
     sdk.getMultiFactorResolver.mockReturnValue(resolver);
@@ -122,12 +122,9 @@ describe('password sign-in', () => {
 
     await firebaseAuth.login('a@b.c', 'pw').catch(() => {});
     await firebaseAuth.sendMfaSignInCode('recaptcha-container');
-    expect(sdk.RecaptchaVerifier).toHaveBeenCalledTimes(1);
-    expect(sdk.PhoneAuthProvider.verifyPhoneNumber.mock.calls[0][1]).toBe(prepared);
-
-    await firebaseAuth.sendMfaSignInCode('recaptcha-container');
     expect(sdk.RecaptchaVerifier).toHaveBeenCalledTimes(2);
-    expect(sdk.PhoneAuthProvider.verifyPhoneNumber.mock.calls[1][1]).not.toBe(prepared);
+    expect(prepared.clear).toHaveBeenCalled();
+    expect(sdk.PhoneAuthProvider.verifyPhoneNumber.mock.calls[0][1]).toBe(sdk.RecaptchaVerifier.mock.results[1].value);
   });
 
   it('ignores a reCAPTCHA loaded ahead once its element has left the page', async () => {

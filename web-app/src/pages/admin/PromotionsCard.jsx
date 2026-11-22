@@ -70,7 +70,7 @@ export default function PromotionsCard({ promotions }) {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Settings className="w-5 h-5" />
-                    Promotional Messages (Rotating every 5 seconds)
+                    Promotional Messages (Rotating every 10 seconds)
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -159,7 +159,7 @@ export default function PromotionsCard({ promotions }) {
                                 className="min-h-[80px]"
                             />
                             <p className="text-xs text-slate-500 mt-1">
-                                This message will rotate on the homepage every 5 seconds
+                                This message will rotate on the homepage every 10 seconds
                             </p>
                         </div>
                         <div className="flex gap-2">

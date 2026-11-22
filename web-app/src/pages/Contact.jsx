@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { firebase } from '@/api/firebaseClient';
-import { usePromotions } from '@/lib/usePromotions';
+import { usePromotions, PROMO_ROTATE_MS } from '@/lib/usePromotions';
 import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
 import {
@@ -36,7 +36,7 @@ export default function Contact() {
 
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % promotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
 
         return () => clearInterval(interval);
     }, [promotions.length]);

@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { firebase } from '@/api/firebaseClient';
 
+// How long each message in the orange banner shows before the next one, in milliseconds.
+export const PROMO_ROTATE_MS = 10000;
+
+
 // The banner messages admins manage on the dashboard, in their display order.
 // An empty list (also when loading fails) lets each page show its default message.
 export function usePromotions() {

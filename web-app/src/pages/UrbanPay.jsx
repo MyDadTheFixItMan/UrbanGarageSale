@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import CashSaleDialog from './urbanpay/CashSaleDialog';
 import SalesHistoryDialog from './urbanpay/SalesHistoryDialog';
 import { sortSalesNewestFirst } from './urbanpay/salesReport';
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 const EMPTY_STATS = { totalEarnings: 0, totalSales: 0 };
 
@@ -62,7 +63,7 @@ function usePromoRotation(count) {
     const [index, setIndex] = useState(0);
     useEffect(() => {
         if (count === 0) return;
-        const interval = setInterval(() => setIndex((i) => (i + 1) % count), 5000);
+        const interval = setInterval(() => setIndex((i) => (i + 1) % count), PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [count]);
     return index;

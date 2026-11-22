@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { passwordProblem, MIN_PASSWORD_LENGTH } from '@/lib/password';
 import { BROKEN_RESET_LINK } from '@/api/firebase/auth';
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();
@@ -51,12 +52,12 @@ export default function ResetPassword() {
         staleTime: 1000 * 60 * 5,
     });
 
-    // Rotate promotional messages every 5 seconds
+    // Rotate promotional messages every 10 seconds
     useEffect(() => {
         if (allPromotions.length === 0) return;
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [allPromotions.length]);
 

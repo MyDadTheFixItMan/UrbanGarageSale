@@ -10,6 +10,7 @@ import { formatDistanceKm } from '@/lib/format';
 import { calculateDistance, toLocalIsoDate } from '@/api/firebase/listingSearch';
 import ListingCard from '@/components/listings/ListingCard';
 import { useToggleSaved } from '@/lib/useToggleSaved';
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 const DEFAULT_FILTERS = {
     postcode: '',
@@ -137,13 +138,13 @@ export default function Home() {
         return () => clearTimeout(timer);
     }, [user?.email]);
 
-    // Rotate promotional messages every 5 seconds
+    // Rotate promotional messages every 10 seconds
     useEffect(() => {
         if (allPromotions.length === 0) return;
 
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
 
         return () => clearInterval(interval);
     }, [allPromotions.length]);
@@ -318,7 +319,7 @@ export default function Home() {
                 }}
             />
 
-            {/* Advertising Ribbon - Rotates every 5 seconds */}
+            {/* Advertising Ribbon - Rotates every 10 seconds */}
             {allPromotions.length > 0 && (
                 <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">

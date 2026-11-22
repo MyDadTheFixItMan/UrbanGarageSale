@@ -57,26 +57,61 @@ function enterpriseScriptReady(timeoutMs = 10000) {
   }));
 }
 
+// Google's reCAPTCHA script is ~350 KB, so it isn't fetched while the page is first drawing.
+// It starts when the browser goes idle after the page has loaded, or straight away when something
+// needs it first (sign-in, an SMS code, or an API call that sends an App Check token). The order
+// never changes: Auth's reCAPTCHA settings first, App Check after (see above).
+const canUseRecaptcha = typeof window !== 'undefined' && !isDevelopment;
+/** @type {Promise<void> | null} */
+let recaptchaStarted = null;
+function startAuthRecaptcha() {
+  if (!recaptchaStarted) {
+    recaptchaStarted = canUseRecaptcha
+      ? initializeRecaptchaConfig(auth).then(() => enterpriseScriptReady(), () => {})
+      : Promise.resolve();
+  }
+  return recaptchaStarted;
+}
+
 // Resolves once Auth's reCAPTCHA settings are known (and its script loaded, if the project uses
 // it). Never rejects: without it Auth still works, it just fetches the settings itself.
-export const authRecaptchaReady = typeof window === 'undefined' || isDevelopment
-  ? Promise.resolve()
-  : initializeRecaptchaConfig(auth).then(() => enterpriseScriptReady(), () => {});
+// Awaiting it starts the loading if it hasn't started yet.
+/** @type {PromiseLike<void>} */
+export const authRecaptchaReady = {
+  then: (onFulfilled, onRejected) => startAuthRecaptcha().then(onFulfilled, onRejected),
+};
 
 // App Check: proves requests come from this website (reCAPTCHA Enterprise, invisible to users).
 // Firestore, Storage and callable functions attach the token automatically; calls to our own
 // API add it with appCheckHeaders(). Off until VITE_APPCHECK_SITE_KEY is set.
 const appCheckSiteKey = import.meta.env.VITE_APPCHECK_SITE_KEY;
-export const appCheckReady = appCheckSiteKey && typeof window !== 'undefined'
-  ? authRecaptchaReady.then(() => initializeAppCheck(app, {
-    provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
-    isTokenAutoRefreshEnabled: true,
-  }))
-  : Promise.resolve(null);
+/** @type {Promise<import('firebase/app-check').AppCheck | null> | null} */
+let appCheckStarted = null;
+function startAppCheck() {
+  if (!appCheckStarted) {
+    appCheckStarted = appCheckSiteKey && typeof window !== 'undefined'
+      ? startAuthRecaptcha().then(() => initializeAppCheck(app, {
+        provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+        isTokenAutoRefreshEnabled: true,
+      }))
+      : startAuthRecaptcha().then(() => null);
+  }
+  return appCheckStarted;
+}
+
+if (typeof window !== 'undefined' && (canUseRecaptcha || appCheckSiteKey)) {
+  const whenIdle = () => {
+    const w = /** @type {any} */ (window);
+    if (typeof w.requestIdleCallback === 'function') w.requestIdleCallback(() => startAppCheck(), { timeout: 3000 });
+    else setTimeout(() => startAppCheck(), 1500);
+  };
+  if (document.readyState === 'complete') whenIdle();
+  else window.addEventListener('load', whenIdle, { once: true });
+}
 
 export async function appCheckHeaders() {
   try {
-    const appCheck = await appCheckReady;
+    const appCheck = await startAppCheck();
     if (!appCheck) return {};
     const { token } = await getToken(appCheck);
     return { 'X-Firebase-AppCheck': token };

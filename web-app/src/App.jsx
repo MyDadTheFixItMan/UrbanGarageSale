@@ -4,13 +4,14 @@ import { queryClientInstance } from '@/lib/query-client'
 import NavigationTracker from '@/lib/NavigationTracker'
 import ErrorBoundary from '@/lib/ErrorBoundary'
 import { pagesConfig } from './pages.config'
-import { Suspense, useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { Analytics } from '@vercel/analytics/react';
 
 const { Pages, Layout, mainPage } = pagesConfig;
+const SuburbSales = lazy(() => import('./pages/SuburbSales'));
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
@@ -51,6 +52,17 @@ const AuthenticatedApp = () => {
             }
           />
         ))}
+        {/* A sale's own page, /sale/coburg-vic/<id>, and a suburb's, /garage-sales/vic/coburg. */}
+        <Route path="/sale/:place/:id" element={
+          <LayoutWrapper currentPageName="ListingDetails">
+            <Pages.ListingDetails />
+          </LayoutWrapper>
+        } />
+        <Route path="/garage-sales/:state/:suburb" element={
+          <LayoutWrapper currentPageName="SuburbSales">
+            <SuburbSales />
+          </LayoutWrapper>
+        } />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </Suspense>

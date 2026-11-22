@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useTransition } from 'react';
-import { firebase, getSuburbCoordinates } from '@/api/firebaseClient';
+import { firebase, getSuburbCoordinates, getPostcodeForLocation } from '@/api/firebaseClient';
 import { Map, List, Tag, Search, Loader2, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -58,7 +58,10 @@ export default function Home() {
         }
 
         const savedFilters = localStorage.getItem('homeSearchFilters');
-        if (!savedFilters) return;
+        if (!savedFilters) {
+            fillPostcodeFromLocation();
+            return;
+        }
         try {
             const restored = JSON.parse(savedFilters);
             // Each visit starts on today's date unless a later day was picked. A past date would match
@@ -67,6 +70,7 @@ export default function Home() {
             if (!restored.saleDate || restored.saleDate < today) restored.saleDate = today;
             setFilters(restored);
             if (restored.postcode) runSearch(restored, { quiet: true });
+            else fillPostcodeFromLocation();
         } catch (error) {
             console.error('Error parsing saved filters:', error);
         }
@@ -175,12 +179,23 @@ export default function Home() {
                     (error) => {
                         console.log('Geolocation permission denied or unavailable:', error);
                         resolve(null);
-                    }
+                    },
+                    // A position from the last few minutes is close enough, and don't wait forever.
+                    { maximumAge: 5 * 60 * 1000, timeout: 15000 }
                 );
             } else {
                 resolve(null);
             }
         });
+    };
+
+    // Fills the Suburb or Postcode box with the postcode where the visitor is, when they allow
+    // their location. Leaves the box alone if they've typed in it meanwhile.
+    const fillPostcodeFromLocation = async (knownLocation) => {
+        const location = knownLocation || await requestGeolocation();
+        if (!location) return;
+        const postcode = await getPostcodeForLocation(location.latitude, location.longitude);
+        if (postcode) setFilters((current) => (current.postcode ? current : { ...current, postcode }));
     };
 
     // Takes the filters as an argument because the search on page load runs before state updates.
@@ -193,6 +208,7 @@ export default function Home() {
             const asking = toast.loading('Requesting your location...');
             location = await requestGeolocation();
             toast.dismiss(asking);
+            if (location) fillPostcodeFromLocation(location);
         }
         
         if (!filters.postcode && !location) {

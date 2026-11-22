@@ -13,7 +13,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
 import { db, storage, functions } from './app';
-import { geocode } from '@/lib/geocode';
+import { geocode, reverseGeocode } from '@/lib/geocode';
 import { toAppError } from '@/lib/appError';
 
 const toRecords = (snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -86,6 +86,24 @@ export const firebaseFirestore = {
     },
   }),
 };
+
+// The Australian postcode at a point (or its suburb when Google has no postcode there), for
+// filling in the search box from the visitor's location; null if there is neither or the
+// point is outside Australia.
+export async function getPostcodeForLocation(lat, lng) {
+  try {
+    const components = await reverseGeocode(lat, lng);
+    if (!components) return null;
+    const inAustralia = components.some((c) => c.types.includes('country') && c.short_name === 'AU');
+    if (!inAustralia) return null;
+    const find = (type) => components.find((c) => c.types.includes(type))?.long_name;
+    const postcode = find('postal_code');
+    return /^\d{4}$/.test(postcode || '') ? postcode : find('locality') || null;
+  } catch (error) {
+    console.warn('⚠️ Google Geocoding API lookup failed for your location:', error.message);
+    return null;
+  }
+}
 
 // Coordinates for a suburb/postcode using Google Maps geocoding; null if not found.
 export async function getSuburbCoordinates(suburbOrPostcode) {

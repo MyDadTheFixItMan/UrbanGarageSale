@@ -2,9 +2,9 @@
 import { auth } from './firebase/app';
 import { firebaseAuth } from './firebase/auth';
 import { firebaseEntities } from './firebase/entities';
-import { firebaseStorage, firebaseFunctions, firebaseFirestore, getSuburbCoordinates } from './firebase/services';
+import { firebaseStorage, firebaseFunctions, firebaseFirestore, getSuburbCoordinates, getPostcodeForLocation } from './firebase/services';
 
-export { firebaseAuth, firebaseEntities, firebaseStorage, firebaseFunctions, firebaseFirestore, getSuburbCoordinates };
+export { firebaseAuth, firebaseEntities, firebaseStorage, firebaseFunctions, firebaseFirestore, getSuburbCoordinates, getPostcodeForLocation };
 
 export const firebase = {
   auth: firebaseAuth,

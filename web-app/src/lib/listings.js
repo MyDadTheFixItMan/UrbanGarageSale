@@ -71,4 +71,7 @@ export const SALE_TYPE_LABELS = Object.freeze({
     clearing_sale: 'Clearing Sale',
     auction: 'Auction',
     street_sale: 'Street Sale',
+    church_sale: 'Church Sale',
+    car_boot_sale: 'Car Boot Sale',
+    deceased_estate: 'Deceased Estate',
 });

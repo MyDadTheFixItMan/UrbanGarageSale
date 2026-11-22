@@ -20,6 +20,9 @@ const SALE_TYPE_LABELS = {
   clearing_sale: 'Clearing Sale',
   auction: 'Auction',
   street_sale: 'Street Sale',
+  church_sale: 'Church Sale',
+  car_boot_sale: 'Car Boot Sale',
+  deceased_estate: 'Deceased Estate',
 };
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

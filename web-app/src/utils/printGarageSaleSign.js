@@ -44,6 +44,9 @@ const SALE_TYPE_LABELS = {
   clearing_sale: 'CLEARING SALE',
   auction: 'AUCTION',
   street_sale: 'STREET SALE',
+  church_sale: 'CHURCH SALE',
+  car_boot_sale: 'CAR BOOT SALE',
+  deceased_estate: 'DECEASED ESTATE',
 };
 
 export function saleTypeLabel(saleType) {

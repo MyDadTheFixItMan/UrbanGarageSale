@@ -402,6 +402,9 @@ export default function Home() {
                                             <SelectItem value="multi_family">Multi-Family Sale</SelectItem>
                                             <SelectItem value="clearing_sale">Clearing Sale</SelectItem>
                                             <SelectItem value="street_sale">Street Sale</SelectItem>
+                                            <SelectItem value="church_sale">Church Sale</SelectItem>
+                                            <SelectItem value="car_boot_sale">Car Boot Sale</SelectItem>
+                                            <SelectItem value="deceased_estate">Deceased Estate</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>

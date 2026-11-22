@@ -19,6 +19,7 @@ const {
 const listingReview = require('./lib/listingReview');
 const { publicListing } = require('./lib/publicListing');
 const freeCodes = require('./lib/freeListingCodes');
+const indexNow = require('./lib/indexNow');
 
 const REGION = 'australia-southeast1';
 const TIME_ZONE = 'Australia/Melbourne';
@@ -841,6 +842,41 @@ exports.syncPublicListing = onDocumentWritten({ document: 'garageSales/{saleId}'
     const publicRef = db.collection('publicListings').doc(saleId);
     if (copy) await publicRef.set(copy);
     else await publicRef.delete();
+});
+
+// Tells Bing and DuckDuckGo (IndexNow, lib/indexNow.js) when a sale page appears, changes in a
+// way visitors would see, or goes away, so new sales show up in their results within hours
+// rather than at the next sitemap read. Off unless INDEXNOW_ENABLED=true in functions/.env, and
+// only ever from the production project: until launch the firewall blocks the key file, and
+// staging listings mustn't be announced. A failure is logged and emailed to the admin, not
+// retried (the sitemap still covers the page, and retries would repeat the email).
+const INDEXNOW_ENABLED = process.env.INDEXNOW_ENABLED === 'true';
+const PRODUCTION_PROJECT = 'urbangaragesale';
+exports.notifySearchEngines = onDocumentWritten({ document: 'garageSales/{saleId}', region: DATABASE_REGION, secrets: ['SENDGRID_API_KEY'] }, async (event) => {
+    if (!INDEXNOW_ENABLED || process.env.GCLOUD_PROJECT !== PRODUCTION_PROJECT) return;
+    const { saleId } = event.params;
+    const urls = indexNow.changedPages(
+        publicListing(event.data?.before?.data()),
+        publicListing(event.data?.after?.data()),
+        saleId,
+    );
+    if (!urls.length) return;
+    try {
+        const status = await indexNow.submitToIndexNow(urls);
+        logger.info(`IndexNow accepted ${urls.length} page(s) for listing ${saleId} (HTTP ${status})`);
+    } catch (error) {
+        logger.error(`IndexNow submission failed for listing ${saleId}: ${error.message}`, { urls });
+        try {
+            const sent = await sendEmail({
+                to: ADMIN_REVIEW_EMAIL,
+                subject: 'IndexNow submission failed',
+                html: indexNow.indexNowFailureEmailHtml({ saleId, urls, error: error.message }),
+            });
+            if (!sent) logger.warn('IndexNow failure email not sent (SendGrid not configured)');
+        } catch (emailError) {
+            logger.error(`IndexNow failure email failed: ${emailError.message}`);
+        }
+    }
 });
 
 // Photos are write-once and sellers can't delete them (storage.rules), so a seller can't swap

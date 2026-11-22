@@ -16,6 +16,7 @@ import { useCardPayments } from './profile/useCardPayments';
 import ProfileListingCard from './profile/ProfileListingCard';
 import ShareListingDialog from '@/components/listings/ShareListingDialog';
 import { EditProfileDialog, ChangePasswordDialog, PrintSignDialog, StripeSetupDialog } from './profile/ProfileDialogs';
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 const DONE_BUTTON = 'bg-green-100 border border-green-300 text-green-700 hover:bg-green-100 cursor-not-allowed opacity-75';
 const ACTION_BUTTON = 'bg-navy text-white hover:bg-navy-dark';
@@ -24,7 +25,7 @@ function usePromoRotation(count) {
     const [index, setIndex] = useState(0);
     useEffect(() => {
         if (count === 0) return;
-        const interval = setInterval(() => setIndex((i) => (i + 1) % count), 5000);
+        const interval = setInterval(() => setIndex((i) => (i + 1) % count), PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [count]);
     return index;

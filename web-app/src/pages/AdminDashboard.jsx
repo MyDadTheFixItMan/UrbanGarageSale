@@ -19,6 +19,7 @@ import PromotionsCard from './admin/PromotionsCard';
 import FreeListingCard from './admin/FreeListingCard';
 import FreeListingCodesCard from './admin/FreeListingCodesCard';
 import MessagesTab from './admin/MessagesTab';
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 function StatCard({ title, value, icon: Icon, color = "bg-navy" }) {
     return (
@@ -79,7 +80,7 @@ function usePromoRotation(count) {
     const [index, setIndex] = useState(0);
     useEffect(() => {
         if (count === 0) return;
-        const interval = setInterval(() => setIndex((i) => (i + 1) % count), 5000);
+        const interval = setInterval(() => setIndex((i) => (i + 1) % count), PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [count]);
     return index;

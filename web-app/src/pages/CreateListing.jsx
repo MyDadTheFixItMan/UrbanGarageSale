@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { firebase } from '@/api/firebaseClient';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { usePromotions } from '@/lib/usePromotions';
+import { usePromotions, PROMO_ROTATE_MS } from '@/lib/usePromotions';
 import { createPageUrl } from '../utils';
 import { formatAud } from '@/lib/format';
 import { LISTING_STATUS } from '@/lib/listings';
@@ -95,12 +95,12 @@ export default function CreateListing() {
         retry: 1,
     });
 
-    // Rotate promotional messages every 5 seconds
+    // Rotate promotional messages every 10 seconds
     useEffect(() => {
         if (allPromotions.length === 0) return;
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [allPromotions.length]);
 

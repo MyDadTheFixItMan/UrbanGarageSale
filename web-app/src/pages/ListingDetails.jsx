@@ -5,7 +5,7 @@ import { canBeSaved, canBeShared, hasFinished, SALE_TYPE_LABELS } from '@/lib/li
 import { listingShareUrl, openShareSheet, shareSheetData, SHARE_CHANNELS } from '@/lib/share';
 import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
 import ShareListingDialog from '@/components/listings/ShareListingDialog';
-import { usePromotions } from '@/lib/usePromotions';
+import { usePromotions, PROMO_ROTATE_MS } from '@/lib/usePromotions';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import {
@@ -69,12 +69,12 @@ export default function ListingDetails() {
 
     const allPromotions = usePromotions();
 
-    // Rotate promotional messages every 5 seconds
+    // Rotate promotional messages every 10 seconds
     useEffect(() => {
         if (allPromotions.length === 0) return;
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [allPromotions.length]);
 

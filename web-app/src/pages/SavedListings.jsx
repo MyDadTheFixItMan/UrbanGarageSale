@@ -20,6 +20,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 export default function SavedListings() {
     const queryClient = useQueryClient();
@@ -40,12 +41,12 @@ export default function SavedListings() {
         staleTime: 1000 * 60 * 5,
     });
 
-    // Rotate promotional messages every 5 seconds
+    // Rotate promotional messages every 10 seconds
     useEffect(() => {
         if (allPromotions.length === 0) return;
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [allPromotions.length]);
 

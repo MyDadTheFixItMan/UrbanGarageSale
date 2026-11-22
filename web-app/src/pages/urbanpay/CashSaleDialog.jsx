@@ -13,7 +13,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 
-const inputClass = "w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500";
+const inputClass = "w-full h-10 px-3 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy disabled:opacity-60";
 
 // Returns an error message for the cash sale form, or null if it can be submitted.
 export function cashSaleProblem({ amount, description, garageSaleId }) {
@@ -82,7 +82,7 @@ export default function CashSaleDialog({ open, onOpenChange, garageSales, garage
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Record Cash Sale</DialogTitle>
+                    <DialogTitle className="text-navy">Record Cash Sale</DialogTitle>
                     <DialogDescription>
                         Enter the amount and item description for this cash transaction.
                     </DialogDescription>
@@ -105,7 +105,7 @@ export default function CashSaleDialog({ open, onOpenChange, garageSales, garage
                             ))}
                         </select>
                         {garageSales.length === 0 && (
-                            <p className="text-xs text-amber-600 mt-1">No live garage sales. Sales can be recorded once a listing is paid for and approved.</p>
+                            <p className="text-xs text-brand-orange-dark mt-1">No live garage sales. Sales can be recorded once a listing is paid for and approved.</p>
                         )}
                     </div>
                     <div>
@@ -113,6 +113,9 @@ export default function CashSaleDialog({ open, onOpenChange, garageSales, garage
                         <input
                             id="cash-sale-amount"
                             type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.01"
                             placeholder="0.00"
                             className={inputClass}
                             value={amount}
@@ -137,7 +140,7 @@ export default function CashSaleDialog({ open, onOpenChange, garageSales, garage
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={recording}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={recording} className="bg-green-600 hover:bg-green-700">
+                    <Button onClick={submit} disabled={recording} className="bg-brand-orange-dark hover:bg-brand-orange-darker text-white">
                         {recording ? 'Recording...' : 'Record Sale'}
                     </Button>
                 </DialogFooter>

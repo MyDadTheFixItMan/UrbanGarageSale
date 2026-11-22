@@ -17,12 +17,13 @@ function Change({ label, from, to }) {
 }
 
 function Photos({ label, photos = [] }) {
+    const shown = photos.filter(Boolean);
     return (
         <div>
             <p className="text-xs text-slate-500 mb-1">{label}</p>
             <div className="flex flex-wrap gap-2">
-                {photos.length === 0 && <p className="text-sm text-slate-400">No photos</p>}
-                {photos.map((photo) => (
+                {shown.length === 0 && <p className="text-sm text-slate-400">No photos</p>}
+                {shown.map((photo) => (
                     <img key={photo} src={photo} alt="" className="w-16 h-16 rounded object-cover" />
                 ))}
             </div>
@@ -32,7 +33,10 @@ function Photos({ label, photos = [] }) {
 
 // A seller's proposed changes to a live listing, shown against what buyers see now.
 export default function ListingEditRow({ listing, edit, onApprove, onRefuse, pending }) {
-    const photosChanged = JSON.stringify(listing.photos ?? []) !== JSON.stringify(edit.photos ?? []);
+    const changed = (field) => JSON.stringify(listing[field] ?? []) !== JSON.stringify(edit[field] ?? []);
+    const photosChanged = changed('photos');
+    // Thumbnails are the pictures on listing cards, so a change to them alone must show here too.
+    const thumbnailsChanged = changed('thumbnails');
 
     return (
         <div className="bg-white rounded-xl border p-4 space-y-3">
@@ -81,6 +85,13 @@ export default function ListingEditRow({ listing, edit, onApprove, onRefuse, pen
                         <p className="font-medium text-slate-700">Photos</p>
                         <Photos label="Now" photos={listing.photos} />
                         <Photos label="Proposed" photos={edit.photos} />
+                    </div>
+                )}
+                {thumbnailsChanged && (
+                    <div className="text-sm space-y-2">
+                        <p className="font-medium text-slate-700">Card pictures (thumbnails)</p>
+                        <Photos label="Now" photos={listing.thumbnails} />
+                        <Photos label="Proposed" photos={edit.thumbnails} />
                     </div>
                 )}
             </div>

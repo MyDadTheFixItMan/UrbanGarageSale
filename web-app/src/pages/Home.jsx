@@ -18,6 +18,10 @@ const DEFAULT_FILTERS = {
     saleDate: '',
 };
 
+// The search starts on today's date. Worked out on each use, so a tab left open overnight still
+// gets the right day.
+const defaultFilters = () => ({ ...DEFAULT_FILTERS, saleDate: toLocalIsoDate(new Date()) });
+
 export default function Home() {
     const [, startTransition] = useTransition();
     const [viewMode, setViewMode] = useState('list');
@@ -31,7 +35,7 @@ export default function Home() {
     const [promoIndex, setPromoIndex] = useState(0);
     const [saleTypeIndex, setSaleTypeIndex] = useState(0);
     const saleTypeLabels = ['Garage', 'Clearing', 'Street', 'Yard', 'Estate', 'Moving'];
-    const [filters, setFilters] = useState(DEFAULT_FILTERS);
+    const [filters, setFilters] = useState(defaultFilters);
 
     // Restore the last search's filters and search again, so a sale that has since been deleted,
     // rejected or changed never shows. Results used to be saved here too; clear any left behind.
@@ -47,7 +51,7 @@ export default function Home() {
             params.delete('near');
             const rest = params.toString();
             window.history.replaceState(window.history.state, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
-            const nearFilters = { ...DEFAULT_FILTERS, postcode: near.toLowerCase() === 'me' ? '' : near };
+            const nearFilters = { ...defaultFilters(), postcode: near.toLowerCase() === 'me' ? '' : near };
             setFilters(nearFilters);
             runSearch(nearFilters);
             return;
@@ -57,8 +61,10 @@ export default function Home() {
         if (!savedFilters) return;
         try {
             const restored = JSON.parse(savedFilters);
-            // A date saved from an earlier visit that has since passed would match nothing.
-            if (restored.saleDate && restored.saleDate < toLocalIsoDate(new Date())) restored.saleDate = '';
+            // Each visit starts on today's date unless a later day was picked. A past date would match
+            // nothing, and "Any date" from an earlier visit isn't kept either.
+            const today = toLocalIsoDate(new Date());
+            if (!restored.saleDate || restored.saleDate < today) restored.saleDate = today;
             setFilters(restored);
             if (restored.postcode) runSearch(restored, { quiet: true });
         } catch (error) {

@@ -22,6 +22,7 @@ import { AU_WEEKDAY_DATE, formatTimeAU } from '@/lib/format';
 import { useToggleSaved } from '@/lib/useToggleSaved';
 import { directionsUrl, saleLocation } from '@/lib/route';
 import { ADMIN_TABS } from './admin/tabs';
+import ReportListing from '@/components/listings/ReportListing';
 import {
     Dialog,
     DialogContent,
@@ -458,6 +459,7 @@ export default function ListingDetails() {
                             )}
                         </div>
 
+                        <ReportListing listing={sale} user={isAuthenticated ? user : null} />
                     </div>
                 </div>
             </div>

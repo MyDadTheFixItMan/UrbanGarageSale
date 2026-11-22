@@ -128,16 +128,18 @@ export function LocationSection({ form, onChange, locked }) {
     );
 }
 
+// iPhones give date and time boxes a built-in minimum width, so two side by side overflowed the
+// card on a phone. min-w-0 and appearance-none let them shrink to their half of the row.
 function DateTimeField({ id, label, type, value, onChange, locked, ...props }) {
     return (
-        <div>
+        <div className="min-w-0">
             <Label htmlFor={id}>{label}</Label>
             <Input
                 id={id}
                 type={type}
                 value={value}
                 onChange={(e) => onChange(id, e.target.value)}
-                className="mt-1.5"
+                className="mt-1.5 block min-w-0 appearance-none bg-white text-left [&::-webkit-date-and-time-value]:text-left"
                 disabled={locked}
                 {...props}
             />

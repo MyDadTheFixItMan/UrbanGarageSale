@@ -14,6 +14,8 @@ const CompleteProfileDialog = lazy(() => import('@/pages/profile/ProfileDialogs'
 
 const TwoFactorSetupDialog = lazy(() => import('@/components/TwoFactorSetupDialog'));
 
+const SignInPromptDialog = lazy(() => import('@/components/SignInPromptDialog'));
+
 // Texting the 2FA code automatically is skipped if it was done in the last few minutes (say, before
 // a page refresh): repeated texts to one number make Google and carriers hold later ones.
 const AUTO_SEND_GAP_MS = 10 * 60 * 1000;
@@ -55,10 +57,15 @@ const PROFILE_OPTIONAL_PAGES = ['Login', 'ResetPassword', 'Terms', 'Privacy'];
 export default function Layout({ children, currentPageName }) {
     const [user, setUser] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    // False until Firebase has said whether anyone is signed in.
+    const [authKnown, setAuthKnown] = useState(false);
+    // The page whose "please sign in" popup is showing, if any.
+    const [signInPromptPage, setSignInPromptPage] = useState(null);
 
     // Follows logins as they happen: signing up changes pages without reloading this header.
     useEffect(() => firebase.auth.onAuthStateChanged(async (authUser) => {
         setIsAuthenticated(!!authUser);
+        setAuthKnown(true);
         setUser(authUser ? await firebase.auth.me() : null);
     }), []);
 
@@ -115,11 +122,12 @@ export default function Layout({ children, currentPageName }) {
         }
     };
 
-    // shortName labels the mobile bottom bar, where there is room for one word.
+    // shortName labels the mobile bottom bar, where there is room for one word. Items with
+    // signInPrompt are shown to everyone, but someone signed out gets a popup asking them to sign in.
     const navItems = [
         { name: 'Home', shortName: 'Home', page: 'Home', icon: Home, requiresAuth: false },
-        { name: 'Create Listing', shortName: 'Create', page: 'CreateListing', icon: Plus, requiresAuth: false },
-        { name: 'Favourites', shortName: 'Favourites', page: 'SavedListings', icon: Heart, requiresAuth: false },
+        { name: 'Create Listing', shortName: 'Create', page: 'CreateListing', icon: Plus, requiresAuth: false, signInPrompt: true },
+        { name: 'Favourites', shortName: 'Favourites', page: 'SavedListings', icon: Heart, requiresAuth: false, signInPrompt: true },
         { name: 'Urban Pay', shortName: 'Pay', page: 'UrbanPay', icon: Smartphone, requiresAuth: true },
         { name: 'Profile', shortName: 'Profile', page: 'Profile', icon: User, requiresAuth: true },
         { name: 'Admin', shortName: 'Admin', page: 'AdminDashboard', icon: Shield, requiresAuth: 'admin' },
@@ -130,6 +138,15 @@ export default function Layout({ children, currentPageName }) {
         (item.requiresAuth === true && isAuthenticated) ||
         (item.requiresAuth === 'admin' && user?.role === 'admin')
     );
+
+    // Before Firebase answers, the link works as normal; the page itself sends anyone signed out
+    // to the login page.
+    const handleNavClick = (item) => (event) => {
+        if (item.signInPrompt && authKnown && !isAuthenticated) {
+            event.preventDefault();
+            setSignInPromptPage(item.page);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-brand-cream flex flex-col pb-20 md:pb-0">
@@ -152,6 +169,7 @@ export default function Layout({ children, currentPageName }) {
                             <Link
                                 key={item.page}
                                 to={createPageUrl(item.page)}
+                                onClick={handleNavClick(item)}
                                 aria-current={currentPageName === item.page ? 'page' : undefined}
                                 className={`px-2.5 lg:px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                                     currentPageName === item.page
@@ -223,6 +241,7 @@ export default function Layout({ children, currentPageName }) {
                             <Link
                                 key={item.page}
                                 to={createPageUrl(item.page)}
+                                onClick={handleNavClick(item)}
                                 aria-current={isCurrent ? 'page' : undefined}
                                 className={`flex-1 flex flex-col items-center justify-center border-t-[3px] transition-colors ${
                                     isCurrent
@@ -238,6 +257,11 @@ export default function Layout({ children, currentPageName }) {
                 </div>
             </nav>
 
+            {signInPromptPage && (
+                <Suspense fallback={null}>
+                    <SignInPromptDialog page={signInPromptPage} onClose={() => setSignInPromptPage(null)} />
+                </Suspense>
+            )}
             {needsProfile && (
                 <Suspense fallback={null}>
                     <CompleteProfileDialog

@@ -50,3 +50,20 @@ export async function geocode(address, { country } = {}) {
         throw error;
     }
 }
+
+// The address parts of the place at a point, for example its postcode and suburb, or null when
+// Google has nothing there. Throws if Google Maps can't be reached or doesn't respond.
+/**
+ * @param {number} lat
+ * @param {number} lng
+ */
+export async function reverseGeocode(lat, lng) {
+    const geocoder = await loadGeocoder();
+    try {
+        const { results } = await withTimeout(geocoder.geocode({ location: { lat, lng }, region: 'au' }));
+        return results?.length ? results.flatMap((result) => result.address_components || []) : null;
+    } catch (error) {
+        if (error?.code === 'ZERO_RESULTS') return null;
+        throw error;
+    }
+}

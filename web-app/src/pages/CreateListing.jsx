@@ -363,7 +363,7 @@ export default function CreateListing() {
                 {!isActiveEdit && (
                     <Alert className="mb-6 border-brand-orange/30 bg-brand-orange/10">
                         <AlertDescription className="text-navy text-center">
-                            Listings are <strong>{formatAud(LISTING_FEE_AUD, { withCode: true })}</strong> (incl. GST) to publish. Drafts are free. Anything not paid for is saved for 2 days, then deleted.
+                            Listings are <strong>{formatAud(LISTING_FEE_AUD).replace(/\.00$/, '')}</strong> (incl. GST) to publish. Drafts are kept for 2 days then deleted.
                         </AlertDescription>
                     </Alert>
                 )}

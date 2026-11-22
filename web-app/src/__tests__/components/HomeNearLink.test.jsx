@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { firebase, getSuburbCoordinates } from '@/api/firebaseClient';
 import Home from '@/pages/Home';
+import { toLocalIsoDate } from '@/api/firebase/listingSearch';
 
 jest.mock('@/api/firebaseClient', () => ({
   firebase: {
@@ -22,7 +23,7 @@ jest.mock('sonner', () => ({
 
 function renderHome(url) {
   window.history.pushState({}, '', url);
-  render(
+  return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
         <Home />
@@ -69,5 +70,38 @@ describe('Home ?near= links', () => {
     ));
     expect(getSuburbCoordinates).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Suburb or Postcode')).toHaveValue('');
+  });
+});
+
+describe('Home search date', () => {
+  const today = toLocalIsoDate(new Date());
+  const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return toLocalIsoDate(d); })();
+
+  it("starts on today's date on a first visit", () => {
+    renderHome('/');
+    expect(screen.getByLabelText('Date')).toHaveValue(today);
+  });
+
+  it("moves a saved date that has passed, or a saved 'Any date', to today", async () => {
+    for (const saleDate of ['2020-01-01', '']) {
+      localStorage.setItem('homeSearchFilters', JSON.stringify({ postcode: '', distance: '25', saleType: 'all', saleDate }));
+      const { unmount } = renderHome('/');
+      await waitFor(() => expect(screen.getByLabelText('Date')).toHaveValue(today));
+      unmount();
+    }
+  });
+
+  it('keeps a saved date later than today', async () => {
+    localStorage.setItem('homeSearchFilters', JSON.stringify({ postcode: '', distance: '25', saleType: 'all', saleDate: tomorrow }));
+    renderHome('/');
+    await waitFor(() => expect(screen.getByLabelText('Date')).toHaveValue(tomorrow));
+  });
+
+  it("searches on today's date from a ?near= link", async () => {
+    getSuburbCoordinates.mockResolvedValue({ lat: -38.16, lng: 144.52 });
+    renderHome('/?near=3226');
+    await waitFor(() => expect(firebase.entities.GarageSale.filter).toHaveBeenCalledWith(
+      expect.objectContaining({ saleDate: today }),
+    ));
   });
 });

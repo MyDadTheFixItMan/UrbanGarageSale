@@ -7,6 +7,7 @@ const {
     editRefusedEmailHtml,
     contactResponseEmailHtml,
     emailText,
+    recentlySignedIn,
 } = require('../lib/helpers');
 
 const photoUrl = (path) =>
@@ -194,4 +195,17 @@ test('storagePathFromUrl with a bucket refuses URLs into any other bucket', () =
     const url = (bucket) => `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/listings%2Fu1%2Fa.jpg?alt=media`;
     assert.equal(storagePathFromUrl(url('site.firebasestorage.app'), 'site.firebasestorage.app'), 'listings/u1/a.jpg');
     assert.equal(storagePathFromUrl(url('attacker.appspot.com'), 'site.firebasestorage.app'), null);
+});
+
+test('recentlySignedIn: only a sign-in within the window counts', () => {
+    const now = 1_800_000_000_000;
+    const at = (secondsAgo) => ({ auth_time: now / 1000 - secondsAgo });
+    assert.equal(recentlySignedIn(at(0), 600, now), true);
+    assert.equal(recentlySignedIn(at(599), 600, now), true);
+    assert.equal(recentlySignedIn(at(601), 600, now), false);
+    assert.equal(recentlySignedIn(at(-30), 600, now), true); // small clock skew is fine
+    assert.equal(recentlySignedIn(at(-3600), 600, now), false);
+    assert.equal(recentlySignedIn({}, 600, now), false);
+    assert.equal(recentlySignedIn(undefined, 600, now), false);
+    assert.equal(recentlySignedIn({ auth_time: 'soon' }, 600, now), false);
 });

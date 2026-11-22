@@ -3,18 +3,22 @@ service firebase.storage {
   match /b/{bucket}/o {
 
     // Listing photos: anyone with a photo's address can view it, but folders can't be listed, so
-    // draft and rejected photos can't be found. Only the owner can upload or delete in their own
-    // folder, and uploading needs the same 2FA session as creating a listing (firestore.rules).
+    // draft and rejected photos can't be found. Only the owner can upload, into their own folder,
+    // and uploading needs the same 2FA session as creating a listing (firestore.rules).
+    // Photos are write-once: a file can't be replaced, and only the server deletes one, once no
+    // listing or edit uses it (cleanUpListingPhotos in web-app/functions/index.js). Otherwise a
+    // seller could swap the picture behind an approved listing's photo address.
     match /listings/{userId}/{fileName} {
       allow get: if true;
       allow list: if false;
-      allow create, update: if request.auth != null &&
-                               request.auth.uid == userId &&
-                               request.auth.token.get('two_fa_enabled', false) == true &&
-                               request.auth.token.firebase.get('sign_in_second_factor', null) != null &&
-                               request.resource.size < 10 * 1024 * 1024 &&
-                               request.resource.contentType.matches('image/(jpeg|png|webp|gif|heic|heif)');
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      // resource == null: no file at this path yet, so an existing photo can't be overwritten.
+      allow create: if resource == null &&
+                       request.auth != null &&
+                       request.auth.uid == userId &&
+                       request.auth.token.get('two_fa_enabled', false) == true &&
+                       request.auth.token.firebase.get('sign_in_second_factor', null) != null &&
+                       request.resource.size < 10 * 1024 * 1024 &&
+                       request.resource.contentType.matches('image/(jpeg|png|webp|gif|heic|heif)');
     }
 
     // Everything else is closed.

@@ -48,13 +48,6 @@ export const canBeShared = (listing, today) => canBeSaved(listing, today);
 export const hasFinished = (listing, today = format(new Date(), 'yyyy-MM-dd')) =>
     listing.status === LISTING_STATUS.COMPLETED || Boolean(listing.end_date && listing.end_date < today);
 
-// The photo URLs `before` used that none of `stillUsed` do, so they can be deleted from Storage.
-export function photosNoLongerUsed(before, ...stillUsed) {
-    const urls = (listing) => [...(listing?.photos ?? []), ...(listing?.thumbnails ?? [])].filter(Boolean);
-    const keep = new Set(stillUsed.flatMap(urls));
-    return [...new Set(urls(before))].filter((url) => !keep.has(url));
-}
-
 // Mirrors isPaidOrApproved() in firestore.rules.
 export const isPaidOrApproved = (listing) => isLiveStatus(listing) || isPaid(listing.payment_status);
 

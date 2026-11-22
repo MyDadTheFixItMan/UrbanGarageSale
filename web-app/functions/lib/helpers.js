@@ -260,13 +260,15 @@ function contactResponseEmailHtml({ userName, originalMessage, responseMessage, 
 // (https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<encoded path>?alt=media&token=…),
 // or null for anything else. Only paths under listings/ are returned, so a crafted URL can't
 // point the cleanup at other files.
-function storagePathFromUrl(url) {
+function storagePathFromUrl(url, bucket) {
     if (typeof url !== 'string') return null;
-    const match = url.match(/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/[^/]+\/o\/([^?#]+)/);
+    const match = url.match(/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/([^/]+)\/o\/([^?#]+)/);
     if (!match) return null;
+    // With `bucket`, a URL into any other bucket isn't one of the site's files.
+    if (bucket !== undefined && match[1] !== bucket) return null;
     let path;
     try {
-        path = decodeURIComponent(match[1]);
+        path = decodeURIComponent(match[2]);
     } catch {
         return null;
     }
@@ -279,7 +281,7 @@ function listingPhotoPaths(listing) {
     if (!listing?.user_id) return [];
     const urls = [...(listing.photos || []), ...(listing.thumbnails || [])];
     const ownFolder = `listings/${listing.user_id}/`;
-    return [...new Set(urls.map(storagePathFromUrl).filter((path) => path?.startsWith(ownFolder)))];
+    return [...new Set(urls.map((url) => storagePathFromUrl(url)).filter((path) => path?.startsWith(ownFolder)))];
 }
 
 // The Storage paths `before` used that none of `stillUsed` do: what's safe to delete once a listing

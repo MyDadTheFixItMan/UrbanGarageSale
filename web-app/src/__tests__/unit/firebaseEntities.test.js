@@ -212,28 +212,10 @@ describe('ContactMessage.create', () => {
 });
 
 describe('GarageSale.delete', () => {
-  const deletedPhotos = () => storageSdk.deleteObject.mock.calls.map(([url]) => url);
-  const listingDoc = (path) => path[0] === 'garageSales'
-    ? docSnap({ id: 'sale-1', user_id: 'user-1', photos: ['p-shared', 'p-own'], thumbnails: ['t-shared'] })
-    : docSnap(null);
-
-  it("keeps photos another of the seller's listings still uses", async () => {
-    store.getDoc.mockImplementation(async (ref) => listingDoc(ref.path));
-    store.getDocs.mockImplementation(async (q) => snapshot(q.collection === 'garageSales'
-      ? [{ id: 'sale-1', photos: ['p-shared', 'p-own'] }, { id: 'sale-2', photos: ['p-shared'], thumbnails: ['t-shared'] }]
-      : []));
+  it('deletes the listing and its waiting edit but leaves photo deletion to the server', async () => {
     await firebaseEntities.GarageSale.delete('sale-1');
-    expect(store.queries.map(wheres)).toEqual([['user_id==user-1'], ['user_id==user-1']]);
-    expect(deletedPhotos()).toEqual(['p-own']);
-    expect(firestore.deleteDoc).toHaveBeenCalled();
-  });
-
-  it("deletes no photos when the seller's other listings can't be read", async () => {
-    store.getDoc.mockImplementation(async (ref) => listingDoc(ref.path));
-    store.getDocs.mockRejectedValue(new Error('permission-denied'));
-    await firebaseEntities.GarageSale.delete('sale-1');
-    expect(deletedPhotos()).toEqual([]);
-    expect(firestore.deleteDoc).toHaveBeenCalled();
+    expect(firestore.deleteDoc).toHaveBeenCalledTimes(2);
+    expect(storageSdk.deleteObject).not.toHaveBeenCalled();
   });
 });
 

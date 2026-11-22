@@ -36,9 +36,9 @@ dependencies:
   cupertino_icons: ^2.0.0
   
   # Firebase and Cloud
-  firebase_core: ^5.1.0
-  cloud_firestore: ^7.1.0
-  firebase_auth: ^7.0.1
+  firebase_core: ^5.2.0
+  cloud_firestore: ^7.2.0
+  firebase_auth: ^7.1.0
   
   # Stripe Payment Integration
   flutter_stripe: ^14.2.0

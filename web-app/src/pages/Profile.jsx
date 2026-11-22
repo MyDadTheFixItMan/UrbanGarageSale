@@ -227,7 +227,7 @@ export default function Profile() {
                                 </div>
                             </div>
 
-                            <div className="flex flex-row gap-2 w-full md:w-auto">
+                            <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto">
                                 <EditProfileDialog
                                     user={user}
                                     onSaved={(data) => {
@@ -241,7 +241,7 @@ export default function Profile() {
                                     onClick={cardEnabled ? undefined : () => setStripeDialogOpen(true)}
                                     disabled={cardPayments.creating || cardEnabled}
                                     size="sm"
-                                    className={`gap-2 flex-1 font-medium ${cardEnabled ? DONE_BUTTON : ACTION_BUTTON}`}
+                                    className={`gap-2 flex-1 font-medium h-auto min-h-8 py-1.5 whitespace-normal leading-tight md:whitespace-nowrap ${cardEnabled ? DONE_BUTTON : ACTION_BUTTON}`}
                                     title={cardEnabled && user.stripeAccountType ? `Account type: ${user.stripeAccountType === 'created' ? 'Created' : 'Linked'}` : ''}
                                 >
                                     {cardPayments.creating ? (
@@ -258,7 +258,7 @@ export default function Profile() {
                                     onClick={user.two_fa_enabled ? undefined : () => setTwoFADialogOpen(true)}
                                     disabled={user.two_fa_enabled}
                                     size="sm"
-                                    className={`gap-2 flex-1 font-medium ${user.two_fa_enabled ? DONE_BUTTON : ACTION_BUTTON}`}
+                                    className={`gap-2 flex-1 font-medium h-auto min-h-8 py-1.5 whitespace-normal leading-tight md:whitespace-nowrap ${user.two_fa_enabled ? DONE_BUTTON : ACTION_BUTTON}`}
                                 >
                                     {user.two_fa_enabled ? <>2FA On <span className="text-lg ml-0.5">✓</span></> : 'Enable 2FA'}
                                 </Button>

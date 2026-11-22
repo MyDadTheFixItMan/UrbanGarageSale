@@ -1,0 +1,10 @@
+# Urban Garage Sales
+User-agent: *
+Disallow: /api/
+Disallow: /AdminDashboard
+Disallow: /Profile
+Disallow: /Payment
+Disallow: /UrbanPay
+Disallow: /ResetPassword
+
+Sitemap: https://www.urbangaragesales.com.au/sitemap.xml

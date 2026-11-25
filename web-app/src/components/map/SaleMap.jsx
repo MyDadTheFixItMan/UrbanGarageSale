@@ -1,13 +1,13 @@
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Link } from 'react-router-dom';
-import { createPageUrl } from '../../utils';
 import { MapPin, Clock, Calendar } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { AU_DAY_MONTH } from '@/lib/format';
+import { listingPath } from '@/lib/seo/site';
 
 // Fix for default marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -110,7 +110,7 @@ export default function SaleMap({ sales, center, zoom = 12 }) {
                                             <span className="truncate">{sale.address || sale.suburb}</span>
                                         </div>
                                     </div>
-                                    <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)}>
+                                    <Link to={listingPath(sale)}>
                                         <Button size="sm" className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-xs">
                                             View Details
                                         </Button>

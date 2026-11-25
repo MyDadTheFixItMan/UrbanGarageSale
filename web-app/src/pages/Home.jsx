@@ -23,7 +23,9 @@ const DEFAULT_FILTERS = {
 // gets the right day.
 const defaultFilters = () => ({ ...DEFAULT_FILTERS, saleDate: toLocalIsoDate(new Date()) });
 
-export default function Home() {
+// `near` and `heading` come from a suburb's page (/garage-sales/vic/coburg, pages/SuburbSales.jsx),
+// which is the home page searching that suburb.
+export default function Home({ near: nearSuburb, heading } = {}) {
     const [, startTransition] = useTransition();
     const [viewMode, setViewMode] = useState('list');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -47,11 +49,13 @@ export default function Home() {
         // the visitor with ?near=me, which asks for their location. The page of a finished sale
         // links here that way.
         const params = new URLSearchParams(window.location.search);
-        const near = params.get('near')?.trim().slice(0, 60);
+        const near = nearSuburb || params.get('near')?.trim().slice(0, 60);
         if (near) {
-            params.delete('near');
-            const rest = params.toString();
-            window.history.replaceState(window.history.state, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
+            if (!nearSuburb) {
+                params.delete('near');
+                const rest = params.toString();
+                window.history.replaceState(window.history.state, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
+            }
             const nearFilters = { ...defaultFilters(), postcode: near.toLowerCase() === 'me' ? '' : near };
             setFilters(nearFilters);
             runSearch(nearFilters);
@@ -75,7 +79,7 @@ export default function Home() {
         } catch (error) {
             console.error('Error parsing saved filters:', error);
         }
-    }, []);
+    }, [nearSuburb]);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -333,6 +337,9 @@ export default function Home() {
             <section className={`relative bg-brand-cream pb-16 px-4 sm:px-6 overflow-hidden ${allPromotions.length > 0 ? 'pt-16 md:pt-24' : 'pt-8 md:pt-16'}`}>
                 <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
                     <div className="text-center mb-4 md:mb-8">
+                        {heading ? (
+                            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-navy-dark md:mb-4">{heading}</h1>
+                        ) : (
                         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-navy-dark md:mb-4">
                             Discover Local{' '}
                             {/* Every label sits in the same grid cell, so the space is always as wide as the longest and the line doesn't shift. */}
@@ -345,6 +352,7 @@ export default function Home() {
                             </span>{' '}
                             Sales
                         </h1>
+                        )}
                         {/* Left off phones, so the search box sits higher. */}
                         <p className="hidden md:block text-lg text-slate-700 max-w-2xl mx-auto">
                             Find unique treasures in your neighbourhood.

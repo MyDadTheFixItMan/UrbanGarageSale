@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { BUSINESS_NAME, BUSINESS_ABN } from '@/lib/business';
 import { profileProblem, normalizePhone } from '@/pages/login/loginForms';
 import { toast } from 'sonner';
+import { PAGE_META, pageDocumentTitle } from '@/lib/seo/site';
 
 // Loaded only for someone who needs it, so the address lookup isn't in every page's download.
 const CompleteProfileDialog = lazy(() => import('@/pages/profile/ProfileDialogs')
@@ -68,6 +69,12 @@ export default function Layout({ children, currentPageName }) {
         setAuthKnown(true);
         setUser(authUser ? await firebase.auth.me() : null);
     }), []);
+
+    // The browser tab's title. The sale and suburb pages set their own (not in PAGE_META).
+    useEffect(() => {
+        const title = currentPageName !== 'ListingDetails' && pageDocumentTitle(currentPageName);
+        if (title) document.title = title;
+    }, [currentPageName]);
 
     // Read again on each page: sign-up saves the profile after the sign-in event above.
     useEffect(() => {
@@ -216,13 +223,13 @@ export default function Layout({ children, currentPageName }) {
                 <div className="w-full px-4 py-4 md:py-6">
                     <div className="flex items-center justify-center md:justify-center">
                         <nav className="flex items-center gap-4 md:gap-6 flex-wrap justify-center">
-                            <Link to={createPageUrl('About')} className="text-xs md:text-sm hover:text-slate-300 transition-colors">About</Link>
+                            <Link to={PAGE_META.About.path} className="text-xs md:text-sm hover:text-slate-300 transition-colors">About</Link>
                             <span className="text-xs md:text-sm text-slate-400">•</span>
-                            <Link to={createPageUrl('Contact')} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Contact</Link>
+                            <Link to={PAGE_META.Contact.path} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Contact</Link>
                             <span className="text-xs md:text-sm text-slate-400">•</span>
-                            <Link to={createPageUrl('Privacy')} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Privacy</Link>
+                            <Link to={PAGE_META.Privacy.path} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Privacy</Link>
                             <span className="text-xs md:text-sm text-slate-400">•</span>
-                            <Link to={createPageUrl('Terms')} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Terms</Link>
+                            <Link to={PAGE_META.Terms.path} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Terms</Link>
                         </nav>
                     </div>
                     <p className="mt-2 text-center text-xs text-slate-300">

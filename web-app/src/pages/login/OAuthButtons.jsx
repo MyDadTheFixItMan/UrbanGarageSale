@@ -53,7 +53,7 @@ export default function OAuthButtons({ onSelect, disabled, label, compact = fals
         <>
             <div className={`${compact ? 'my-4' : 'my-6'} flex items-center`}>
                 <div className="flex-1 border-t border-slate-300"></div>
-                <span className="px-2 text-xs text-slate-500">{label}</span>
+                <span className="px-2 text-xs text-slate-600">{label}</span>
                 <div className="flex-1 border-t border-slate-300"></div>
             </div>
             <div className={compact ? 'space-y-2' : 'space-y-3'}>

@@ -20,7 +20,7 @@ function Field({ id, label, hint, children }) {
         <div>
             <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
             {children}
-            {hint && <p className="text-xs text-slate-500 mt-1">{hint}</p>}
+            {hint && <p className="text-xs text-slate-600 mt-1">{hint}</p>}
         </div>
     );
 }
@@ -39,7 +39,7 @@ function SignUpComplete() {
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Account created</h2>
                 <p className="text-slate-600 mb-2">We've emailed you a verification link.</p>
                 <p className="text-slate-600 mb-6">Next we'll set up two-factor authentication, which you need to create listings and use Urban Pay.</p>
-                <p className="text-sm text-slate-500">Taking you to your Profile...</p>
+                <p className="text-sm text-slate-600">Taking you to your Profile...</p>
             </div>
         </div>
     );
@@ -192,7 +192,7 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
                 <OAuthButtons onSelect={handleOAuth} disabled={loading} label="Or sign up with" compact />
             </form>
 
-            <p className="text-xs text-slate-500 mt-4 text-center">
+            <p className="text-xs text-slate-600 mt-4 text-center">
                 By signing up, you agree to our Terms of Service and Privacy Policy
             </p>
         </>

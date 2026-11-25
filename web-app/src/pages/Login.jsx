@@ -21,7 +21,7 @@ function TabButton({ active, onClick, children }) {
       type="button"
       onClick={onClick}
       className={`flex-1 py-2 px-4 font-medium text-center transition-colors ${
-        active ? 'text-navy border-b-2 border-navy' : 'text-slate-500 hover:text-slate-700'
+        active ? 'text-navy border-b-2 border-navy' : 'text-slate-600 hover:text-slate-800'
       }`}
     >
       {children}
@@ -186,7 +186,7 @@ export default function Login() {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-navy">Account</h2>
-              <p className="text-slate-500">Log in or create an account</p>
+              <p className="text-slate-600">Log in or create an account</p>
             </div>
           </div>
 

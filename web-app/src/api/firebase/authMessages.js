@@ -1,5 +1,8 @@
 // Pure helpers for the auth client: no Firebase SDK imports, so they can be unit tested directly.
-import { AppError } from '@/lib/appError';
+import { AppError, SECURITY_CHECK_FAILED } from '@/lib/appError';
+
+// Google only keeps a half-finished 2-step sign-in for a few minutes.
+export const SIGN_IN_TIMED_OUT = 'Your sign-in timed out. Please go back and sign in again.';
 
 // E.164 format; Australian numbers like 0412 345 678 or +61 0412... become +61412345678.
 export function normalizePhone(phone) {
@@ -17,7 +20,10 @@ export function smsErrorMessage(error) {
     case 'auth/too-many-requests': return 'Too many SMS requests. Please wait a few minutes and try again.';
     case 'auth/invalid-phone-number': return 'That mobile number is not valid.';
     case 'auth/operation-not-allowed': return 'We can only send SMS codes to Australian mobile numbers.';
-    case 'auth/captcha-check-failed': return 'Security check failed. Please refresh the page and try again.';
+    case 'auth/captcha-check-failed':
+    case 'auth/invalid-recaptcha-token':
+    case 'auth/missing-recaptcha-token': return SECURITY_CHECK_FAILED;
+    case 'auth/invalid-multi-factor-session': return SIGN_IN_TIMED_OUT;
     case 'auth/network-request-failed': return 'Network error. Please check your connection and try again.';
     case 'auth/unverified-email': return 'Please verify your email address first.';
     case 'auth/second-factor-already-in-use': return 'That mobile number is already enrolled on this account.';
@@ -36,6 +42,9 @@ export function signUpErrorMessage(error) {
     case 'auth/weak-password': return 'Password is too weak. Use at least 12 characters with letters and numbers.';
     case 'auth/password-does-not-meet-requirements': return 'Password must be at least 12 characters and include letters and numbers.';
     case 'auth/operation-not-allowed': return 'Email/password sign up is not enabled. Contact support.';
+    case 'auth/captcha-check-failed':
+    case 'auth/invalid-recaptcha-token':
+    case 'auth/missing-recaptcha-token': return SECURITY_CHECK_FAILED;
     default: return 'Sign up failed. Please try again.';
   }
 }
@@ -53,6 +62,7 @@ export function verificationCodeErrorMessage(error, fallbackPrefix) {
   switch (error.code) {
     case 'auth/invalid-verification-code': return 'That code is incorrect. Please check the SMS and try again.';
     case 'auth/code-expired': return 'That code has expired. Please request a new one.';
+    case 'auth/invalid-multi-factor-session': return SIGN_IN_TIMED_OUT;
     default: return `${fallbackPrefix}. Please try again.`;
   }
 }

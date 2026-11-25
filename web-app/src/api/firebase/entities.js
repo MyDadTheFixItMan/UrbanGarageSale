@@ -21,6 +21,7 @@ import {
   writeBatch,
   serverTimestamp
 } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { geohashQueryBounds } from 'geofire-common';
 import { auth, db, functions } from './app';
@@ -279,6 +280,27 @@ export const firebaseEntities = {
       requireUser('Not authenticated. Please log in to delete users.');
       await httpsCallable(functions, 'deleteUser')({ userId: id });
       return { id, deleted: true };
+    },
+
+    // Deletes the signed-in user's own account and personal data (Cloud Function deleteMyAccount).
+    // The server refuses unless the user signed in within the last 10 minutes; that error has
+    // code 'app/recent-login-required'. The local session is signed out afterwards.
+    deleteMe: async () => {
+      requireUser('Please sign in to delete your account.');
+      try {
+        await httpsCallable(functions, 'deleteMyAccount')({});
+      } catch (error) {
+        if (error?.details?.reason === 'recent-login-required') {
+          throw new AppError(error.message, { code: 'app/recent-login-required', cause: error });
+        }
+        throw error;
+      }
+      try {
+        await signOut(auth);
+      } catch {
+        // The account is already gone; a failed local sign-out doesn't matter.
+      }
+      return { deleted: true };
     }
   },
 

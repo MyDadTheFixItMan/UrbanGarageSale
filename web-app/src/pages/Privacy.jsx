@@ -121,6 +121,8 @@ export default function Privacy() {
                                     <li>correct inaccurate information;</li>
                                     <li>delete your account and listings.</li>
                                 </ul>
+                                <p className="mt-2">You can delete your account yourself at any time from your Profile (Delete my account).</p>
+                                <p className="mt-2">Photos of a finished sale are deleted one week after the sale ends.</p>
                                 <p className="mt-2">When an account is deleted we remove the profile, listings, saved listings, sales records and contact messages. Payment records are kept in de-identified form where we are required to keep financial records by law.</p>
                             </div>
 

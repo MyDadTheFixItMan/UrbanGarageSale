@@ -7,7 +7,7 @@
 // exactly the key. Change both together.
 const { emailLayout, emailParagraph, emailList, escapeHtml } = require('./helpers');
 
-const INDEXNOW_KEY = 'b2a25ef8878f9a2a01b291923f6ecc7a';
+const INDEXNOW_KEY = 'b2a25ef8878f9a2a01b291923f6ecc7a'; // gitleaks:allow (public by design, see above)
 const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/indexnow';
 // Must match SITE_URL in web-app/src/lib/seo/site.js (test/indexNow.test.js checks).
 const SITE_URL = 'https://www.urbangaragesales.com.au';

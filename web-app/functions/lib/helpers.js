@@ -296,6 +296,14 @@ function melbourneDate(date = new Date()) {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne' }).format(date);
 }
 
+// A completed listing's photos stay on the seller's Past tab for a week after the sale ends.
+const COMPLETED_PHOTO_DAYS = 7;
+
+// Completed listings that ended before this Melbourne date (YYYY-MM-DD) are due to lose their photos.
+function completedPhotoCutoff(now = new Date(), days = COMPLETED_PHOTO_DAYS) {
+    return melbourneDate(new Date(now.getTime() - days * 24 * 60 * 60 * 1000));
+}
+
 // Listings that were never paid for: saved drafts, and publishes abandoned at Stripe Checkout.
 const UNPAID_STATUSES = ['draft', 'pending_payment'];
 // Longer than a Stripe Checkout session stays open (24 hours), so a listing can't be deleted
@@ -333,6 +341,8 @@ module.exports = {
     listingPhotoPaths,
     unusedPhotoPaths,
     melbourneDate,
+    COMPLETED_PHOTO_DAYS,
+    completedPhotoCutoff,
     UNPAID_STATUSES,
     DRAFT_LIFETIME_MS,
     isUnpaidListing,

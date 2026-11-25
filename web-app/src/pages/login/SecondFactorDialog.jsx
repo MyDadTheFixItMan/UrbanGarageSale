@@ -123,7 +123,7 @@ export default function SecondFactorDialog({ phoneHint, sending = false, error: 
                             maxLength="6"
                             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent text-center text-2xl tracking-widest"
                         />
-                        <p className="text-xs text-slate-500 mt-1">Enter the 6-digit code</p>
+                        <p className="text-xs text-slate-600 mt-1">Enter the 6-digit code</p>
                     </div>
 
                     <Button

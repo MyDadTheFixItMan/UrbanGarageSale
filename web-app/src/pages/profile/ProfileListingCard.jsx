@@ -21,6 +21,7 @@ import { createPageUrl } from '../../utils';
 import { listingActions } from './profileListings';
 import { coverImage } from '@/lib/listings';
 import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
+import { listingPath } from '@/lib/seo/site';
 
 const statusConfig = {
     draft: { label: 'Draft', color: 'bg-slate-100 text-slate-700' },
@@ -97,7 +98,7 @@ export default function ProfileListingCard({ listing, edit, onDelete, onPrint, o
 
                 <div className="flex gap-3">
                     {actions.view && (
-                        <Link to={createPageUrl(`ListingDetails?id=${listing.id}`)} className="flex-1">
+                        <Link to={listingPath(listing)} className="flex-1">
                             <Button size="sm" variant="outline" className="w-full h-9 text-sm font-medium">
                                 <Eye className="w-4 h-4 mr-1.5" />
                                 View

@@ -34,3 +34,5 @@ b47f67ca6187a26de2af8fe639ab7ced59bbc774:lib/firebase_options.dart:gcp-api-key:9
 12bd6570c17ddef95b7af4f9bfbe391b91200aff:lib/firebase_options.dart:gcp-api-key:20
 12bd6570c17ddef95b7af4f9bfbe391b91200aff:lib/firebase_options.dart:gcp-api-key:30
 c6607ddf3e390413676891ba1acf587de7713e1e:web-app/.env.staging:gcp-api-key:6
+# IndexNow key (PR #100): public by design, served at /<key>.txt for search engines to verify.
+3727eab0a894f2d8625696d10e9a469cfa8068e2:web-app/functions/lib/indexNow.js:generic-api-key:10

@@ -200,6 +200,34 @@ Test a restore every quarter into a scratch database.
 - `healthCheck` runs every 10 minutes and reports an error if the website or API is down.
 - Billing: create a budget alert (Google Cloud → Billing → Budgets & alerts), e.g. A$50/month
   with emails at 50%, 90% and 100%, so SMS toll fraud or a runaway query is noticed early.
+- Uptime: an UptimeRobot (free) monitor emails within minutes if the site is down. Set it up once
+  the firewall lockdown is lifted (until then every check gets 403):
+  1. Sign up at uptimerobot.com with the admin@ address and confirm the email.
+  2. **New monitor** → HTTP(s) → `https://www.urbangaragesales.com.au/`, every 5 minutes,
+     alert contact admin@.
+  3. A **Keyword** monitor on `https://www.urbangaragesales.com.au/sitemap.xml`, alert when the
+     keyword `/sale/` is *not* found. The home page is a plain file, so it loads even if the
+     server functions or their Firestore reads are broken; the sitemap only lists sale pages when
+     those work. (While there are no live sales it has no `/sale/` addresses and will alert; use
+     `<urlset` as the keyword until there are.) Sale pages themselves come and go, so they make a
+     poor fixed monitor.
+  4. Optional: a monitor on `https://urban-garage-sale.vercel.app/api/urbanPayment` (the API).
+  The `healthCheck` function already checks the home page and API every 10 minutes, but it only
+  writes to Error Reporting, so it emails only if Error Reporting notifications are on.
+
+## Search engines
+
+- Google reads `/sitemap.xml` (built on each request from `publicListings`, `api/sitemap.js`).
+  At launch, add the site in Google Search Console and Bing Webmaster Tools and submit the sitemap.
+- **IndexNow** (Bing, DuckDuckGo, Yandex and others): the `notifySearchEngines` function sends a
+  listing's sale page and suburb page to IndexNow whenever its public copy appears, changes or
+  goes away. The key file is `web-app/public/<key>.txt` (key in `functions/lib/indexNow.js`; change
+  both together). It only runs on the production project with `INDEXNOW_ENABLED=true` in
+  `functions/.env`. **Turn on at launch:** lift the firewall lockdown, check
+  `https://www.urbangaragesales.com.au/<key>.txt` shows the key, set `INDEXNOW_ENABLED=true`,
+  then redeploy functions (`npx firebase-tools deploy --only functions:notifySearchEngines --project urbangaragesale`).
+  Failures are logged and emailed to `ADMIN_REVIEW_EMAIL`; Bing Webmaster Tools → IndexNow shows
+  what arrived.
 
 ## App Check
 

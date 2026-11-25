@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-    isDocId, isRole, escapeHtml, storagePathFromUrl, listingPhotoPaths, unusedPhotoPaths, isUnpaidListing, isExpiredDraft, refundablePayments,
+    isDocId, isRole, escapeHtml, storagePathFromUrl, listingPhotoPaths, unusedPhotoPaths, completedPhotoCutoff, isUnpaidListing, isExpiredDraft, refundablePayments,
     approvalEmailHtml,
     rejectionEmailHtml,
     editRefusedEmailHtml,
@@ -83,6 +83,14 @@ test('isUnpaidListing is true only for unpaid drafts and abandoned payments', ()
         assert.equal(isUnpaidListing({ status, payment_status: 'pending' }), false, status);
     }
     assert.equal(isUnpaidListing(undefined), false);
+});
+
+test('completedPhotoCutoff is the Melbourne date a week ago', () => {
+    // 2026-11-16 09:00 in Melbourne (UTC+11).
+    assert.equal(completedPhotoCutoff(new Date('2026-11-15T22:00:00Z')), '2026-11-09');
+    // Just after midnight in Melbourne is still the next day there.
+    assert.equal(completedPhotoCutoff(new Date('2026-11-15T13:30:00Z')), '2026-11-09');
+    assert.equal(completedPhotoCutoff(new Date('2026-11-15T12:30:00Z')), '2026-11-08');
 });
 
 test('isExpiredDraft uses draft_expires_at, falling back to created_at', () => {

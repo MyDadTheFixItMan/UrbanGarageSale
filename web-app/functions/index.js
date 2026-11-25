@@ -13,7 +13,7 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
-    isDocId, recentlySignedIn, isRole, emailText, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, unusedPhotoPaths, melbourneDate, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
+    isDocId, recentlySignedIn, isRole, emailText, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, unusedPhotoPaths, melbourneDate, completedPhotoCutoff, COMPLETED_PHOTO_DAYS, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
     isUnpaidListing, isExpiredDraft, refundablePayments, storagePathFromUrl, SUPPORT_EMAIL,
 } = require('./lib/helpers');
 const listingReview = require('./lib/listingReview');
@@ -1243,6 +1243,35 @@ exports.expireListings = onSchedule({ schedule: 'every day 00:15', timeZone: TIM
         await deleteStorageFiles(unused).catch((error) => logger.warn(`Unused edit photos not deleted: ${error.message}`));
     }
     logger.info(`Marked ${expired} ended listing(s) completed`);
+});
+
+// Photos of completed listings are kept for a week after the sale ends (the seller's Past tab shows
+// them), then deleted from Storage and removed from the listing (APP 11.2). Photos another of the
+// seller's listings or waiting edits still uses are kept. Listings are done one at a time so two
+// old listings sharing a photo can't both keep it.
+exports.deleteCompletedListingPhotos = onSchedule({ schedule: 'every day 00:30', timeZone: TIME_ZONE }, async () => {
+    const snap = await db.collection('garageSales')
+        .where('status', '==', 'completed')
+        .where('end_date', '<', completedPhotoCutoff())
+        .select('user_id', 'photos', 'thumbnails')
+        .get();
+
+    let cleared = 0;
+    for (const doc of snap.docs) {
+        const listing = doc.data();
+        if (!listing.photos?.length && !listing.thumbnails?.length) continue;
+        try {
+            const others = await Promise.all(['garageSales', 'listingEdits'].map((name) =>
+                db.collection(name).where('user_id', '==', listing.user_id).get()));
+            const stillUsed = others.flatMap((other) => other.docs).filter((other) => other.id !== doc.id).map((other) => other.data());
+            await deleteStorageFiles(unusedPhotoPaths(listing, ...stillUsed));
+            await doc.ref.update({ photos: [], thumbnails: [] });
+            cleared += 1;
+        } catch (error) {
+            logger.warn(`Photos of completed listing ${doc.id} not deleted: ${error.message}`);
+        }
+    }
+    logger.info(`Deleted the photos of ${cleared} listing(s) completed over ${COMPLETED_PHOTO_DAYS} days ago`);
 });
 
 // Unpaid listings are kept for two days, as the listing form tells sellers (APP 11.2: don't keep

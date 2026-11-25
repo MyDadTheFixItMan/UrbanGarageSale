@@ -19,7 +19,14 @@ export class AppError extends Error {
 }
 
 // Friendly text for Firebase error codes that can come from any call.
+export const SECURITY_CHECK_FAILED = 'The security check on this page stopped working. Please refresh the page and try again.';
+
 const COMMON_MESSAGES = {
+  // reCAPTCHA in the browser broke (often a page left open in the background on a phone), so
+  // Google refused its token. Reloading the page loads it fresh.
+  'auth/invalid-recaptcha-token': SECURITY_CHECK_FAILED,
+  'auth/missing-recaptcha-token': SECURITY_CHECK_FAILED,
+  'auth/captcha-check-failed': SECURITY_CHECK_FAILED,
   'auth/network-request-failed': 'Network error. Please check your connection and try again.',
   'auth/too-many-requests': 'Too many attempts. Please wait a few minutes and try again.',
   'auth/user-disabled': 'This account has been disabled. Contact support@urbangaragesales.com.au.',

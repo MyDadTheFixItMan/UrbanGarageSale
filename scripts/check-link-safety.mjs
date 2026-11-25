@@ -11,6 +11,8 @@ const allowedHttpPrefixes = [
   'http://www.w3.org/1998/Math/MathML',
   'http://www.w3.org/1999/xlink',
   'http://www.w3.org/XML/1998/namespace',
+  // XML namespace names (identifiers, not links; the spec requires http)
+  'http://www.sitemaps.org/schemas/sitemap/0.9',
 ];
 
 const trackedFiles = execSync(

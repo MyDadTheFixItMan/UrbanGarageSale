@@ -50,3 +50,18 @@ describe('auth error messages', () => {
     expect(verificationCodeErrorMessage({ code: 'x', message: 'm' }, 'Could not turn on 2FA')).toBe('Could not turn on 2FA. Please try again.');
   });
 });
+
+describe('reCAPTCHA and timed-out sign-in messages', () => {
+  const err = (code) => ({ code });
+
+  it('asks for a page refresh when the security check token is refused', () => {
+    // A phone tab left in the background breaks reCAPTCHA; Google answers INVALID_RECAPTCHA_TOKEN.
+    expect(smsErrorMessage(err('auth/invalid-recaptcha-token'))).toMatch('refresh the page');
+    expect(signUpErrorMessage(err('auth/invalid-recaptcha-token'))).toMatch('refresh the page');
+  });
+
+  it('says the sign-in timed out when Resend comes too late', () => {
+    expect(smsErrorMessage(err('auth/invalid-multi-factor-session'))).toMatch('timed out');
+    expect(verificationCodeErrorMessage(err('auth/invalid-multi-factor-session'), 'Verification failed')).toMatch('timed out');
+  });
+});

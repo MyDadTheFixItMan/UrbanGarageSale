@@ -26,3 +26,9 @@ describe('toAppError', () => {
     expect(toAppError(error)).toBe(error);
   });
 });
+
+describe('toAppError for reCAPTCHA failures', () => {
+  it('asks for a page refresh when password sign-in is refused by reCAPTCHA', () => {
+    expect(toAppError({ code: 'auth/invalid-recaptcha-token' }, 'Sign in failed.').message).toMatch('refresh the page');
+  });
+});

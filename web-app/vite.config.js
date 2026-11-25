@@ -44,7 +44,6 @@ export default defineConfig(({ mode }) => {
         manualChunks: {
           react: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
           firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/functions'],
-          charts: ['recharts'],
           maps: ['leaflet', 'react-leaflet'],
         },
       },

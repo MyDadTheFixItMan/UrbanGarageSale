@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition, lazy, Suspense } from 'react';
 import { firebase, getSuburbCoordinates, getPostcodeForLocation } from '@/api/firebaseClient';
 import { Map, List, Tag, Search, Loader2, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
-import SaleMap from '../components/map/SaleMap';
+// The map (Leaflet) is only downloaded when someone switches to the map view; the list is the default.
+const SaleMap = lazy(() => import('../components/map/SaleMap'));
 import { formatDistanceKm } from '@/lib/format';
 import { calculateDistance, toLocalIsoDate } from '@/api/firebase/listingSearch';
 import ListingCard from '@/components/listings/ListingCard';
@@ -550,6 +551,7 @@ export default function Home({ near: nearSuburb, heading } = {}) {
                     </div>
                 ) : (
                     <div className="h-[600px] rounded-lg overflow-hidden shadow-md">
+                        <Suspense fallback={<div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-slate-400" aria-label="Loading map" /></div>}>
                         <SaleMap sales={searchResults.filter(sale => {
                             // Filter out past-dated listings for map view
                             if (!sale.end_date) return true;
@@ -559,6 +561,7 @@ export default function Home({ near: nearSuburb, heading } = {}) {
                             endDate.setHours(23, 59, 59, 999);
                             return endDate >= now;
                         })} />
+                        </Suspense>
                     </div>
                 )}
             </section>

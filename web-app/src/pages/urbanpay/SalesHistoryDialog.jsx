@@ -24,33 +24,33 @@ export default function SalesHistoryDialog({ open, onOpenChange, sales, garageSa
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-96 overflow-y-auto">
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Sales History</DialogTitle>
+                    <DialogTitle className="text-navy">Sales History</DialogTitle>
                     <DialogDescription>All your sales transactions</DialogDescription>
                 </DialogHeader>
 
                 {sales.length === 0 ? (
-                    <div className="py-8 text-center">
+                    <div className="py-10 text-center">
                         <p className="text-slate-600">No sales recorded yet.</p>
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+                        <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-gradient-to-br from-navy to-navy-light text-white">
                             <div>
-                                <p className="text-xs text-slate-600 font-semibold">Total Sales</p>
-                                <p className="text-xl font-bold text-slate-900">{sales.length}</p>
+                                <p className="text-xs font-medium text-white/70">Total sales</p>
+                                <p className="text-xl font-bold">{sales.length}</p>
                             </div>
                             <div>
-                                <p className="text-xs text-slate-600 font-semibold">Total Amount</p>
-                                <p className="text-xl font-bold text-green-600">{formatAud(salesTotal(sales))}</p>
+                                <p className="text-xs font-medium text-white/70">Total amount</p>
+                                <p className="text-xl font-bold">{formatAud(salesTotal(sales))}</p>
                             </div>
                         </div>
 
-                        <div className="max-h-64 overflow-y-auto">
+                        <div className="max-h-80 overflow-auto rounded-xl border border-slate-100">
                             <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-slate-200 bg-slate-50">
+                                <thead className="sticky top-0">
+                                    <tr className="border-b border-slate-200 bg-brand-cream text-navy">
                                         <th className="text-left py-2 px-3 font-semibold text-xs">Date</th>
                                         <th className="text-left py-2 px-3 font-semibold text-xs">Type</th>
                                         <th className="text-left py-2 px-3 font-semibold text-xs">Garage Sale</th>
@@ -79,7 +79,7 @@ export default function SalesHistoryDialog({ open, onOpenChange, sales, garageSa
                         Close
                     </Button>
                     {sales.length > 0 && (
-                        <Button onClick={print} className="bg-blue-600 hover:bg-blue-700 gap-2">
+                        <Button onClick={print} className="bg-navy hover:bg-navy-dark text-white gap-2">
                             <Printer className="w-4 h-4" />
                             Print Report
                         </Button>

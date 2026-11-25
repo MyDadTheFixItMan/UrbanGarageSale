@@ -37,7 +37,7 @@ const as = {
 const seed = (path, data) => env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), path), data));
 
 const photo = (uid, name = '1.jpg') =>
-  `https://firebasestorage.googleapis.com/v0/b/test.appspot.com/o/listings%2F${uid}%2F${name}?alt=media&token=t`;
+  `https://firebasestorage.googleapis.com/v0/b/urbangaragesale.firebasestorage.app/o/listings%2F${uid}%2F${name}?alt=media&token=t`;
 
 // A date string `days` from now, so tests of the "not years away" limit don't go stale.
 const daysAhead = (days) => new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -369,9 +369,49 @@ test('a seller can submit a draft for free during their state free period', asyn
     is_active: false,
     free_listing_states: { WA: { is_active: true, free_listing_start: '2026-12-01', free_listing_end: '2026-12-10' } },
   });
-  await seed('garageSales/draft', listing({ state: 'WA', start_date: '2026-12-05', end_date: '2026-12-05' }));
+  await seed('garageSales/draft', listing({ state: 'WA', postcode: '6000', start_date: '2026-12-05', end_date: '2026-12-05' }));
   const db = as.seller('alice');
   await assertSucceeds(updateDoc(doc(db, 'garageSales/draft'), { status: 'pending_approval', payment_status: 'completed' }));
+});
+
+test("a state free period needs a postcode in that state, so typing the state isn't enough", async () => {
+  const period = { is_active: true, free_listing_start: '2026-12-01', free_listing_end: '2026-12-10' };
+  await seed('appSettings/default', { is_active: false, free_listing_states: { VIC: period, NSW: period, ACT: period, NT: period } });
+  const db = as.seller('alice');
+  const free = (state, postcode) => listing({ state, postcode, status: 'pending_approval', payment_status: 'completed', start_date: '2026-12-05', end_date: '2026-12-05' });
+
+  await assertFails(setDoc(doc(db, 'garageSales/sydney-as-vic'), free('VIC', '2000')));
+  await assertFails(setDoc(doc(db, 'garageSales/blank-postcode'), free('VIC', '')));
+  await assertSucceeds(setDoc(doc(db, 'garageSales/geelong'), free('VIC', '3220')));
+  await assertSucceeds(setDoc(doc(db, 'garageSales/sydney'), free('NSW', '2000')));
+  await assertSucceeds(setDoc(doc(db, 'garageSales/queanbeyan'), free('NSW', '2620')));
+  await assertFails(setDoc(doc(db, 'garageSales/canberra-as-nsw'), free('NSW', '2600')));
+  await assertSucceeds(setDoc(doc(db, 'garageSales/canberra'), free('ACT', '2600')));
+  await assertSucceeds(setDoc(doc(db, 'garageSales/darwin'), free('NT', '0800')));
+});
+
+test("photo addresses must be in the site's own Storage, not another bucket", async () => {
+  const db = as.seller('alice');
+  const other = (bucket) => `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/listings%2Falice%2F1.jpg?alt=media`;
+  await assertFails(setDoc(doc(db, 'garageSales/a'), listing({ photos: [other('attacker.appspot.com')] })));
+  await assertFails(setDoc(doc(db, 'garageSales/b'), listing({ thumbnails: [other('urbangaragesale.evil.app')] })));
+  await assertSucceeds(setDoc(doc(db, 'garageSales/c'), listing({ photos: [other('urbangaragesale.firebasestorage.app')] })));
+  await assertSucceeds(setDoc(doc(db, 'garageSales/d'), listing({ photos: [other('urbangaragesale-staging.firebasestorage.app')] })));
+});
+
+test("other users can't tell whether a listing has changes waiting", async () => {
+  await seed('garageSales/with-edit', listing({ status: 'active', payment_status: 'paid' }));
+  await seed('garageSales/without-edit', listing({ status: 'active', payment_status: 'paid' }));
+  await seed('listingEdits/with-edit', { user_id: 'alice', title: 't', status: 'pending', submitted_at: Timestamp.now() });
+  const bob = as.user('bob');
+  await assertFails(getDoc(doc(bob, 'listingEdits/with-edit')));
+  await assertFails(getDoc(doc(bob, 'listingEdits/without-edit')));
+  await assertFails(getDoc(doc(bob, 'listingEdits/no-such-listing')));
+  const mine = await assertSucceeds(getDoc(doc(as.seller('alice'), 'listingEdits/without-edit')));
+  assert.equal(mine.exists(), false);
+  // The Profile page lists the seller's own edits with a query.
+  const own = await assertSucceeds(getDocs(query(collection(as.seller('alice'), 'listingEdits'), where('user_id', '==', 'alice'))));
+  assert.equal(own.size, 1);
 });
 
 test('free listings wait for admin approval and stay private until then', async () => {

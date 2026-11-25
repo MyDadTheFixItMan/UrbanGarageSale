@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
-import { Trash2, Eye, Pencil, Printer } from 'lucide-react';
+import { Trash2, Eye, Pencil, Printer, Share2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,6 +21,7 @@ import { createPageUrl } from '../../utils';
 import { listingActions } from './profileListings';
 import { coverImage } from '@/lib/listings';
 import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
+import { listingPath } from '@/lib/seo/site';
 
 const statusConfig = {
     draft: { label: 'Draft', color: 'bg-slate-100 text-slate-700' },
@@ -30,7 +31,7 @@ const statusConfig = {
     rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700' },
 };
 
-export default function ProfileListingCard({ listing, edit, onDelete, onPrint }) {
+export default function ProfileListingCard({ listing, edit, onDelete, onPrint, onShare }) {
     const status = statusConfig[listing.status] || statusConfig.draft;
     const actions = listingActions(listing);
 
@@ -84,9 +85,20 @@ export default function ProfileListingCard({ listing, edit, onDelete, onPrint })
                     </div>
                 )}
 
+                {actions.share && onShare && (
+                    <Button
+                        size="sm"
+                        className="w-full h-9 mb-3 text-sm font-medium bg-navy hover:bg-navy-dark"
+                        onClick={() => onShare(listing)}
+                    >
+                        <Share2 className="w-4 h-4 mr-1.5" />
+                        Share your sale
+                    </Button>
+                )}
+
                 <div className="flex gap-3">
                     {actions.view && (
-                        <Link to={createPageUrl(`ListingDetails?id=${listing.id}`)} className="flex-1">
+                        <Link to={listingPath(listing)} className="flex-1">
                             <Button size="sm" variant="outline" className="w-full h-9 text-sm font-medium">
                                 <Eye className="w-4 h-4 mr-1.5" />
                                 View

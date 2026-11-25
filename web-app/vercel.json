@@ -2,10 +2,36 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
+  "regions": ["syd1"],
+  "functions": {
+    "api/page.js": {
+      "includeFiles": "dist/index.html"
+    }
+  },
   "rewrites": [
     {
+      "source": "/ListingDetails",
+      "has": [
+        {
+          "type": "query",
+          "key": "id",
+          "value": "(?<id>[A-Za-z0-9_-]{1,128})"
+        },
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|WhatsApp|Slackbot|LinkedInBot|TelegramBot|Discordbot|Pinterestbot|Pinterest/0\\.|SkypeUriPreview|redditbot|Snap URL Preview|Mastodon/|Cardyb|Embedly|Iframely).*"
+        }
+      ],
+      "destination": "https://urban-garage-sale.vercel.app/api/listingPreview?id=:id"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
       "source": "/(.*)",
-      "destination": "/"
+      "destination": "/api/page?path=/$1"
     }
   ],
   "headers": [

@@ -1,7 +1,7 @@
 // Pure helpers for the profile page's listings. No React or Firebase, so they are unit tested directly.
 import { isBefore, parseISO, startOfDay } from 'date-fns';
 import { passwordProblem } from '@/lib/password';
-import { LISTING_STATUS, isLiveStatus, isPaid, isUnpaidDraft } from '@/lib/listings';
+import { LISTING_STATUS, canBeShared, isLiveStatus, isPaid, isUnpaidDraft } from '@/lib/listings';
 
 export { isUnpaidDraft };
 
@@ -20,14 +20,16 @@ export function groupProfileListings(listings, today = new Date()) {
     };
 }
 
-// Which actions the listing card offers for a listing.
-export function listingActions(listing) {
+// Which actions the listing card offers for a listing. Sharing waits for approval, because until
+// then the people a seller shares it with can't open it. `today` (YYYY-MM-DD) is for tests.
+export function listingActions(listing, today) {
     const viewable = [LISTING_STATUS.ACTIVE, LISTING_STATUS.PENDING_APPROVAL, LISTING_STATUS.COMPLETED, LISTING_STATUS.REJECTED].includes(listing.status);
     return {
         view: viewable,
         edit: isUnpaidDraft(listing) || listing.status === LISTING_STATUS.ACTIVE,
         pay: isUnpaidDraft(listing),
         print: isLiveStatus(listing),
+        share: canBeShared(listing, today),
     };
 }
 

@@ -22,7 +22,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { API_BASE_URL, apiFetch } from '@/lib/api-base';
-import { auth, db, isDevelopment } from './app';
+import { auth, authRecaptchaReady, db, isDevelopment } from './app';
 import {
   normalizePhone,
   smsErrorMessage,
@@ -99,12 +99,8 @@ function clearRecaptchaElement(element) {
 
 // The current invisible reCAPTCHA verifier for SMS codes (one per page).
 let recaptchaVerifier = null;
-// A verifier loaded ahead of time by prepareRecaptcha, waiting for its first send:
-// { elementId, element, verifier }.
-let preparedRecaptcha = null;
 
 function clearRecaptchaVerifier() {
-  preparedRecaptcha = null;
   if (recaptchaVerifier) {
     try {
       recaptchaVerifier.clear();
@@ -115,15 +111,37 @@ function clearRecaptchaVerifier() {
   }
 }
 
-// The verifier prepareRecaptcha loaded for this element, if it's still unused and on the page;
-// otherwise a fresh one. Each is used for one send only (see setupRecaptcha).
-function recaptchaFor(elementId) {
-  const prepared = preparedRecaptcha;
-  preparedRecaptcha = null;
-  if (prepared && prepared.elementId === elementId && prepared.verifier === recaptchaVerifier
-      && prepared.element?.isConnected && document.getElementById(elementId) === prepared.element) {
-    return Promise.resolve(prepared.verifier);
+// Google's reply to an SMS send normally takes a few seconds. If reCAPTCHA never answers, the
+// send would wait forever, so give up and let the person press Resend.
+export const SMS_SEND_TIMEOUT_MS = 30000;
+
+function withSendTimeout(promise) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new AppError(
+      'Sending the code is taking too long. Please press Resend, or go back and sign in again.',
+      { code: 'auth/sms-send-timeout' }
+    )), SMS_SEND_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// True when the project makes every SMS send pass reCAPTCHA Enterprise (ENFORCE). Then Firebase
+// never uses the older invisible reCAPTCHA (v2), so its script needn't load at all. In AUDIT or
+// OFF it is still the fallback. Reads Firebase's cached copy of the project setting.
+function phoneUsesEnterpriseOnly() {
+  try {
+    return /** @type {any} */ (auth)._getRecaptchaConfig?.()?.getProviderEnforcementState?.('PHONE_PROVIDER') === 'ENFORCE';
+  } catch {
+    return false;
   }
+}
+
+// A fresh verifier for every send, the first one included. Reusing the one prepareRecaptcha
+// rendered when the page opened made the first code fail to arrive on phones while Resend,
+// which always got a fresh one, worked. Google's script is already loaded by then, so this is
+// still quick.
+function recaptchaFor(elementId) {
   return firebaseAuth.setupRecaptcha(elementId);
 }
 
@@ -360,17 +378,15 @@ export const firebaseAuth = {
     });
   },
 
-  // Loads Google's reCAPTCHA before it's needed, so pressing Send doesn't wait for it to
-  // download. Call once the element is on the page. A failure here is ignored: the send then
-  // sets up its own verifier.
+  // Loads Google's reCAPTCHA script before it's needed, so pressing Send doesn't wait for it to
+  // download. Call once the element is on the page. The verifier rendered here only loads the
+  // script; each send sets up its own (recaptchaFor). A failure here is ignored.
   prepareRecaptcha: async (elementId) => {
     try {
+      await authRecaptchaReady;
+      if (phoneUsesEnterpriseOnly()) return;
       const verifier = await firebaseAuth.setupRecaptcha(elementId);
       await verifier.render();
-      // A send may have replaced it while it loaded.
-      if (recaptchaVerifier === verifier) {
-        preparedRecaptcha = { elementId, element: document.getElementById(elementId), verifier };
-      }
     } catch (error) {
       console.log('ℹ reCAPTCHA not loaded ahead:', error.message);
     }
@@ -408,11 +424,12 @@ export const firebaseAuth = {
     }
     const verifier = await recaptchaFor(recaptchaElementId);
     try {
-      pendingMfaVerificationId = await new PhoneAuthProvider(auth).verifyPhoneNumber(
+      pendingMfaVerificationId = await withSendTimeout(new PhoneAuthProvider(auth).verifyPhoneNumber(
         { multiFactorHint: hint, session: pendingMfaResolver.session },
         verifier
-      );
+      ));
     } catch (error) {
+      if (error instanceof AppError) throw error;
       throw new AppError(smsErrorMessage(error), { code: error.code, cause: error });
     }
   },
@@ -472,11 +489,12 @@ export const firebaseAuth = {
     const normalized = normalizePhone(phoneNumber);
     try {
       const session = await multiFactor(user).getSession();
-      pendingEnrollmentVerificationId = await new PhoneAuthProvider(auth).verifyPhoneNumber(
+      pendingEnrollmentVerificationId = await withSendTimeout(new PhoneAuthProvider(auth).verifyPhoneNumber(
         { phoneNumber: normalized, session },
         verifier
-      );
+      ));
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error.code === 'auth/requires-recent-login') {
         throw new AppError('For your security, please sign out and sign in again before turning on 2FA.', { code: error.code, cause: error });
       }

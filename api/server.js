@@ -31,6 +31,7 @@ app.use(express.json({ limit: '1mb' }));
 
 // Route path -> handler module (relative to this folder)
 const routes = {
+  '/api/listingPreview': './listingPreview.js',
   '/api/setUserClaims': './setUserClaims.ts',
   '/api/stripeTerminal/createConnectionToken': './stripeTerminal/createConnectionToken.js',
   '/api/urbanPayment/createPaymentIntent': './urbanPayment/createPaymentIntent.js',
@@ -66,6 +67,6 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Urban Garage Sale API running at http://localhost:${PORT}`);
+  console.log(`Urban Garage Sales API running at http://localhost:${PORT}`);
   console.log('Routes:\n  ' + Object.keys(routes).join('\n  '));
 });

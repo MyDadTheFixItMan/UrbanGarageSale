@@ -24,7 +24,7 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-// The house style for every email Urban Garage Sale sends. The colours are the website's
+// The house style for every email Urban Garage Sales sends. The colours are the website's
 // (web-app/tailwind.config.js); white text only goes on orangeDark or darker, as on the site.
 const EMAIL_COLOURS = {
     navy: '#1e3a5f',
@@ -43,9 +43,9 @@ const DEFAULT_SITE_URL = 'https://urbangaragesales.com.au';
 // The logo always comes from the live site (www, which skips the redirect from the bare
 // domain), so emails sent from staging or a local build show it too.
 const EMAIL_LOGO_URL = 'https://www.urbangaragesales.com.au/email-logo.png';
-const EMAIL_SELLER_NOTE = 'You received this email because you listed a sale on Urban Garage Sale.';
-const EMAIL_CONTACT_NOTE = 'You received this email because you sent us a message through Urban Garage Sale.';
-const EMAIL_ADMIN_NOTE = 'You received this email because you are an Urban Garage Sale admin.';
+const EMAIL_SELLER_NOTE = 'You received this email because you listed a sale on Urban Garage Sales.';
+const EMAIL_CONTACT_NOTE = 'You received this email because you sent us a message through Urban Garage Sales.';
+const EMAIL_ADMIN_NOTE = 'You received this email because you are an Urban Garage Sales admin.';
 
 // The website address links point at, without a trailing slash.
 function siteBase(siteUrl) {
@@ -133,17 +133,17 @@ function emailLayout({ siteUrl, preheader, heading, body, button, signoff = true
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:${EMAIL_FONT};">
             <tr><td height="6" bgcolor="${c.orange}" style="height:6px;line-height:6px;font-size:0;background:${c.orange};background-image:linear-gradient(90deg, ${c.orange}, ${c.teal});">&nbsp;</td></tr>
             <tr><td class="ugs-pad" style="padding:24px 32px 8px;">
-                <a href="${escapeHtml(site)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;"><img src="${EMAIL_LOGO_URL}" width="170" height="78" alt="Urban Garage Sale" style="display:block;border:0;width:170px;height:78px;font-family:${EMAIL_FONT};font-size:24px;font-weight:bold;color:${c.orangeDark};"></a>
+                <a href="${escapeHtml(site)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;"><img src="${EMAIL_LOGO_URL}" width="170" height="78" alt="Urban Garage Sales" style="display:block;border:0;width:170px;height:78px;font-family:${EMAIL_FONT};font-size:24px;font-weight:bold;color:${c.orangeDark};"></a>
             </td></tr>
             <tr><td class="ugs-pad" style="padding:16px 32px 8px;color:${c.text};font-size:16px;line-height:1.6;">
                 <h1 class="ugs-heading" style="margin:0 0 16px;color:${c.navy};font-size:26px;line-height:1.25;font-weight:800;">${heading}</h1>
                 ${body}
                 ${button ? emailButton(button.label, button.url) : ''}
-                ${signoff ? emailParagraph('Cheers,<br><strong>The Urban Garage Sale team</strong>') : ''}
+                ${signoff ? emailParagraph('Cheers,<br><strong>The Urban Garage Sales team</strong>') : ''}
             </td></tr>
             <tr><td class="ugs-pad" style="padding:20px 32px 24px;border-top:1px solid ${c.line};background:#fbfaf7;color:${c.muted};font-size:13px;line-height:1.6;">
                 <p style="margin:0 0 10px;">${footerLinks}</p>
-                <p style="margin:0 0 10px;"><strong style="color:${c.navy};">Urban Garage Sale</strong> · Find unique treasures in your neighbourhood.</p>
+                <p style="margin:0 0 10px;"><strong style="color:${c.navy};">Urban Garage Sales</strong> · Find unique treasures in your neighbourhood.</p>
                 <p style="margin:0;">${note ? `${note} ` : ''}Questions? Email ${emailLink(SUPPORT_EMAIL, `mailto:${SUPPORT_EMAIL}`)} or read our ${emailLink('privacy policy', `${site}/Privacy`)}.</p>
             </td></tr>
         </table>
@@ -186,15 +186,16 @@ function approvalEmailHtml({ title, saleId, siteUrl }) {
         preheader: 'Your listing has been approved and buyers can now find it.',
         heading: 'Your garage sale is live!',
         body: [
-            emailParagraph(`Great news! ${listingName(title)} has been approved and is now live on Urban Garage Sale, so buyers near you can find it.`),
+            emailParagraph(`Great news! ${listingName(title)} has been approved and is now live on Urban Garage Sales, so buyers near you can find it.`),
             emailParagraph('<strong>A few tips for a great sale:</strong>'),
             emailList([
-                'Share your listing with friends, family and local community groups.',
+                'Share it in local buy, swap and sell groups, on Instagram and with friends. The Share button on your listing has its link, a flyer image and words for your post.',
                 'Put up signs on the day so passers-by can find you.',
                 'Price items clearly and have some change ready.',
             ]),
         ].join('\n'),
-        button: { label: 'View your listing', url: saleId ? `${site}/ListingDetails?id=${encodeURIComponent(saleId)}` : `${site}/Profile` },
+        // share=1 opens the listing's share options as soon as it loads.
+        button: { label: 'View and share your listing', url: saleId ? `${site}/ListingDetails?id=${encodeURIComponent(saleId)}&share=1` : `${site}/Profile` },
         note: EMAIL_SELLER_NOTE,
     });
 }
@@ -213,7 +214,7 @@ function rejectionEmailHtml({ title, reason, refunded, freeCode, siteUrl }) {
         preheader: "Here's why, and how to list your sale again.",
         heading: "Your listing wasn't approved",
         body: [
-            emailParagraph(`Unfortunately ${listingName(title)} wasn't approved, so it won't appear on Urban Garage Sale.`),
+            emailParagraph(`Unfortunately ${listingName(title)} wasn't approved, so it won't appear on Urban Garage Sales.`),
             emailBox('Reason', reason, EMAIL_COLOURS.orange),
             refundLine,
             emailParagraph("You're welcome to create a new listing with these changes. We'd love to help you have a great sale."),
@@ -245,7 +246,7 @@ function contactResponseEmailHtml({ userName, originalMessage, responseMessage, 
         heading: "We've replied to your message",
         body: [
             emailParagraph(`Hi ${escapeHtml(userName || 'there')},`),
-            emailParagraph('Thanks for getting in touch with Urban Garage Sale. Here is our reply.'),
+            emailParagraph('Thanks for getting in touch with Urban Garage Sales. Here is our reply.'),
             emailBox('Our reply', responseMessage, EMAIL_COLOURS.teal),
             emailBox('Your message', originalMessage, EMAIL_COLOURS.line),
             emailParagraph('If you have any more questions, send us another message through our Contact page.'),
@@ -259,13 +260,15 @@ function contactResponseEmailHtml({ userName, originalMessage, responseMessage, 
 // (https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<encoded path>?alt=media&token=…),
 // or null for anything else. Only paths under listings/ are returned, so a crafted URL can't
 // point the cleanup at other files.
-function storagePathFromUrl(url) {
+function storagePathFromUrl(url, bucket) {
     if (typeof url !== 'string') return null;
-    const match = url.match(/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/[^/]+\/o\/([^?#]+)/);
+    const match = url.match(/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/([^/]+)\/o\/([^?#]+)/);
     if (!match) return null;
+    // With `bucket`, a URL into any other bucket isn't one of the site's files.
+    if (bucket !== undefined && match[1] !== bucket) return null;
     let path;
     try {
-        path = decodeURIComponent(match[1]);
+        path = decodeURIComponent(match[2]);
     } catch {
         return null;
     }
@@ -278,7 +281,7 @@ function listingPhotoPaths(listing) {
     if (!listing?.user_id) return [];
     const urls = [...(listing.photos || []), ...(listing.thumbnails || [])];
     const ownFolder = `listings/${listing.user_id}/`;
-    return [...new Set(urls.map(storagePathFromUrl).filter((path) => path?.startsWith(ownFolder)))];
+    return [...new Set(urls.map((url) => storagePathFromUrl(url)).filter((path) => path?.startsWith(ownFolder)))];
 }
 
 // The Storage paths `before` used that none of `stillUsed` do: what's safe to delete once a listing

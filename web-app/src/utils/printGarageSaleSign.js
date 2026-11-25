@@ -44,6 +44,9 @@ const SALE_TYPE_LABELS = {
   clearing_sale: 'CLEARING SALE',
   auction: 'AUCTION',
   street_sale: 'STREET SALE',
+  church_sale: 'CHURCH SALE',
+  car_boot_sale: 'CAR BOOT SALE',
+  deceased_estate: 'DECEASED ESTATE',
 };
 
 export function saleTypeLabel(saleType) {
@@ -165,7 +168,7 @@ export function buildPosterHtml(listing, { logoUrl, qrCodeDataUrl, fontsUrl = '/
               <div class="poster-cta-head">Scan to see<br>what&rsquo;s for sale</div>
               <div class="poster-cta-sub">Photos, map &amp; directions</div>
               <div class="poster-brand">
-                <img src="${logoUrl}" alt="Urban Garage Sale" class="poster-logo">
+                <img src="${logoUrl}" alt="Urban Garage Sales" class="poster-logo">
                 <div>Find more sales near you<b>urbangaragesales.com.au</b></div>
               </div>
             </div>

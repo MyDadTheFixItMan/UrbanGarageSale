@@ -39,21 +39,26 @@ describe('groupProfileListings', () => {
 
 describe('listingActions', () => {
   it('lets sellers pay for and edit unpaid drafts, but not view or print them', () => {
-    expect(listingActions({ status: 'draft' })).toEqual({ view: false, edit: true, pay: true, print: false });
+    expect(listingActions({ status: 'draft' })).toEqual({ view: false, edit: true, pay: true, print: false, share: false });
     expect(isUnpaidDraft({ status: 'pending_payment' })).toBe(true);
   });
 
-  it('lets sellers view, edit and print approved listings', () => {
-    expect(listingActions({ status: 'active' })).toEqual({ view: true, edit: true, pay: false, print: true });
+  it('lets sellers view, edit, print and share approved listings', () => {
+    expect(listingActions({ status: 'active' })).toEqual({ view: true, edit: true, pay: false, print: true, share: true });
   });
 
-  it('lets sellers view and print listings awaiting approval, but not edit them', () => {
-    expect(listingActions({ status: 'pending_approval' })).toEqual({ view: true, edit: false, pay: false, print: true });
+  it('stops offering to share a sale once it has finished', () => {
+    expect(listingActions({ status: 'active', end_date: '2026-10-08' }, '2026-10-09').share).toBe(false);
+    expect(listingActions({ status: 'active', end_date: '2026-10-09' }, '2026-10-09').share).toBe(true);
+  });
+
+  it('lets sellers view and print listings awaiting approval, but not edit or share them', () => {
+    expect(listingActions({ status: 'pending_approval' })).toEqual({ view: true, edit: false, pay: false, print: true, share: false });
   });
 
   it('only lets sellers view finished or rejected listings', () => {
-    expect(listingActions({ status: 'completed' })).toEqual({ view: true, edit: false, pay: false, print: false });
-    expect(listingActions({ status: 'rejected' })).toEqual({ view: true, edit: false, pay: false, print: false });
+    expect(listingActions({ status: 'completed' })).toEqual({ view: true, edit: false, pay: false, print: false, share: false });
+    expect(listingActions({ status: 'rejected' })).toEqual({ view: true, edit: false, pay: false, print: false, share: false });
   });
 });
 

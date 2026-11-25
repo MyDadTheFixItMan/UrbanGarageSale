@@ -157,7 +157,8 @@ test('rejectionEmailHtml tells the seller a free listing code they used works ag
 test('approvalEmailHtml names the listing and escapes its title', () => {
     const html = approvalEmailHtml({ title: '<b>Sale</b>', saleId: 'abc123', siteUrl: 'https://example.com/' });
     assert.match(html, /has been approved/);
-    assert.match(html, /href="https:\/\/example\.com\/ListingDetails\?id=abc123"/);
+    // Opens the listing with its share options showing.
+    assert.match(html, /href="https:\/\/example\.com\/ListingDetails\?id=abc123&amp;share=1"[^>]*>View and share your listing</);
     assert.match(html, /&lt;b&gt;Sale&lt;\/b&gt;/);
     assert.doesNotMatch(html, /<b>Sale<\/b>/);
 });
@@ -177,22 +178,28 @@ test('every email has the same logo, button, footer and plain-text copy', () => 
         contactResponseEmailHtml({ responseMessage: 'Yes', siteUrl: 'https://example.com' }),
     ];
     for (const html of emails) {
-        assert.match(html, /<img src="https:\/\/www\.urbangaragesales\.com\.au\/email-logo\.png"[^>]*alt="Urban Garage Sale"/);
+        assert.match(html, /<img src="https:\/\/www\.urbangaragesales\.com\.au\/email-logo\.png"[^>]*alt="Urban Garage Sales"/);
         assert.match(html, /bgcolor="#c2410c"/);
         assert.match(html, /href="https:\/\/example\.com\/Privacy"/);
         assert.match(html, /admin@urbangaragesales\.com\.au/);
         assert.doesNotMatch(html, /support@/);
         const text = emailText(html);
         assert.doesNotMatch(text, /<|&nbsp;|&amp;/);
-        assert.match(text, /The Urban Garage Sale team/);
+        assert.match(text, /The Urban Garage Sales team/);
     }
 });
 
 test('emailText keeps link addresses and drops the hidden preview line', () => {
     const text = emailText(approvalEmailHtml({ title: "Tom & Sue's sale", saleId: 's1', siteUrl: 'https://example.com' }));
-    assert.match(text, /^Urban Garage Sale \(https:\/\/example\.com\)\n\nYour garage sale is live!/);
+    assert.match(text, /^Urban Garage Sales \(https:\/\/example\.com\)\n\nYour garage sale is live!/);
     assert.match(text, /Tom & Sue's sale/);
-    assert.match(text, /View your listing \(https:\/\/example\.com\/ListingDetails\?id=s1\)/);
-    assert.match(text, /- Share your listing/);
+    assert.match(text, /View and share your listing \(https:\/\/example\.com\/ListingDetails\?id=s1&share=1\)/);
+    assert.match(text, /- Share it in local buy, swap and sell groups/);
     assert.doesNotMatch(text, /buyers can now find it\./);
+});
+
+test('storagePathFromUrl with a bucket refuses URLs into any other bucket', () => {
+    const url = (bucket) => `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/listings%2Fu1%2Fa.jpg?alt=media`;
+    assert.equal(storagePathFromUrl(url('site.firebasestorage.app'), 'site.firebasestorage.app'), 'listings/u1/a.jpg');
+    assert.equal(storagePathFromUrl(url('attacker.appspot.com'), 'site.firebasestorage.app'), null);
 });

@@ -33,7 +33,7 @@ const dayLabel = (isoDate) => (isoDate ? format(parseISO(isoDate), AU_DATE) : ''
 
 // The text a code is shared as (by text message or any app the phone offers).
 const shareMessage = (code, expiresOn) =>
-    `Here's a code for a free garage sale listing on Urban Garage Sale: ${code}\n` +
+    `Here's a code for a free garage sale listing on Urban Garage Sales: ${code}\n` +
     `Enter it under "Have a free listing code?" when you create your listing at ${window.location.origin}${createPageUrl('CreateListing')}` +
     (expiresOn ? ` (use it by ${dayLabel(expiresOn)}).` : '.');
 

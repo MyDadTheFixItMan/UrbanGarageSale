@@ -11,6 +11,7 @@ import OAuthButtons, { signInWithProvider } from './login/OAuthButtons';
 import SecondFactorDialog, { RECAPTCHA_CONTAINER_ID } from './login/SecondFactorDialog';
 import SignUpForm from './login/SignUpForm';
 import { oauthErrorMessage } from './login/loginForms';
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 const INPUT_CLASS = 'w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent';
 
@@ -55,12 +56,12 @@ export default function Login() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Rotate promotional messages every 5 seconds
+  // Rotate promotional messages every 10 seconds
   useEffect(() => {
     if (allPromotions.length === 0) return;
     const interval = setInterval(() => {
       setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-    }, 5000);
+    }, PROMO_ROTATE_MS);
     return () => clearInterval(interval);
   }, [allPromotions.length]);
 

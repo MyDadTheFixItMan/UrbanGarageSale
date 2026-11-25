@@ -7,12 +7,15 @@ import { Button } from "@/components/ui/button";
 import { BUSINESS_NAME, BUSINESS_ABN } from '@/lib/business';
 import { profileProblem, normalizePhone } from '@/pages/login/loginForms';
 import { toast } from 'sonner';
+import { PAGE_META, pageDocumentTitle } from '@/lib/seo/site';
 
 // Loaded only for someone who needs it, so the address lookup isn't in every page's download.
 const CompleteProfileDialog = lazy(() => import('@/pages/profile/ProfileDialogs')
     .then((module) => ({ default: module.CompleteProfileDialog })));
 
 const TwoFactorSetupDialog = lazy(() => import('@/components/TwoFactorSetupDialog'));
+
+const SignInPromptDialog = lazy(() => import('@/components/SignInPromptDialog'));
 
 // Texting the 2FA code automatically is skipped if it was done in the last few minutes (say, before
 // a page refresh): repeated texts to one number make Google and carriers hold later ones.
@@ -55,12 +58,23 @@ const PROFILE_OPTIONAL_PAGES = ['Login', 'ResetPassword', 'Terms', 'Privacy'];
 export default function Layout({ children, currentPageName }) {
     const [user, setUser] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    // False until Firebase has said whether anyone is signed in.
+    const [authKnown, setAuthKnown] = useState(false);
+    // The page whose "please sign in" popup is showing, if any.
+    const [signInPromptPage, setSignInPromptPage] = useState(null);
 
     // Follows logins as they happen: signing up changes pages without reloading this header.
     useEffect(() => firebase.auth.onAuthStateChanged(async (authUser) => {
         setIsAuthenticated(!!authUser);
+        setAuthKnown(true);
         setUser(authUser ? await firebase.auth.me() : null);
     }), []);
+
+    // The browser tab's title. The sale and suburb pages set their own (not in PAGE_META).
+    useEffect(() => {
+        const title = currentPageName !== 'ListingDetails' && pageDocumentTitle(currentPageName);
+        if (title) document.title = title;
+    }, [currentPageName]);
 
     // Read again on each page: sign-up saves the profile after the sign-in event above.
     useEffect(() => {
@@ -115,11 +129,12 @@ export default function Layout({ children, currentPageName }) {
         }
     };
 
-    // shortName labels the mobile bottom bar, where there is room for one word.
+    // shortName labels the mobile bottom bar, where there is room for one word. Items with
+    // signInPrompt are shown to everyone, but someone signed out gets a popup asking them to sign in.
     const navItems = [
         { name: 'Home', shortName: 'Home', page: 'Home', icon: Home, requiresAuth: false },
-        { name: 'Create Listing', shortName: 'Create', page: 'CreateListing', icon: Plus, requiresAuth: false },
-        { name: 'Favourites', shortName: 'Favourites', page: 'SavedListings', icon: Heart, requiresAuth: false },
+        { name: 'Create Listing', shortName: 'Create', page: 'CreateListing', icon: Plus, requiresAuth: false, signInPrompt: true },
+        { name: 'Favourites', shortName: 'Favourites', page: 'SavedListings', icon: Heart, requiresAuth: false, signInPrompt: true },
         { name: 'Urban Pay', shortName: 'Pay', page: 'UrbanPay', icon: Smartphone, requiresAuth: true },
         { name: 'Profile', shortName: 'Profile', page: 'Profile', icon: User, requiresAuth: true },
         { name: 'Admin', shortName: 'Admin', page: 'AdminDashboard', icon: Shield, requiresAuth: 'admin' },
@@ -131,6 +146,15 @@ export default function Layout({ children, currentPageName }) {
         (item.requiresAuth === 'admin' && user?.role === 'admin')
     );
 
+    // Before Firebase answers, the link works as normal; the page itself sends anyone signed out
+    // to the login page.
+    const handleNavClick = (item) => (event) => {
+        if (item.signInPrompt && authKnown && !isAuthenticated) {
+            event.preventDefault();
+            setSignInPromptPage(item.page);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-brand-cream flex flex-col pb-20 md:pb-0">
             {/* Header: logo, menu and log in/out. The three-column grid keeps the menu centred. */}
@@ -139,7 +163,7 @@ export default function Layout({ children, currentPageName }) {
                     <Link to={createPageUrl('Home')} className="justify-self-start flex-shrink-0">
                         <img
                             src="/logo-header.webp"
-                            alt="Urban Garage Sale"
+                            alt="Urban Garage Sales"
                             width="383"
                             height="176"
                             className="h-12 md:h-14 w-auto"
@@ -152,6 +176,7 @@ export default function Layout({ children, currentPageName }) {
                             <Link
                                 key={item.page}
                                 to={createPageUrl(item.page)}
+                                onClick={handleNavClick(item)}
                                 aria-current={currentPageName === item.page ? 'page' : undefined}
                                 className={`px-2.5 lg:px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                                     currentPageName === item.page
@@ -198,13 +223,13 @@ export default function Layout({ children, currentPageName }) {
                 <div className="w-full px-4 py-4 md:py-6">
                     <div className="flex items-center justify-center md:justify-center">
                         <nav className="flex items-center gap-4 md:gap-6 flex-wrap justify-center">
-                            <Link to={createPageUrl('About')} className="text-xs md:text-sm hover:text-slate-300 transition-colors">About</Link>
+                            <Link to={PAGE_META.About.path} className="text-xs md:text-sm hover:text-slate-300 transition-colors">About</Link>
                             <span className="text-xs md:text-sm text-slate-400">•</span>
-                            <Link to={createPageUrl('Contact')} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Contact</Link>
+                            <Link to={PAGE_META.Contact.path} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Contact</Link>
                             <span className="text-xs md:text-sm text-slate-400">•</span>
-                            <Link to={createPageUrl('Privacy')} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Privacy</Link>
+                            <Link to={PAGE_META.Privacy.path} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Privacy</Link>
                             <span className="text-xs md:text-sm text-slate-400">•</span>
-                            <Link to={createPageUrl('Terms')} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Terms</Link>
+                            <Link to={PAGE_META.Terms.path} className="text-xs md:text-sm hover:text-slate-300 transition-colors">Terms</Link>
                         </nav>
                     </div>
                     <p className="mt-2 text-center text-xs text-slate-300">
@@ -223,6 +248,7 @@ export default function Layout({ children, currentPageName }) {
                             <Link
                                 key={item.page}
                                 to={createPageUrl(item.page)}
+                                onClick={handleNavClick(item)}
                                 aria-current={isCurrent ? 'page' : undefined}
                                 className={`flex-1 flex flex-col items-center justify-center border-t-[3px] transition-colors ${
                                     isCurrent
@@ -238,6 +264,11 @@ export default function Layout({ children, currentPageName }) {
                 </div>
             </nav>
 
+            {signInPromptPage && (
+                <Suspense fallback={null}>
+                    <SignInPromptDialog page={signInPromptPage} onClose={() => setSignInPromptPage(null)} />
+                </Suspense>
+            )}
             {needsProfile && (
                 <Suspense fallback={null}>
                     <CompleteProfileDialog

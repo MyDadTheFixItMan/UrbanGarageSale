@@ -50,14 +50,14 @@ function getStripe() {
 
 // Returns false (and sends nothing) when SendGrid isn't configured. Secret Manager can't hold an
 // empty value, so projects without email (e.g. staging) set the secret to "not-configured".
-// Every email goes out from "Urban Garage Sale", replies go to SUPPORT_EMAIL, and a plain-text copy is
+// Every email goes out from "Urban Garage Sales", replies go to SUPPORT_EMAIL, and a plain-text copy is
 // made from the HTML (lib/helpers.js emailLayout gives every email the same look).
 async function sendEmail(message) {
     const key = process.env.SENDGRID_API_KEY;
     if (!key || key === 'not-configured') return false;
     sgMail.setApiKey(key);
     await sgMail.send({
-        from: { email: FROM_EMAIL, name: 'Urban Garage Sale' },
+        from: { email: FROM_EMAIL, name: 'Urban Garage Sales' },
         replyTo: SUPPORT_EMAIL,
         text: emailText(message.html),
         ...message,
@@ -237,7 +237,7 @@ exports.createStripeCheckout = callable(['STRIPE_SECRET_KEY'], async (request) =
                         currency: 'aud',
                         product_data: {
                             name: `Garage sale listing: ${(listingData.title || 'Untitled').slice(0, 80)}`,
-                            description: 'Publish your garage sale on Urban Garage Sale. Price includes GST.',
+                            description: 'Publish your garage sale on Urban Garage Sales. Price includes GST.',
                         },
                         unit_amount: LISTING_FEE_CENTS,
                     },
@@ -716,13 +716,16 @@ const REVIEW_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'
 // this when uploaded.
 const MAX_REVIEW_PHOTO_BYTES = 3.5 * 1024 * 1024;
 
-// The listing's photos as image blocks for Claude, read from the seller's own Storage folder
-// (photo URLs are written by the seller, so nothing else is fetched). Throws if one can't be read.
+// The listing's photos, then its thumbnails, as image blocks for Claude, read from the seller's
+// own folder in the site's own Storage bucket (photo URLs are written by the seller, so nothing
+// else is fetched, and a URL into another bucket would show buyers a different file from the one
+// checked). Throws if one can't be read.
 async function reviewPhotoBlocks(listing) {
     const bucket = getStorage().bucket();
     const ownFolder = `listings/${listing.user_id}/`;
-    return Promise.all((listing.photos || []).map(async (url) => {
-        const path = storagePathFromUrl(url);
+    const urls = [...(listing.photos || []), ...(listing.thumbnails || []).filter(Boolean)];
+    return Promise.all(urls.map(async (url) => {
+        const path = storagePathFromUrl(url, bucket.name);
         if (!path?.startsWith(ownFolder)) throw new Error("a photo isn't stored in the seller's folder");
         const file = bucket.file(path);
         const [metadata] = await file.getMetadata();
@@ -754,7 +757,10 @@ async function checkListing(saleId, listing) {
             },
             messages: [{
                 role: 'user',
-                content: [{ type: 'text', text: listingReview.listingText(listing, photos.length) }, ...photos],
+                content: [{
+                    type: 'text',
+                    text: listingReview.listingText(listing, (listing.photos || []).length, (listing.thumbnails || []).filter(Boolean).length),
+                }, ...photos],
             }],
         });
         return listingReview.readVerdict(message);
@@ -836,6 +842,26 @@ exports.syncPublicListing = onDocumentWritten({ document: 'garageSales/{saleId}'
     if (copy) await publicRef.set(copy);
     else await publicRef.delete();
 });
+
+// Photos are write-once and sellers can't delete them (storage.rules), so a seller can't swap
+// the picture behind an approved listing. They are deleted here instead, once a listing or edit
+// stops using them (photos removed, listing deleted, edit replaced or withdrawn), and only if
+// none of the seller's other listings or edits still uses them.
+async function deletePhotosNoLongerUsed(before, after) {
+    const sellerId = before?.user_id;
+    const dropped = unusedPhotoPaths(before, ...(after ? [after] : []));
+    if (!sellerId || !dropped.length) return;
+    const [sales, edits] = await Promise.all(['garageSales', 'listingEdits'].map((name) =>
+        db.collection(name).where('user_id', '==', sellerId).select('user_id', 'photos', 'thumbnails').get()));
+    const stillUsed = new Set([...sales.docs, ...edits.docs].flatMap((doc) => listingPhotoPaths(doc.data())));
+    await deleteStorageFiles(dropped.filter((path) => !stillUsed.has(path)));
+}
+
+const photoCleanupTrigger = (document) => onDocumentWritten({ document, region: DATABASE_REGION, retry: true }, (event) =>
+    deletePhotosNoLongerUsed(event.data?.before?.data(), event.data?.after?.data()));
+
+exports.cleanUpListingPhotos = photoCleanupTrigger('garageSales/{saleId}');
+exports.cleanUpListingEditPhotos = photoCleanupTrigger('listingEdits/{saleId}');
 
 // Removes buyers' favourites of a listing once it stops being live: ended (by the seller or by
 // expireListings), unpublished by an admin, or deleted. Only live listings can be saved, so a
@@ -948,7 +974,7 @@ exports.sendContactResponseEmail = callable(['SENDGRID_API_KEY'], async (request
 
     const sent = await sendEmail({
         to: userEmail,
-        subject: 'Re: Your Urban Garage Sale enquiry',
+        subject: 'Re: Your Urban Garage Sales enquiry',
         html: contactResponseEmailHtml({ userName, originalMessage, responseMessage, siteUrl: APP_URL }),
     });
     return { success: true, message: sent ? 'Response email sent' : 'Email service not configured' };

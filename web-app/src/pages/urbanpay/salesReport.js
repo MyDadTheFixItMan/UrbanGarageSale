@@ -44,7 +44,7 @@ export function buildSalesReportHtml(sales, generatedAt = new Date()) {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Urban Garage Sale - Sales Report</title>
+            <title>Urban Garage Sales - Sales Report</title>
             <style>${SALES_REPORT_CSS}</style>
         </head>
         <body>
@@ -52,7 +52,7 @@ export function buildSalesReportHtml(sales, generatedAt = new Date()) {
                 <div class="header">
                     <div class="ribbon">
                         <div class="ribbon-text">
-                            <h1>Urban Garage Sale</h1>
+                            <h1>Urban Garage Sales</h1>
                             <p>Sales Performance Report</p>
                         </div>
                     </div>
@@ -94,7 +94,7 @@ export function buildSalesReportHtml(sales, generatedAt = new Date()) {
                 </div>
 
                 <div class="footer">
-                    <div class="footer-text">Urban Garage Sale Platform © ${generatedAt.getFullYear()} — Your Local Garage Sale Hub</div>
+                    <div class="footer-text">Urban Garage Sales Platform © ${generatedAt.getFullYear()} — Your Local Garage Sale Hub</div>
                     <div class="footer-text">Find & List Garage Sales Locally | This report is confidential and for your records only</div>
                 </div>
             </div>

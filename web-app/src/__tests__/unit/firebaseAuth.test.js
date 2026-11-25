@@ -30,13 +30,13 @@ jest.mock('firebase/auth', () => {
   };
 });
 jest.mock('firebase/firestore', () => ({ doc: jest.fn(), getDoc: jest.fn(), setDoc: jest.fn() }));
-jest.mock('@/api/firebase/app', () => ({ auth: { currentUser: null }, db: {}, isDevelopment: true }));
+jest.mock('@/api/firebase/app', () => ({ auth: { currentUser: null }, authRecaptchaReady: Promise.resolve(), db: {}, isDevelopment: true }));
 jest.mock('@/lib/api-base', () => ({ API_BASE_URL: 'https://api.test', apiFetch: jest.fn() }));
 
 import * as sdk from 'firebase/auth';
 import { auth } from '@/api/firebase/app';
 import { apiFetch } from '@/lib/api-base';
-import { firebaseAuth } from '@/api/firebase/auth';
+import { firebaseAuth, SMS_SEND_TIMEOUT_MS } from '@/api/firebase/auth';
 
 const authError = (code, message = code) => Object.assign(new Error(message), { code });
 const jsonResponse = (ok, body, status = ok ? 200 : 400) => ({ ok, status, json: async () => body });
@@ -55,6 +55,7 @@ function signedInUser({ emailVerified = true, claims = {} } = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   auth.currentUser = null;
+  delete auth._getRecaptchaConfig;
   document.body.innerHTML = '<div id="recaptcha-container"></div>';
 });
 
@@ -110,7 +111,7 @@ describe('password sign-in', () => {
     expect(sdk.RecaptchaVerifier.mock.results[0].value.clear).toHaveBeenCalled();
   });
 
-  it('uses the reCAPTCHA loaded ahead for the first send, and a fresh one after that', async () => {
+  it('gives the first send a fresh reCAPTCHA, not the one loaded ahead (its first code never arrived on phones)', async () => {
     const resolver = { hints: [{ factorId: 'phone' }], session: 's' };
     sdk.signInWithEmailAndPassword.mockRejectedValue(authError('auth/multi-factor-auth-required'));
     sdk.getMultiFactorResolver.mockReturnValue(resolver);
@@ -122,12 +123,9 @@ describe('password sign-in', () => {
 
     await firebaseAuth.login('a@b.c', 'pw').catch(() => {});
     await firebaseAuth.sendMfaSignInCode('recaptcha-container');
-    expect(sdk.RecaptchaVerifier).toHaveBeenCalledTimes(1);
-    expect(sdk.PhoneAuthProvider.verifyPhoneNumber.mock.calls[0][1]).toBe(prepared);
-
-    await firebaseAuth.sendMfaSignInCode('recaptcha-container');
     expect(sdk.RecaptchaVerifier).toHaveBeenCalledTimes(2);
-    expect(sdk.PhoneAuthProvider.verifyPhoneNumber.mock.calls[1][1]).not.toBe(prepared);
+    expect(prepared.clear).toHaveBeenCalled();
+    expect(sdk.PhoneAuthProvider.verifyPhoneNumber.mock.calls[0][1]).toBe(sdk.RecaptchaVerifier.mock.results[1].value);
   });
 
   it('ignores a reCAPTCHA loaded ahead once its element has left the page', async () => {
@@ -143,6 +141,38 @@ describe('password sign-in', () => {
     await firebaseAuth.sendMfaSignInCode('recaptcha-container');
     expect(sdk.RecaptchaVerifier).toHaveBeenCalledTimes(2);
     expect(document.getElementById('recaptcha-container').contains(sdk.RecaptchaVerifier.mock.calls[1][1])).toBe(true);
+  });
+
+  it('does not load the older reCAPTCHA ahead when the project enforces reCAPTCHA Enterprise for SMS', async () => {
+    // Loading both kinds on one page is what hung 2FA sign-in when protection was turned on.
+    auth._getRecaptchaConfig = () => ({ getProviderEnforcementState: (provider) => (provider === 'PHONE_PROVIDER' ? 'ENFORCE' : 'OFF') });
+    await firebaseAuth.prepareRecaptcha('recaptcha-container');
+    expect(sdk.RecaptchaVerifier).not.toHaveBeenCalled();
+  });
+
+  it('still loads the older reCAPTCHA ahead when SMS protection is only auditing', async () => {
+    auth._getRecaptchaConfig = () => ({ getProviderEnforcementState: () => 'AUDIT' });
+    await firebaseAuth.prepareRecaptcha('recaptcha-container');
+    expect(sdk.RecaptchaVerifier.mock.results[0].value.render).toHaveBeenCalled();
+  });
+
+  it('gives up on a send that never answers, so the dialog is not stuck on "Sending"', async () => {
+    jest.useFakeTimers();
+    try {
+      const resolver = { hints: [{ factorId: 'phone' }], session: 's' };
+      sdk.signInWithEmailAndPassword.mockRejectedValue(authError('auth/multi-factor-auth-required'));
+      sdk.getMultiFactorResolver.mockReturnValue(resolver);
+      sdk.PhoneAuthProvider.verifyPhoneNumber.mockReturnValue(new Promise(() => {}));
+      await firebaseAuth.login('a@b.c', 'pw').catch(() => {});
+
+      const sending = firebaseAuth.sendMfaSignInCode('recaptcha-container').catch((e) => e);
+      await jest.advanceTimersByTimeAsync(SMS_SEND_TIMEOUT_MS);
+      const error = await sending;
+      expect(error.code).toBe('auth/sms-send-timeout');
+      expect(error.message).toMatch('taking too long');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('explains a wrong SMS code', async () => {

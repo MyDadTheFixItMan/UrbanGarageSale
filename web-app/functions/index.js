@@ -13,7 +13,7 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
-    isDocId, isRole, emailText, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, unusedPhotoPaths, melbourneDate, completedPhotoCutoff, COMPLETED_PHOTO_DAYS, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
+    isDocId, recentlySignedIn, isRole, emailText, approvalEmailHtml, rejectionEmailHtml, editRefusedEmailHtml, contactResponseEmailHtml, listingPhotoPaths, unusedPhotoPaths, melbourneDate, completedPhotoCutoff, COMPLETED_PHOTO_DAYS, UNPAID_STATUSES, DRAFT_LIFETIME_MS,
     isUnpaidListing, isExpiredDraft, refundablePayments, storagePathFromUrl, SUPPORT_EMAIL,
 } = require('./lib/helpers');
 const listingReview = require('./lib/listingReview');
@@ -992,18 +992,11 @@ async function deleteQueryInBatches(query) {
     }
 }
 
-// Delete a user and their personal information (admin only), including their listing photos.
-// Payment records are kept for tax record-keeping but de-identified (APP 11.2 allows
-// retention where required by law).
-exports.deleteUser = callable([], async (request) => {
-    const adminUid = requireAdmin(request);
-    await rateLimit(adminUid, 'deleteUser', 10);
-    const userId = requireDocId(request.data?.userId, 'user ID');
-
-    if (userId === adminUid) {
-        throw new HttpsError('failed-precondition', 'You cannot delete your own account here');
-    }
-
+// Deletes a user's sign-in account and personal information, including their listing photos.
+// Payment records are kept for tax record-keeping but de-identified (APP 11.2 allows retention
+// where required by law). The publicListings copies and other people's favourites of the deleted
+// listings are removed by the syncPublicListing and removeEndedFavourites triggers.
+async function deleteAccountData(userId) {
     let email = null;
     try {
         email = (await auth.getUser(userId)).email || null;
@@ -1048,10 +1041,44 @@ exports.deleteUser = callable([], async (request) => {
     batch.delete(db.collection('contactRateLimits').doc(userId));
     batch.delete(db.collection('users').doc(userId));
     await batch.commit();
+}
 
+// Delete a user and their personal information (admin only).
+exports.deleteUser = callable([], async (request) => {
+    const adminUid = requireAdmin(request);
+    await rateLimit(adminUid, 'deleteUser', 10);
+    const userId = requireDocId(request.data?.userId, 'user ID');
+
+    if (userId === adminUid) {
+        throw new HttpsError('failed-precondition', 'You cannot delete your own account here');
+    }
+
+    await deleteAccountData(userId);
     await audit('deleteUser', adminUid, { userId });
     logger.info(`User ${userId} and personal data deleted by admin ${adminUid}`);
     return { success: true, message: 'User deleted successfully' };
+});
+
+// How recently someone must have signed in to delete their own account, so a phone or computer
+// left signed in can't be used to delete it.
+const DELETE_ACCOUNT_SIGN_IN_WINDOW_S = 10 * 60;
+
+// Delete your own account and personal information (Profile > Delete account). Admins are refused,
+// so the site can't lose its last admin by accident; remove the admin role first.
+exports.deleteMyAccount = callable([], async (request) => {
+    const { uid, token } = requireAuth(request);
+    await rateLimit(uid, 'deleteMyAccount', 3);
+    if (!recentlySignedIn(token, DELETE_ACCOUNT_SIGN_IN_WINDOW_S)) {
+        throw new HttpsError('failed-precondition', 'For your security, please sign out and sign in again, then delete your account within 10 minutes.', { reason: 'recent-login-required' });
+    }
+    if (token.admin === true) {
+        throw new HttpsError('failed-precondition', "Admin accounts can't be deleted here. Ask another admin to remove your admin role first.");
+    }
+
+    await deleteAccountData(uid);
+    await audit('deleteMyAccount', uid, { userId: uid });
+    logger.info(`User ${uid} deleted their own account`);
+    return { success: true };
 });
 
 // ---------------------------------------------------------------------------

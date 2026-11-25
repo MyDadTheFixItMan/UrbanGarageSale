@@ -48,6 +48,7 @@ jest.mock('firebase/storage', () => ({
   ref: (_storage, url) => url,
   deleteObject: jest.fn(async () => {}),
 }));
+jest.mock('firebase/auth', () => ({ signOut: jest.fn(async () => {}) }));
 jest.mock('@/api/firebase/app', () => ({
   auth: { currentUser: null, authStateReady: async () => {} },
   db: {},
@@ -57,6 +58,7 @@ jest.mock('@/api/firebase/app', () => ({
 import * as firestore from 'firebase/firestore';
 import * as functionsSdk from 'firebase/functions';
 import * as storageSdk from 'firebase/storage';
+import * as authSdk from 'firebase/auth';
 import { auth } from '@/api/firebase/app';
 import { firebaseEntities } from '@/api/firebase/entities';
 
@@ -225,6 +227,29 @@ describe('User.delete', () => {
     expect(functionsSdk.httpsCallable).toHaveBeenCalledWith(expect.anything(), 'deleteUser');
     expect(functionsSdk.__call).toHaveBeenCalledWith({ userId: 'user-42' });
     expect(firestore.deleteDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe('User.deleteMe', () => {
+  it('calls deleteMyAccount and then signs out locally', async () => {
+    await expect(firebaseEntities.User.deleteMe()).resolves.toEqual({ deleted: true });
+    expect(functionsSdk.httpsCallable).toHaveBeenCalledWith(expect.anything(), 'deleteMyAccount');
+    expect(authSdk.signOut).toHaveBeenCalled();
+    expect(firestore.deleteDoc).not.toHaveBeenCalled();
+  });
+
+  it('turns the server recent-login refusal into app/recent-login-required and stays signed in', async () => {
+    functionsSdk.__call.mockRejectedValueOnce(Object.assign(new Error('Please sign in again'), {
+      code: 'functions/failed-precondition', details: { reason: 'recent-login-required' },
+    }));
+    await expect(firebaseEntities.User.deleteMe()).rejects.toMatchObject({ code: 'app/recent-login-required', message: 'Please sign in again' });
+    expect(authSdk.signOut).not.toHaveBeenCalled();
+  });
+
+  it('needs a signed-in user', async () => {
+    auth.currentUser = null;
+    await expect(firebaseEntities.User.deleteMe()).rejects.toThrow(/sign in/i);
+    expect(functionsSdk.__call).not.toHaveBeenCalled();
   });
 });
 

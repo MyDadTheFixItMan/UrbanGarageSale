@@ -16,6 +16,7 @@ import { useCardPayments } from './profile/useCardPayments';
 import ProfileListingCard from './profile/ProfileListingCard';
 import ShareListingDialog from '@/components/listings/ShareListingDialog';
 import { EditProfileDialog, ChangePasswordDialog, PrintSignDialog, StripeSetupDialog } from './profile/ProfileDialogs';
+import DeleteAccountSection from './profile/DeleteAccountSection';
 import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 const DONE_BUTTON = 'bg-green-100 border border-green-300 text-green-700 hover:bg-green-100 cursor-not-allowed opacity-75';
@@ -358,6 +359,8 @@ export default function Profile() {
                     </Tabs>
                 </div>
             </section>
+
+            <DeleteAccountSection />
 
             <StripeSetupDialog
                 open={stripeDialogOpen}

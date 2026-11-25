@@ -333,8 +333,18 @@ function refundablePayments(payments) {
         typeof p.transaction_id === 'string' && p.transaction_id.startsWith('pi_'));
 }
 
+// True when the ID token's sign-in time (auth_time, seconds) is within the last windowSeconds.
+// Refreshing a token keeps the original auth_time, so only a real sign-in resets it.
+function recentlySignedIn(token, windowSeconds, nowMs = Date.now()) {
+    const at = Number(token?.auth_time);
+    if (!Number.isFinite(at) || at <= 0) return false;
+    const age = nowMs / 1000 - at;
+    return age >= -60 && age <= windowSeconds;
+}
+
 module.exports = {
     isDocId,
+    recentlySignedIn,
     isRole,
     escapeHtml,
     storagePathFromUrl,

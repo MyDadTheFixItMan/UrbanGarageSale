@@ -19,6 +19,7 @@ import PromotionsCard from './admin/PromotionsCard';
 import FreeListingCard from './admin/FreeListingCard';
 import FreeListingCodesCard from './admin/FreeListingCodesCard';
 import MessagesTab from './admin/MessagesTab';
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 function StatCard({ title, value, icon: Icon, color = "bg-navy" }) {
     return (
@@ -79,7 +80,7 @@ function usePromoRotation(count) {
     const [index, setIndex] = useState(0);
     useEffect(() => {
         if (count === 0) return;
-        const interval = setInterval(() => setIndex((i) => (i + 1) % count), 5000);
+        const interval = setInterval(() => setIndex((i) => (i + 1) % count), PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [count]);
     return index;
@@ -218,9 +219,22 @@ export default function AdminDashboard() {
                             <PaymentsTab />
                         </TabsContent>
                         <TabsContent value="settings" className="space-y-4">
-                            <PromotionsCard promotions={allPromotions} />
-                            <FreeListingCard appSettings={appSettings} />
-                            <FreeListingCodesCard />
+                            <Tabs defaultValue="promotions" className="space-y-4">
+                                <TabsList className="bg-white border border-slate-200 rounded-lg p-1 w-full justify-start overflow-x-auto md:overflow-visible md:flex-wrap">
+                                    <TabsTrigger value="promotions" className="text-xs md:text-sm whitespace-nowrap">Promotional Messages</TabsTrigger>
+                                    <TabsTrigger value="free-periods" className="text-xs md:text-sm whitespace-nowrap">Free Listing Periods</TabsTrigger>
+                                    <TabsTrigger value="free-codes" className="text-xs md:text-sm whitespace-nowrap">Free Listing Codes</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="promotions" className="space-y-4">
+                                    <PromotionsCard promotions={allPromotions} />
+                                </TabsContent>
+                                <TabsContent value="free-periods" className="space-y-4">
+                                    <FreeListingCard appSettings={appSettings} />
+                                </TabsContent>
+                                <TabsContent value="free-codes" className="space-y-4">
+                                    <FreeListingCodesCard />
+                                </TabsContent>
+                            </Tabs>
                         </TabsContent>
                         <TabsContent value="messages" className="space-y-4">
                             <MessagesTab currentUserEmail={user.email} />

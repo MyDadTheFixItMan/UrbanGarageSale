@@ -189,3 +189,9 @@ test('emailText keeps link addresses and drops the hidden preview line', () => {
     assert.match(text, /- Share it in local buy, swap and sell groups/);
     assert.doesNotMatch(text, /buyers can now find it\./);
 });
+
+test('storagePathFromUrl with a bucket refuses URLs into any other bucket', () => {
+    const url = (bucket) => `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/listings%2Fu1%2Fa.jpg?alt=media`;
+    assert.equal(storagePathFromUrl(url('site.firebasestorage.app'), 'site.firebasestorage.app'), 'listings/u1/a.jpg');
+    assert.equal(storagePathFromUrl(url('attacker.appspot.com'), 'site.firebasestorage.app'), null);
+});

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useTransition } from 'react';
-import { firebase, getSuburbCoordinates } from '@/api/firebaseClient';
+import { firebase, getSuburbCoordinates, getPostcodeForLocation } from '@/api/firebaseClient';
 import { Map, List, Tag, Search, Loader2, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,6 +10,7 @@ import { formatDistanceKm } from '@/lib/format';
 import { calculateDistance, toLocalIsoDate } from '@/api/firebase/listingSearch';
 import ListingCard from '@/components/listings/ListingCard';
 import { useToggleSaved } from '@/lib/useToggleSaved';
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 const DEFAULT_FILTERS = {
     postcode: '',
@@ -18,7 +19,13 @@ const DEFAULT_FILTERS = {
     saleDate: '',
 };
 
-export default function Home() {
+// The search starts on today's date. Worked out on each use, so a tab left open overnight still
+// gets the right day.
+const defaultFilters = () => ({ ...DEFAULT_FILTERS, saleDate: toLocalIsoDate(new Date()) });
+
+// `near` and `heading` come from a suburb's page (/garage-sales/vic/coburg, pages/SuburbSales.jsx),
+// which is the home page searching that suburb.
+export default function Home({ near: nearSuburb, heading } = {}) {
     const [, startTransition] = useTransition();
     const [viewMode, setViewMode] = useState('list');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -31,7 +38,7 @@ export default function Home() {
     const [promoIndex, setPromoIndex] = useState(0);
     const [saleTypeIndex, setSaleTypeIndex] = useState(0);
     const saleTypeLabels = ['Garage', 'Clearing', 'Street', 'Yard', 'Estate', 'Moving'];
-    const [filters, setFilters] = useState(DEFAULT_FILTERS);
+    const [filters, setFilters] = useState(defaultFilters);
 
     // Restore the last search's filters and search again, so a sale that has since been deleted,
     // rejected or changed never shows. Results used to be saved here too; clear any left behind.
@@ -42,29 +49,37 @@ export default function Home() {
         // the visitor with ?near=me, which asks for their location. The page of a finished sale
         // links here that way.
         const params = new URLSearchParams(window.location.search);
-        const near = params.get('near')?.trim().slice(0, 60);
+        const near = nearSuburb || params.get('near')?.trim().slice(0, 60);
         if (near) {
-            params.delete('near');
-            const rest = params.toString();
-            window.history.replaceState(window.history.state, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
-            const nearFilters = { ...DEFAULT_FILTERS, postcode: near.toLowerCase() === 'me' ? '' : near };
+            if (!nearSuburb) {
+                params.delete('near');
+                const rest = params.toString();
+                window.history.replaceState(window.history.state, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
+            }
+            const nearFilters = { ...defaultFilters(), postcode: near.toLowerCase() === 'me' ? '' : near };
             setFilters(nearFilters);
             runSearch(nearFilters);
             return;
         }
 
         const savedFilters = localStorage.getItem('homeSearchFilters');
-        if (!savedFilters) return;
+        if (!savedFilters) {
+            fillPostcodeFromLocation();
+            return;
+        }
         try {
             const restored = JSON.parse(savedFilters);
-            // A date saved from an earlier visit that has since passed would match nothing.
-            if (restored.saleDate && restored.saleDate < toLocalIsoDate(new Date())) restored.saleDate = '';
+            // Each visit starts on today's date unless a later day was picked. A past date would match
+            // nothing, and "Any date" from an earlier visit isn't kept either.
+            const today = toLocalIsoDate(new Date());
+            if (!restored.saleDate || restored.saleDate < today) restored.saleDate = today;
             setFilters(restored);
             if (restored.postcode) runSearch(restored, { quiet: true });
+            else fillPostcodeFromLocation();
         } catch (error) {
             console.error('Error parsing saved filters:', error);
         }
-    }, []);
+    }, [nearSuburb]);
 
     const { data: allPromotions = [] } = useQuery({
         queryKey: ['allPromotions'],
@@ -127,13 +142,13 @@ export default function Home() {
         return () => clearTimeout(timer);
     }, [user?.email]);
 
-    // Rotate promotional messages every 5 seconds
+    // Rotate promotional messages every 10 seconds
     useEffect(() => {
         if (allPromotions.length === 0) return;
 
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
 
         return () => clearInterval(interval);
     }, [allPromotions.length]);
@@ -169,12 +184,23 @@ export default function Home() {
                     (error) => {
                         console.log('Geolocation permission denied or unavailable:', error);
                         resolve(null);
-                    }
+                    },
+                    // A position from the last few minutes is close enough, and don't wait forever.
+                    { maximumAge: 5 * 60 * 1000, timeout: 15000 }
                 );
             } else {
                 resolve(null);
             }
         });
+    };
+
+    // Fills the Suburb or Postcode box with the postcode where the visitor is, when they allow
+    // their location. Leaves the box alone if they've typed in it meanwhile.
+    const fillPostcodeFromLocation = async (knownLocation) => {
+        const location = knownLocation || await requestGeolocation();
+        if (!location) return;
+        const postcode = await getPostcodeForLocation(location.latitude, location.longitude);
+        if (postcode) setFilters((current) => (current.postcode ? current : { ...current, postcode }));
     };
 
     // Takes the filters as an argument because the search on page load runs before state updates.
@@ -187,6 +213,7 @@ export default function Home() {
             const asking = toast.loading('Requesting your location...');
             location = await requestGeolocation();
             toast.dismiss(asking);
+            if (location) fillPostcodeFromLocation(location);
         }
         
         if (!filters.postcode && !location) {
@@ -296,7 +323,7 @@ export default function Home() {
                 }}
             />
 
-            {/* Advertising Ribbon - Rotates every 5 seconds */}
+            {/* Advertising Ribbon - Rotates every 10 seconds */}
             {allPromotions.length > 0 && (
                 <div className="bg-brand-orange-dark text-white py-3 px-4 text-center shadow-lg fixed top-20 left-0 right-0 z-30 w-full">
                     <p className="text-sm sm:text-base font-semibold">
@@ -310,6 +337,9 @@ export default function Home() {
             <section className={`relative bg-brand-cream pb-16 px-4 sm:px-6 overflow-hidden ${allPromotions.length > 0 ? 'pt-16 md:pt-24' : 'pt-8 md:pt-16'}`}>
                 <div className="max-w-7xl mx-auto pt-2 md:pt-4 relative z-10">
                     <div className="text-center mb-4 md:mb-8">
+                        {heading ? (
+                            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-navy-dark md:mb-4">{heading}</h1>
+                        ) : (
                         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-navy-dark md:mb-4">
                             Discover Local{' '}
                             {/* Every label sits in the same grid cell, so the space is always as wide as the longest and the line doesn't shift. */}
@@ -322,6 +352,7 @@ export default function Home() {
                             </span>{' '}
                             Sales
                         </h1>
+                        )}
                         {/* Left off phones, so the search box sits higher. */}
                         <p className="hidden md:block text-lg text-slate-700 max-w-2xl mx-auto">
                             Find unique treasures in your neighbourhood.
@@ -379,6 +410,9 @@ export default function Home() {
                                             <SelectItem value="multi_family">Multi-Family Sale</SelectItem>
                                             <SelectItem value="clearing_sale">Clearing Sale</SelectItem>
                                             <SelectItem value="street_sale">Street Sale</SelectItem>
+                                            <SelectItem value="church_sale">Church Sale</SelectItem>
+                                            <SelectItem value="car_boot_sale">Car Boot Sale</SelectItem>
+                                            <SelectItem value="deceased_estate">Deceased Estate</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>

@@ -20,6 +20,8 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
+import { listingPath } from '@/lib/seo/site';
 
 export default function SavedListings() {
     const queryClient = useQueryClient();
@@ -40,12 +42,12 @@ export default function SavedListings() {
         staleTime: 1000 * 60 * 5,
     });
 
-    // Rotate promotional messages every 5 seconds
+    // Rotate promotional messages every 10 seconds
     useEffect(() => {
         if (allPromotions.length === 0) return;
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [allPromotions.length]);
 
@@ -253,7 +255,7 @@ export default function SavedListings() {
                                     )}
                                 >
                                     <div className="flex gap-3">
-                                        <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)} className="flex-1">
+                                        <Link to={listingPath(sale)} className="flex-1">
                                             <Button variant="outline" size="sm" className="w-full">
                                                 View Details
                                             </Button>

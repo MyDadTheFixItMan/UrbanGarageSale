@@ -1,5 +1,6 @@
 // Storage security rules tests: listing photos are public to view but folders can't be listed,
-// and only their owner can upload (images under 10 MB, in a 2FA session) or delete them.
+// and only their owner can upload them (images under 10 MB, in a 2FA session). Photos are
+// write-once and only the server deletes them, so an approved photo can't be swapped.
 // Everything else is closed.
 import test, { before, after } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -48,11 +49,16 @@ test('only image types under 10 MB are accepted', async () => {
   await assertFails(uploadBytes(ref(s, 'listings/alice/big.jpg'), new Uint8Array(10 * 1024 * 1024), jpeg));
 });
 
-test('listing photos are public to read; only the owner can delete them', async () => {
+test('listing photos are public to read; nobody can delete them from the browser', async () => {
   await env.withSecurityRulesDisabled((ctx) => uploadBytes(ref(ctx.storage(), 'listings/alice/p.jpg'), image, jpeg));
   await assertSucceeds(getBytes(ref(storageFor(null), 'listings/alice/p.jpg')));
   await assertFails(deleteObject(ref(storageFor('bob'), 'listings/alice/p.jpg')));
-  await assertSucceeds(deleteObject(ref(storageFor('alice'), 'listings/alice/p.jpg')));
+  await assertFails(deleteObject(ref(storageFor('alice'), 'listings/alice/p.jpg')));
+});
+
+test('an uploaded photo cannot be replaced, even by its owner', async () => {
+  await env.withSecurityRulesDisabled((ctx) => uploadBytes(ref(ctx.storage(), 'listings/alice/p.jpg'), image, jpeg));
+  await assertFails(uploadBytes(ref(storageFor('alice'), 'listings/alice/p.jpg'), image, { contentType: 'image/png' }));
 });
 
 test('everything outside listings/ is closed', async () => {

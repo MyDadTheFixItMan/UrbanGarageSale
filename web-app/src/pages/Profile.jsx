@@ -16,6 +16,7 @@ import { useCardPayments } from './profile/useCardPayments';
 import ProfileListingCard from './profile/ProfileListingCard';
 import ShareListingDialog from '@/components/listings/ShareListingDialog';
 import { EditProfileDialog, ChangePasswordDialog, PrintSignDialog, StripeSetupDialog } from './profile/ProfileDialogs';
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 const DONE_BUTTON = 'bg-green-100 border border-green-300 text-green-700 hover:bg-green-100 cursor-not-allowed opacity-75';
 const ACTION_BUTTON = 'bg-navy text-white hover:bg-navy-dark';
@@ -24,7 +25,7 @@ function usePromoRotation(count) {
     const [index, setIndex] = useState(0);
     useEffect(() => {
         if (count === 0) return;
-        const interval = setInterval(() => setIndex((i) => (i + 1) % count), 5000);
+        const interval = setInterval(() => setIndex((i) => (i + 1) % count), PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [count]);
     return index;
@@ -227,7 +228,7 @@ export default function Profile() {
                                 </div>
                             </div>
 
-                            <div className="flex flex-row gap-2 w-full md:w-auto">
+                            <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto">
                                 <EditProfileDialog
                                     user={user}
                                     onSaved={(data) => {
@@ -241,7 +242,7 @@ export default function Profile() {
                                     onClick={cardEnabled ? undefined : () => setStripeDialogOpen(true)}
                                     disabled={cardPayments.creating || cardEnabled}
                                     size="sm"
-                                    className={`gap-2 flex-1 font-medium ${cardEnabled ? DONE_BUTTON : ACTION_BUTTON}`}
+                                    className={`gap-2 flex-1 font-medium h-auto min-h-8 py-1.5 whitespace-normal leading-tight md:whitespace-nowrap ${cardEnabled ? DONE_BUTTON : ACTION_BUTTON}`}
                                     title={cardEnabled && user.stripeAccountType ? `Account type: ${user.stripeAccountType === 'created' ? 'Created' : 'Linked'}` : ''}
                                 >
                                     {cardPayments.creating ? (
@@ -258,7 +259,7 @@ export default function Profile() {
                                     onClick={user.two_fa_enabled ? undefined : () => setTwoFADialogOpen(true)}
                                     disabled={user.two_fa_enabled}
                                     size="sm"
-                                    className={`gap-2 flex-1 font-medium ${user.two_fa_enabled ? DONE_BUTTON : ACTION_BUTTON}`}
+                                    className={`gap-2 flex-1 font-medium h-auto min-h-8 py-1.5 whitespace-normal leading-tight md:whitespace-nowrap ${user.two_fa_enabled ? DONE_BUTTON : ACTION_BUTTON}`}
                                 >
                                     {user.two_fa_enabled ? <>2FA On <span className="text-lg ml-0.5">✓</span></> : 'Enable 2FA'}
                                 </Button>

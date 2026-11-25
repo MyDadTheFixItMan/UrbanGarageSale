@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { usePromotions } from '@/lib/usePromotions';
+import { usePromotions, PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 export default function About() {
     const [promoIndex, setPromoIndex] = useState(0);
@@ -15,13 +15,13 @@ export default function About() {
         { id: 'default', message: '🎉 Welcome to Urban Garage Sales! Find amazing deals near you!' }
     ];
 
-    // Rotate promotional messages every 5 seconds
+    // Rotate promotional messages every 10 seconds
     useEffect(() => {
         if (promotions.length === 0) return;
 
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % promotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
 
         return () => clearInterval(interval);
     }, [promotions.length]);

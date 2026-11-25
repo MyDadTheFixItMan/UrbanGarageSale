@@ -128,7 +128,7 @@ export function EditProfileDialog({ user, onSaved }) {
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 flex-1">
+                <Button variant="outline" size="sm" className="gap-2 flex-1 h-auto min-h-8 py-1.5 whitespace-normal leading-tight md:whitespace-nowrap">
                     <Pencil className="w-4 h-4" />
                     Edit Profile
                 </Button>
@@ -235,7 +235,7 @@ export function ChangePasswordDialog({ email }) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 flex-1">
+                <Button variant="outline" size="sm" className="gap-2 flex-1 h-auto min-h-8 py-1.5 whitespace-normal leading-tight md:whitespace-nowrap">
                     <Pencil className="w-4 h-4" />
                     Change Password
                 </Button>

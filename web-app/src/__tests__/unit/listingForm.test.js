@@ -1,7 +1,9 @@
 import {
   EMPTY_FORM, formFromListing, isPaidOrApproved, listingFormProblem as checkForm,
-  isInFreePeriod, buildSaleData, liveEditData, photoProblem,
+  isInFreePeriod, buildSaleData, liveEditData, photoProblem, SALE_TYPES,
 } from '@/pages/createListing/listingForm';
+import { SALE_TYPE_LABELS } from '@/lib/listings';
+import { saleTypeLabel } from '@/utils/printGarageSaleSign';
 
 const form = (overrides = {}) => ({
   ...EMPTY_FORM,
@@ -200,5 +202,15 @@ describe('photoProblem', () => {
   it('refuses other types and files over 20MB', () => {
     expect(photoProblem(file({ type: 'image/gif' }))).toMatch(/Only JPEG, PNG, or WEBP/);
     expect(photoProblem(file({ size: 21 * 1024 * 1024 }))).toMatch(/exceeds 20MB/);
+  });
+});
+
+describe('sale types', () => {
+  it('every sale type on the form has a label for cards and for the printed sign', () => {
+    for (const [value, label] of SALE_TYPES) {
+      expect(SALE_TYPE_LABELS[value]).toBeTruthy();
+      expect(saleTypeLabel(value)).toBe(label.toUpperCase());
+    }
+    expect(SALE_TYPES.map(([value]) => value)).toEqual(expect.arrayContaining(['church_sale', 'car_boot_sale', 'deceased_estate']));
   });
 });

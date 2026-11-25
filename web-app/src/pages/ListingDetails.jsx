@@ -5,8 +5,9 @@ import { canBeSaved, canBeShared, hasFinished, SALE_TYPE_LABELS } from '@/lib/li
 import { listingShareUrl, openShareSheet, shareSheetData, SHARE_CHANNELS } from '@/lib/share';
 import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
 import ShareListingDialog from '@/components/listings/ShareListingDialog';
-import { usePromotions } from '@/lib/usePromotions';
-import { Link } from 'react-router-dom';
+import { usePromotions, PROMO_ROTATE_MS } from '@/lib/usePromotions';
+import { Link, useParams } from 'react-router-dom';
+import { documentTitle, saleTitle } from '@/lib/seo/site';
 import { createPageUrl } from '../utils';
 import {
     MapPin, Clock, Calendar, Heart, Navigation, ChevronLeft,
@@ -35,7 +36,9 @@ const NEARBY_SALES_URL = `${createPageUrl('Home')}?near=me`;
 
 export default function ListingDetails() {
     const urlParams = new URLSearchParams(window.location.search);
-    const saleId = urlParams.get('id');
+    // /sale/coburg-vic/<id>, or the older /ListingDetails?id=<id> that emails and posters use.
+    const { id: routeId } = useParams();
+    const saleId = routeId || urlParams.get('id');
     // Opened from the admin dashboard: go back to the tab it was opened from.
     const adminTab = ADMIN_TABS.includes(urlParams.get('adminTab')) ? urlParams.get('adminTab') : null;
     const backUrl = adminTab ? createPageUrl(`AdminDashboard?tab=${adminTab}`) : createPageUrl('Home');
@@ -69,12 +72,12 @@ export default function ListingDetails() {
 
     const allPromotions = usePromotions();
 
-    // Rotate promotional messages every 5 seconds
+    // Rotate promotional messages every 10 seconds
     useEffect(() => {
         if (allPromotions.length === 0) return;
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [allPromotions.length]);
 
@@ -88,6 +91,10 @@ export default function ListingDetails() {
         },
         enabled: !!saleId,
     });
+
+    useEffect(() => {
+        if (sale) document.title = documentTitle(saleTitle(sale));
+    }, [sale]);
 
     const { data: savedListings = [] } = useQuery({
         queryKey: ['savedListings', user?.email],

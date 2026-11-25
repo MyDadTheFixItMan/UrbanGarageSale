@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
+import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 export default function Payment() {
     const queryClient = useQueryClient();
@@ -41,12 +42,12 @@ export default function Payment() {
         staleTime: 1000 * 60 * 5,
     });
 
-    // Rotate promotional messages every 5 seconds
+    // Rotate promotional messages every 10 seconds
     useEffect(() => {
         if (allPromotions.length === 0) return;
         const interval = setInterval(() => {
             setPromoIndex((prevIndex) => (prevIndex + 1) % allPromotions.length);
-        }, 5000);
+        }, PROMO_ROTATE_MS);
         return () => clearInterval(interval);
     }, [allPromotions.length]);
 

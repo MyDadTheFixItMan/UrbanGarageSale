@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, CalendarClock } from 'lucide-react';
-import { createPageUrl } from '@/utils';
 import { saleWhenLabel } from '@/lib/format';
 import { coverImage, SALE_TYPE_LABELS } from '@/lib/listings';
 import ListingPlaceholder from '@/components/listings/ListingPlaceholder';
+import { listingPath } from '@/lib/seo/site';
 
 // A sale's card, as the home page and Favourites show it: photo with the sale type, when, title
 // and suburb, all linking to the listing. `action` sits over the photo's top right (the
@@ -13,7 +13,7 @@ export default function ListingCard({ sale, distance = '', action = null, childr
     const when = saleWhenLabel(sale);
     return (
         <div className="relative h-full flex flex-col bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow overflow-hidden">
-            <Link to={createPageUrl(`ListingDetails?id=${sale.id}`)} className="block flex-1">
+            <Link to={listingPath(sale)} className="block flex-1">
                 <div className="aspect-video relative">
                     {coverImage(sale) ? (
                         <img src={coverImage(sale)} alt={sale.title} className="w-full h-full object-cover" />

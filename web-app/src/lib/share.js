@@ -13,6 +13,8 @@ export const SHARE_CHANNELS = Object.freeze({
     WHATSAPP: 'whatsapp',
     EMAIL: 'email',
     POST_TEXT: 'post_text',
+    // The QR code on the Instagram flyer.
+    FLYER: 'flyer',
 });
 
 /**

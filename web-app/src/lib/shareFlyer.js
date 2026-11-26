@@ -1,8 +1,10 @@
 // A flyer image of a sale for Instagram posts and Stories, where links can't be clicked. It looks
 // like the printed sign (utils/printGarageSaleSign.js) and is drawn on a canvas in the browser.
-// Like the public listing page, it shows the suburb, never the street address.
+// Like the public listing page, it shows the suburb, never the street address. Its QR code opens
+// the listing, like the sign's.
+import QRCode from 'qrcode';
 import { formatPosterDates, saleTypeLabel, saleTypeLines } from '@/utils/printGarageSaleSign';
-import { flyerFileName, salePlace } from '@/lib/share';
+import { flyerFileName, listingShareUrl, salePlace, SHARE_CHANNELS } from '@/lib/share';
 
 // 4:5, the tallest shape Instagram shows in the feed without cropping.
 export const FLYER_WIDTH = 1080;
@@ -215,34 +217,76 @@ function drawBody(ctx, content, scale, draw) {
     return y;
 }
 
-const FOOTER_HEIGHT = 150;
+const FOOTER_HEIGHT = 280;
+const QR_SIZE = 248;
+// White space around the code, in modules: scanners need some to find it.
+const QR_QUIET_MODULES = 2;
 
-// The site's logo and address along the bottom, so people know where to find the sale.
-function drawFooter(ctx, logo) {
+/**
+ * The address the flyer's QR code opens: the listing's page, tagged so visits from it show up.
+ * @param {string} origin
+ * @param {string} listingId
+ */
+export function flyerQrUrl(origin, listingId) {
+    return listingShareUrl(origin, listingId, SHARE_CHANNELS.FLYER);
+}
+
+// Draws a QR code of `value`, dark squares on a white tile, filling a `size` square at (x, y).
+function drawQrCode(ctx, value, x, y, size) {
+    const { modules } = QRCode.create(value, { errorCorrectionLevel: 'M' });
+    const cells = modules.size + QR_QUIET_MODULES * 2;
+    const cell = size / cells;
+    ctx.fillStyle = '#ffffff';
+    roundedRect(ctx, x, y, size, size, 16);
+    ctx.fill();
+    ctx.fillStyle = '#000000';
+    for (let row = 0; row < modules.size; row += 1) {
+        for (let col = 0; col < modules.size; col += 1) {
+            if (!modules.get(row, col)) continue;
+            // Whole pixels, a hair oversized, so no faint seams show between squares.
+            const left = Math.floor(x + (col + QR_QUIET_MODULES) * cell);
+            const top = Math.floor(y + (row + QR_QUIET_MODULES) * cell);
+            ctx.fillRect(left, top, Math.ceil(cell) + 1, Math.ceil(cell) + 1);
+        }
+    }
+}
+
+// Along the bottom: the site's logo and address, and a QR code that opens the listing, so people
+// can find the sale from a post whose links can't be clicked.
+function drawFooter(ctx, logo, qrValue) {
     const top = FLYER_HEIGHT - MARGIN - FOOTER_HEIGHT;
     ctx.fillStyle = INK;
     ctx.fillRect(MARGIN, top, CONTENT_WIDTH, 8);
 
-    let textLeft = MARGIN;
-    if (logo) {
-        const height = 112;
-        const width = (logo.width / logo.height) * height;
-        ctx.drawImage(logo, MARGIN, top + 38, width, height);
-        textLeft += width + 40;
+    const qrTop = top + 8 + (FOOTER_HEIGHT - 8 - QR_SIZE) / 2;
+    let textWidth = CONTENT_WIDTH;
+    if (qrValue) {
+        try {
+            drawQrCode(ctx, qrValue, FLYER_WIDTH - MARGIN - QR_SIZE, qrTop, QR_SIZE);
+            textWidth -= QR_SIZE + 40;
+        } catch {
+            // No code rather than no flyer; the web address below still says where to look.
+        }
     }
-    const textWidth = FLYER_WIDTH - MARGIN - textLeft;
+
+    if (logo) {
+        const height = 100;
+        const width = (logo.width / logo.height) * height;
+        ctx.drawImage(logo, MARGIN, top + 40, width, height);
+    }
+    const invite = qrValue && textWidth < CONTENT_WIDTH ? 'Scan for photos and details' : 'See photos and details at';
     ctx.fillStyle = MUTED;
     ctx.font = text(600, fitFontSize((size) => {
         ctx.font = text(600, size);
-        return ctx.measureText('See photos and details at').width;
+        return ctx.measureText(invite).width;
     }, 40, textWidth));
-    ctx.fillText('See photos and details at', textLeft, top + 86);
+    ctx.fillText(invite, MARGIN, top + 200);
     ctx.fillStyle = INK;
     ctx.font = text(800, fitFontSize((size) => {
         ctx.font = text(800, size);
         return ctx.measureText('urbangaragesales.com.au').width;
     }, 48, textWidth));
-    ctx.fillText('urbangaragesales.com.au', textLeft, top + 140);
+    ctx.fillText('urbangaragesales.com.au', MARGIN, top + 256);
 }
 
 /**
@@ -268,7 +312,7 @@ export async function createShareFlyer(listing) {
     let scale = 1;
     while (scale > SMALLEST_SCALE && drawBody(ctx, content, scale, false) > room) scale -= 0.04;
     drawBody(ctx, content, scale, true);
-    drawFooter(ctx, logo);
+    drawFooter(ctx, logo, listing.id ? flyerQrUrl(window.location.origin, listing.id) : '');
 
     // JPEG: Instagram's share option handles it more reliably than PNG.
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));

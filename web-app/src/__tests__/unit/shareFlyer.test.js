@@ -1,4 +1,4 @@
-import { fitFontSize, wrapLines } from '@/lib/shareFlyer';
+import { fitFontSize, flyerQrUrl, wrapLines } from '@/lib/shareFlyer';
 
 // Pretend every character is as wide as the font size, so text is (length × size) wide, and
 // 10 wide per character at the size wrapLines is given.
@@ -35,5 +35,13 @@ describe('wrapLines', () => {
   it('copes with no text', () => {
     expect(wrapLines(widthOf, '', 100, 2)).toEqual([]);
     expect(wrapLines(widthOf, undefined, 100, 2)).toEqual([]);
+  });
+});
+
+describe('flyerQrUrl', () => {
+  it('opens the listing, tagged as coming from the flyer', () => {
+    expect(flyerQrUrl('https://www.urbangaragesales.com.au', 'abc 1')).toBe(
+      'https://www.urbangaragesales.com.au/ListingDetails?id=abc+1&utm_source=flyer&utm_medium=share',
+    );
   });
 });

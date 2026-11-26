@@ -1,4 +1,4 @@
-import { addressDetails, displayAddress } from '@/lib/addressDetails';
+import { addressDetails, areaPoint, displayAddress, needsAreaPoint } from '@/lib/addressDetails';
 import { geocode } from '@/lib/geocode';
 
 jest.mock('@/lib/geocode', () => ({ geocode: jest.fn() }));
@@ -65,5 +65,32 @@ describe('displayAddress', () => {
   it('copes with parts missing', () => {
     expect(displayAddress({ address: '26 Seawind Place Ocean Grove' })).toBe('26 Seawind Place Ocean Grove');
     expect(displayAddress({})).toBe('');
+  });
+});
+
+describe('areaPoint', () => {
+  it('rounds the address map point to about 1 km', async () => {
+    geocode.mockResolvedValue({ lat: -38.256789, lng: 144.523456, components: [] });
+    await expect(areaPoint('26 Seawind Place Ocean Grove')).resolves.toEqual({ area_lat: -38.26, area_lng: 144.52 });
+  });
+
+  it('is empty when the address is not found or the lookup fails', async () => {
+    geocode.mockResolvedValueOnce(null);
+    await expect(areaPoint('nowhere')).resolves.toEqual({ area_lat: null, area_lng: null });
+    geocode.mockRejectedValueOnce(new Error('Google Maps did not respond'));
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(areaPoint('somewhere')).resolves.toEqual({ area_lat: null, area_lng: null });
+    await expect(areaPoint('  ')).resolves.toEqual({ area_lat: null, area_lng: null });
+  });
+});
+
+describe('needsAreaPoint', () => {
+  it('is needed for a new or changed address, or one without an area yet', () => {
+    expect(needsAreaPoint({ address: '1 Main St', area_lat: -38.1 })).toBe(false);
+    expect(needsAreaPoint({ address: '1 Main St', area_lat: -38.1 }, '2 High St')).toBe(true);
+    expect(needsAreaPoint({ address: '1 Main St' })).toBe(true);
+    expect(needsAreaPoint({ address: '1 Main St', area_lat: null })).toBe(true);
+    expect(needsAreaPoint({})).toBe(false);
+    expect(needsAreaPoint(undefined, '1 Main St')).toBe(true);
   });
 });

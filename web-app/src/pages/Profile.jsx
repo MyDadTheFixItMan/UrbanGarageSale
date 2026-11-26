@@ -10,13 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { printAfterDialogCloses } from '../utils/printGarageSaleSign';
-import { displayAddress } from '@/lib/addressDetails';
+import { areaPoint, displayAddress, needsAreaPoint } from '@/lib/addressDetails';
 import { groupProfileListings } from './profile/profileListings';
 import { useCardPayments } from './profile/useCardPayments';
 import ProfileListingCard from './profile/ProfileListingCard';
 import ShareListingDialog from '@/components/listings/ShareListingDialog';
 import { EditProfileDialog, ChangePasswordDialog, PrintSignDialog, StripeSetupDialog } from './profile/ProfileDialogs';
 import DeleteAccountSection from './profile/DeleteAccountSection';
+import WeeklyEmailSection from './profile/WeeklyEmailSection';
 import { PROMO_ROTATE_MS } from '@/lib/usePromotions';
 
 const DONE_BUTTON = 'bg-green-100 border border-green-300 text-green-700 hover:bg-green-100 cursor-not-allowed opacity-75';
@@ -92,6 +93,16 @@ export default function Profile() {
             const me = await firebase.auth.me();
             setUser(me);
             // Accounts without 2FA are taken through setup by the required dialog in Layout.jsx.
+
+            // Accounts made before the weekly sales email have an address but no area for it.
+            if (!me.profile_unavailable && needsAreaPoint(me)) {
+                const area = await areaPoint(me.address);
+                if (area.area_lat !== null) {
+                    await firebase.auth.updateProfile(area)
+                        .then(() => setUser((prev) => ({ ...prev, ...area })))
+                        .catch((error) => console.warn('Could not save the email area:', error));
+                }
+            }
         };
         init();
     }, []);
@@ -359,6 +370,8 @@ export default function Profile() {
                     </Tabs>
                 </div>
             </section>
+
+            <WeeklyEmailSection user={user} onChange={(change) => setUser((prev) => ({ ...prev, ...change }))} />
 
             <DeleteAccountSection />
 

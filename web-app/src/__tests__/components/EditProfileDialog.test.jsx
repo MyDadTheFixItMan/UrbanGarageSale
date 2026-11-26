@@ -72,9 +72,25 @@ describe('EditProfileDialog', () => {
   });
 
   it('leaves a complete address alone', async () => {
-    await saveProfile({ address: '26 Seawind Place', suburb: 'Ocean Grove', postcode: '3226', state: 'VIC' });
+    await saveProfile({ address: '26 Seawind Place', suburb: 'Ocean Grove', postcode: '3226', state: 'VIC', area_lat: -38.26, area_lng: 144.52 });
 
     expect(geocode).not.toHaveBeenCalled();
+  });
+
+  it('looks up the weekly email area for an address without one, rounded to about 1 km', async () => {
+    geocode.mockResolvedValue({ lat: -38.256789, lng: 144.523456, components: [] });
+
+    await saveProfile({ address: '26 Seawind Place', suburb: 'Ocean Grove', postcode: '3226', state: 'VIC' });
+
+    expect(firebase.auth.updateProfile).toHaveBeenCalledWith(expect.objectContaining({ area_lat: -38.26, area_lng: 144.52 }));
+  });
+
+  it('moves the weekly email area when the address is edited', async () => {
+    geocode.mockResolvedValue({ ...located('2000', 'NSW', 'Sydney'), lat: -33.8651, lng: 151.2099 });
+
+    await saveProfile({ address: '26 Seawind Place', suburb: 'Ocean Grove', postcode: '3226', state: 'VIC', area_lat: -38.26, area_lng: 144.52 }, '1 George St Sydney');
+
+    expect(firebase.auth.updateProfile).toHaveBeenCalledWith(expect.objectContaining({ area_lat: -33.87, area_lng: 151.21 }));
   });
 
   it('refuses to clear the name or the phone number', async () => {

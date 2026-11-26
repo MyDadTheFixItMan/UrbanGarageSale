@@ -104,11 +104,15 @@ service cloud.firestore {
       let d = request.resource.data;
       let keys = changedKeys();
       return keys.hasOnly(['email', 'full_name', 'address', 'phone', 'phone_verified',
-                           'suburb', 'postcode', 'state', 'created_date', 'role']) &&
+                           'suburb', 'postcode', 'state', 'created_date', 'role',
+                           'weekly_email', 'area_lat', 'area_lng']) &&
              isText(d, keys, 'email', 254) && isText(d, keys, 'full_name', 100) &&
              isText(d, keys, 'address', 300) && isText(d, keys, 'suburb', 100) && isText(d, keys, 'phone', 20) &&
              matchesOrEmpty(d, keys, 'postcode', '^[0-9]{4}$') && isText(d, keys, 'state', 3) &&
-             isText(d, keys, 'created_date', 40) && isBool(d, keys, 'phone_verified');
+             isText(d, keys, 'created_date', 40) && isBool(d, keys, 'phone_verified') &&
+             // The weekly sales email: on/off, and the area it covers (about 1 km from the address).
+             isBool(d, keys, 'weekly_email') &&
+             isCoordinateOrNull(d, keys, 'area_lat', 90) && isCoordinateOrNull(d, keys, 'area_lng', 180);
     }
 
     // Fields a seller may write on their own listing. Status, payment and ownership rules are
@@ -140,7 +144,9 @@ service cloud.firestore {
     function protectedUserFields() {
       return ['role', 'two_fa_enabled', 'two_fa_enabled_date', 'two_fa_disabled_date',
               'cardPaymentsEnabled', 'stripeConnectId', 'stripeAccountType', 'stripeConnectSetup',
-              'stripeBusinessName', 'stripeBusinessType', 'stripeCountry', 'stripeEmail', 'linkedAt'];
+              'stripeBusinessName', 'stripeBusinessType', 'stripeCountry', 'stripeEmail', 'linkedAt',
+              // Set by the weekly sales email (functions/index.js sendWeeklySalesEmail).
+              'unsubscribe_token', 'last_weekly_email'];
     }
 
     match /users/{userId} {

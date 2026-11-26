@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { firebase } from '@/api/firebaseClient';
+import { firebase, startAppCheckWhenIdle } from '@/api/firebaseClient';
 
 const AuthContext = createContext();
 
@@ -16,6 +16,8 @@ export const AuthProvider = ({ children }) => {
     // Listen to auth state changes
     const unsubscribe = firebase.auth.onAuthStateChanged(async (authUser) => {
       if (authUser) {
+        // Signed-in people use the API and callable functions, so get App Check ready.
+        startAppCheckWhenIdle();
         try {
           const userData = await firebase.auth.me();
           setUser(userData);

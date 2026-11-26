@@ -10,9 +10,7 @@ import {
   setDoc,
   orderBy
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { httpsCallable } from 'firebase/functions';
-import { db, storage, functions } from './app';
+import { db, getStorageInstance, getFunctionsInstance } from './app';
 import { geocode, reverseGeocode } from '@/lib/geocode';
 import { toAppError } from '@/lib/appError';
 
@@ -22,6 +20,7 @@ const toRecords = (snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data(
 export const firebaseStorage = {
   uploadImage: async (file, path) => {
     try {
+      const [{ ref, uploadBytes, getDownloadURL }, storage] = await Promise.all([import('firebase/storage'), getStorageInstance()]);
       const storageRef = ref(storage, path);
       await uploadBytes(storageRef, file);
       return await getDownloadURL(storageRef);
@@ -35,6 +34,7 @@ export const firebaseStorage = {
 export const firebaseFunctions = {
   invoke: async (functionName, data) => {
     try {
+      const [{ httpsCallable }, functions] = await Promise.all([import('firebase/functions'), getFunctionsInstance()]);
       const response = await httpsCallable(functions, functionName)(data);
       return response.data;
     } catch (error) {

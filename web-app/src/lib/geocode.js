@@ -1,18 +1,12 @@
-// Address lookups through the Maps JavaScript API that index.html already loads. Unlike the
+// Address lookups through the Maps JavaScript API (loaded on first use, lib/googleMaps.js). Unlike the
 // Geocoding web service (maps/api/geocode/json), this works with an API key locked to the
 // website's address, so the key can't be copied and used from anywhere else.
 
-// The Maps JavaScript API global (loaded by a script tag, so it has no imported types).
-const maps = () => /** @type {any} */ (window).google?.maps;
+import { loadGoogleMaps } from '@/lib/googleMaps';
 
 async function loadGeocoder() {
-    for (let attempt = 0; !maps()?.importLibrary && attempt < 50; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    if (!maps()?.importLibrary) {
-        throw new Error('Google Maps did not load');
-    }
-    const { Geocoder } = await maps().importLibrary('geocoding');
+    const maps = await loadGoogleMaps();
+    const { Geocoder } = await maps.importLibrary('geocoding');
     return new Geocoder();
 }
 

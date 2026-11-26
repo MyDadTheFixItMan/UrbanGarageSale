@@ -1,8 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, initializeRecaptchaConfig } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import { getFunctions } from 'firebase/functions';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from 'firebase/app-check';
 
 // Firebase configuration
@@ -20,10 +18,19 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app);
 // Cloud Functions run in Sydney, next to the Firestore database in Melbourne.
 export const FUNCTIONS_REGION = 'australia-southeast1';
-export const functions = getFunctions(app, FUNCTIONS_REGION);
+
+// Storage (photo uploads) and Cloud Functions are only used for signed-in actions, so their code
+// is downloaded the first time it's needed instead of on every page.
+export async function getStorageInstance() {
+  const { getStorage } = await import('firebase/storage');
+  return getStorage(app);
+}
+export async function getFunctionsInstance() {
+  const { getFunctions } = await import('firebase/functions');
+  return getFunctions(app, FUNCTIONS_REGION);
+}
 
 // Configure app verification for Phone Authentication
 // For development: disable app verification to allow testing
@@ -57,10 +64,12 @@ function enterpriseScriptReady(timeoutMs = 10000) {
   }));
 }
 
-// Google's reCAPTCHA script is ~350 KB, so it isn't fetched while the page is first drawing.
-// It starts when the browser goes idle after the page has loaded, or straight away when something
-// needs it first (sign-in, an SMS code, or an API call that sends an App Check token). The order
-// never changes: Auth's reCAPTCHA settings first, App Check after (see above).
+// Google's reCAPTCHA script is ~350 KB and takes a phone seconds to run, so visitors who are
+// only browsing never load it. It starts straight away when something needs it (the Login page,
+// sign-in, an SMS code, or an API call that sends an App Check token), and when the browser goes
+// idle for someone who is signed in (startAppCheckWhenIdle, from AuthContext). App Check isn't
+// enforced for Firestore or Storage, so reads without a token still work. The order never
+// changes: Auth's reCAPTCHA settings first, App Check after (see above).
 const canUseRecaptcha = typeof window !== 'undefined' && !isDevelopment;
 /** @type {Promise<void> | null} */
 let recaptchaStarted = null;
@@ -99,7 +108,10 @@ function startAppCheck() {
   return appCheckStarted;
 }
 
-if (typeof window !== 'undefined' && (canUseRecaptcha || appCheckSiteKey)) {
+let idleStartQueued = false;
+export function startAppCheckWhenIdle() {
+  if (idleStartQueued || typeof window === 'undefined' || !(canUseRecaptcha || appCheckSiteKey)) return;
+  idleStartQueued = true;
   const whenIdle = () => {
     const w = /** @type {any} */ (window);
     if (typeof w.requestIdleCallback === 'function') w.requestIdleCallback(() => startAppCheck(), { timeout: 3000 });

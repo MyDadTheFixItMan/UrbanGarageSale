@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { loadGoogleMaps } from '@/lib/googleMaps';
 
 // Google bills each lookup, so wait until the seller pauses typing before asking for suggestions.
 const LOOKUP_DELAY_MS = 300;
@@ -47,11 +48,13 @@ export default function GooglePlacesAutocomplete({
   }, [value]);
 
   const initializeAutocomplete = async () => {
-    // Wait for Google Maps API to be available
-    let attempts = 0;
-    while (!window.google?.maps?.places?.AutocompleteService && attempts < 50) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      attempts++;
+    // Google Maps loads the first time an address box appears (lib/googleMaps.js).
+    try {
+      const maps = await loadGoogleMaps();
+      await maps.importLibrary('places');
+    } catch (error) {
+      console.error('Google Maps did not load:', error);
+      return;
     }
 
     // @ts-ignore

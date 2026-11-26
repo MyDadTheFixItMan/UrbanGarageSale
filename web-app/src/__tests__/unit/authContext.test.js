@@ -17,6 +17,7 @@ jest.mock('@/api/firebaseClient', () => ({
       onAuthStateChanged: jest.fn(),
     },
   },
+  startAppCheckWhenIdle: jest.fn(),
 }));
 
 // Test component that uses useAuth hook

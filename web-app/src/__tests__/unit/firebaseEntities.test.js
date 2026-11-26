@@ -52,7 +52,7 @@ jest.mock('firebase/auth', () => ({ signOut: jest.fn(async () => {}) }));
 jest.mock('@/api/firebase/app', () => ({
   auth: { currentUser: null, authStateReady: async () => {} },
   db: {},
-  functions: {},
+  getFunctionsInstance: async () => ({}),
 }));
 
 import * as firestore from 'firebase/firestore';

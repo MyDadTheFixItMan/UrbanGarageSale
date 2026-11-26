@@ -16,6 +16,7 @@ beforeEach(() => {
   tokensMade = 0;
   window.google = {
     maps: {
+      importLibrary: async () => ({}),
       Map: function Map() {},
       places: {
         AutocompleteService: function AutocompleteService() { return { getPlacePredictions }; },

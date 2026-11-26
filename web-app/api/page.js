@@ -55,6 +55,14 @@ export default async function handler(req, res) {
     // visitor's own.
     const pathname = url.searchParams.get('path') || '/';
     url.searchParams.delete('path');
+
+    // A build file that doesn't exist (an old one, after a new version went live). vercel.json
+    // lets browsers keep /assets/ files for a year, so say clearly that this answer mustn't be kept.
+    if (pathname.startsWith('/assets/')) {
+        res.setHeader('Cache-Control', 'no-store');
+        return res.status(404).send('Not found');
+    }
+
     const route = resolveRoute(pathname.startsWith('/') ? pathname : `/${pathname}`, url.search);
 
     if (route.type === 'redirect') {

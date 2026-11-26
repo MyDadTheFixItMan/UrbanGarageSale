@@ -1,6 +1,6 @@
 import { geocode } from '@/lib/geocode';
 import { getPostcodeForLocation } from '@/api/firebase/services';
-jest.mock('@/api/firebase/app', () => ({ db: {}, storage: {}, functions: {} }));
+jest.mock('@/api/firebase/app', () => ({ db: {} }));
 
 function stubMaps(lookup) {
   window.google = {

@@ -16,7 +16,7 @@ export default function ListingCard({ sale, distance = '', action = null, childr
             <Link to={listingPath(sale)} className="block flex-1">
                 <div className="aspect-video relative">
                     {coverImage(sale) ? (
-                        <img src={coverImage(sale)} alt={sale.title} className="w-full h-full object-cover" />
+                        <img src={coverImage(sale)} alt={sale.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     ) : (
                         <ListingPlaceholder />
                     )}

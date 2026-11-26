@@ -26,8 +26,7 @@
     <meta property="og:image:alt" content="Urban Garage Sales" />
     <meta name="twitter:card" content="summary_large_image" />
     <!--/seo:head-->
-    <!-- Google Maps API - loaded with proper async handling -->
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key=%VITE_GOOGLE_PLACES_API_KEY%&libraries=places&loading=async"></script>
+    <!-- Google Maps loads only when an address box or lookup needs it (src/lib/googleMaps.js). -->
   </head>
   <body>
     <!-- What search engines and visitors see until the app loads, which replaces it. -->

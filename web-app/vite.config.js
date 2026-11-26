@@ -43,7 +43,8 @@ export default defineConfig(({ mode }) => {
         // Large libraries in their own files so browsers cache them across app updates.
         manualChunks: {
           react: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
-          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/functions'],
+          // Storage and Functions stay out: they load on first use (src/api/firebase/app.js).
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
           maps: ['leaflet', 'react-leaflet'],
         },
       },

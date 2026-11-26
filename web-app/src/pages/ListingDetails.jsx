@@ -349,6 +349,10 @@ export default function ListingDetails() {
                                 <img
                                     src={sale.photos[selectedImageIndex]}
                                     alt={sale.title}
+                                    // Download this before the other photos. React 18 only passes the
+                                    // lowercase spelling through to the page (React 19 adds fetchPriority).
+                                    // eslint-disable-next-line react/no-unknown-property
+                                    fetchpriority="high"
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -368,9 +372,12 @@ export default function ListingDetails() {
                                                 : 'border-transparent opacity-70 hover:opacity-100'
                                         }`}
                                     >
+                                        {/* The small card-sized copy where there is one: these are 80px wide. */}
                                         <img
-                                            src={photo}
+                                            src={sale.thumbnails?.[index] || photo}
                                             alt={`${sale.title} ${index + 1}`}
+                                            loading="lazy"
+                                            decoding="async"
                                             className="w-full h-full object-cover"
                                         />
                                     </button>

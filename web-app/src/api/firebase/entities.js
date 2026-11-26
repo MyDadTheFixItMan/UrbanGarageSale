@@ -22,9 +22,8 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { httpsCallable } from 'firebase/functions';
 import { geohashQueryBounds } from 'geofire-common';
-import { auth, db, functions } from './app';
+import { auth, db, getFunctionsInstance } from './app';
 import { LISTING_STATUS, PAYMENT_STATUS } from '@/lib/listings';
 import { AppError, toAppError } from '@/lib/appError';
 import {
@@ -103,9 +102,15 @@ function localIsoDate(date = new Date()) {
 
 // Calls a Cloud Function and resolves to its result. A failure becomes an AppError that keeps the
 // server's message, which callable functions write for users (HttpsError).
+// A callable Cloud Function (the Functions SDK loads on first use, see app.js).
+async function callable(name) {
+  const [{ httpsCallable }, functions] = await Promise.all([import('firebase/functions'), getFunctionsInstance()]);
+  return httpsCallable(functions, name);
+}
+
 async function callFunction(name, data) {
   try {
-    return (await httpsCallable(functions, name)(data)).data;
+    return (await (await callable(name))(data)).data;
   } catch (error) {
     throw toAppError(error, 'That request failed. Please try again.');
   }
@@ -171,7 +176,7 @@ export const firebaseEntities = {
 
     // Admin: rejects a listing awaiting approval and refunds its listing fee (Cloud Function).
     reject: async (id, reason) => {
-      const result = await httpsCallable(functions, 'rejectListing')({ saleId: id, reason });
+      const result = await (await callable('rejectListing'))({ saleId: id, reason });
       return result.data;
     },
 
@@ -219,12 +224,12 @@ export const firebaseEntities = {
 
     // Admin: puts the changes live on the listing and deletes the photos they replaced (Cloud Function).
     approve: async ({ id }) => {
-      await httpsCallable(functions, 'approveListingEdit')({ saleId: id });
+      await (await callable('approveListingEdit'))({ saleId: id });
     },
 
     // Admin: keeps the listing as it is and tells the seller why (Cloud Function).
     refuse: async (saleId, reason) => {
-      const result = await httpsCallable(functions, 'refuseListingEdit')({ saleId, reason });
+      const result = await (await callable('refuseListingEdit'))({ saleId, reason });
       return result.data;
     }
   },
@@ -271,14 +276,14 @@ export const firebaseEntities = {
 
     // Admin: sets the admin claim and role, and records the change in the audit log.
     setRole: async (id, role) => {
-      await httpsCallable(functions, 'setUserRole')({ userId: id, role });
+      await (await callable('setUserRole'))({ userId: id, role });
       return { id, role };
     },
 
     delete: async (id) => {
       // Admin-only Cloud Function: removes the auth account and the user's personal data.
       requireUser('Not authenticated. Please log in to delete users.');
-      await httpsCallable(functions, 'deleteUser')({ userId: id });
+      await (await callable('deleteUser'))({ userId: id });
       return { id, deleted: true };
     },
 
@@ -288,7 +293,7 @@ export const firebaseEntities = {
     deleteMe: async () => {
       requireUser('Please sign in to delete your account.');
       try {
-        await httpsCallable(functions, 'deleteMyAccount')({});
+        await (await callable('deleteMyAccount'))({});
       } catch (error) {
         if (error?.details?.reason === 'recent-login-required') {
           throw new AppError(error.message, { code: 'app/recent-login-required', cause: error });
@@ -415,7 +420,7 @@ export const firebaseEntities = {
 
     // Top 10 postcodes by listing count, counted server-side by an admin Cloud Function.
     topPostcodes: async (state) => {
-      const result = await httpsCallable(functions, 'adminTopPostcodes')({ state: state || null });
+      const result = await (await callable('adminTopPostcodes'))({ state: state || null });
       const data = /** @type {{ postcodes?: Array<{ name: string, count: number }> }} */ (result.data);
       return data.postcodes || [];
     }

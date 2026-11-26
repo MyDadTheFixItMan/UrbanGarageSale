@@ -1,10 +1,10 @@
 // Public entry point for the Firebase client. The implementation lives in ./firebase/.
-import { auth } from './firebase/app';
+import { auth, startAppCheckWhenIdle } from './firebase/app';
 import { firebaseAuth } from './firebase/auth';
 import { firebaseEntities } from './firebase/entities';
 import { firebaseStorage, firebaseFunctions, firebaseFirestore, getSuburbCoordinates, getPostcodeForLocation } from './firebase/services';
 
-export { firebaseAuth, firebaseEntities, firebaseStorage, firebaseFunctions, firebaseFirestore, getSuburbCoordinates, getPostcodeForLocation };
+export { startAppCheckWhenIdle, firebaseAuth, firebaseEntities, firebaseStorage, firebaseFunctions, firebaseFirestore, getSuburbCoordinates, getPostcodeForLocation };
 
 export const firebase = {
   auth: firebaseAuth,

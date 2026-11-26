@@ -8,7 +8,7 @@ import GooglePlacesAutocomplete from '@/components/GooglePlacesAutocomplete';
 import { MIN_PASSWORD_LENGTH } from '@/lib/password';
 import { createPageUrl } from '@/utils';
 import OAuthButtons, { signInWithProvider } from './OAuthButtons';
-import { addressDetails } from '@/lib/addressDetails';
+import { addressDetails, areaPoint } from '@/lib/addressDetails';
 import { PHONE_PREFIX, PHONE_PLACEHOLDER, normalizePhone, signUpProblem, profileProblem, oauthErrorMessage } from './loginForms';
 
 // Editing the address means these may no longer match it; saving looks them up again.
@@ -74,7 +74,7 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
         try {
             // Firebase emails a verification link; a verified email is needed before the mobile
             // number can be enrolled for 2FA in the Profile page.
-            const location = await addressDetails(fields.address, fields);
+            const [location, area] = await Promise.all([addressDetails(fields.address, fields), areaPoint(fields.address)]);
             const missing = profileProblem({ full_name: fields.fullName, phone: fields.phone, address: fields.address, ...location });
             if (missing) {
                 setError(missing);
@@ -87,6 +87,7 @@ export default function SignUpForm({ onExistingEmail, onSecondFactor }) {
                 full_name: fields.fullName.trim(),
                 address: fields.address,
                 ...location,
+                ...area,
                 created_date: new Date().toISOString(),
                 role: 'user',
             });

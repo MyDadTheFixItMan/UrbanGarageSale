@@ -367,6 +367,7 @@ module.exports = {
     emailParagraph,
     emailList,
     emailBox,
+    emailLink,
     emailText,
     approvalEmailHtml,
     rejectionEmailHtml,

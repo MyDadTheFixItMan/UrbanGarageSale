@@ -90,6 +90,7 @@ export default function Privacy() {
                                     <li>check listings against our Listing Rules before they go live, and publish and show them on the map and in search;</li>
                                     <li>process listing fees and Urban Pay card payments;</li>
                                     <li>respond to your enquiries and send service emails (such as listing approvals);</li>
+                                    <li>send a weekly email of garage sales within 25 km of your address, which you can turn off at any time from your profile or with the unsubscribe link in the email;</li>
                                     <li>prevent misuse of the platform and meet our legal obligations.</li>
                                 </ul>
                                 <p className="mt-2">If you do not provide this information, we may not be able to create your account or publish your listing.</p>

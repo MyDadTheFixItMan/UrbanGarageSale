@@ -16,7 +16,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import AddressParts from '@/components/AddressParts';
-import { addressDetails, displayAddress } from '@/lib/addressDetails';
+import { addressDetails, areaPoint, displayAddress, needsAreaPoint } from '@/lib/addressDetails';
 import { MIN_PASSWORD_LENGTH } from '@/lib/password';
 import { paperSizes } from '../../utils/printGarageSaleSign';
 import { changePasswordProblem } from './profileListings';
@@ -42,7 +42,13 @@ function useProfileForm(user, onSaved, successMessage) {
 
     const saveMutation = useMutation({
         mutationFn: async (data) => {
-            const saved = { ...data, ...await addressDetails(data.address, data), full_name: data.full_name.trim() };
+            const saved = {
+                ...data,
+                ...await addressDetails(data.address, data),
+                // The weekly sales email's area follows the address.
+                ...(needsAreaPoint(user, data.address) ? await areaPoint(data.address) : {}),
+                full_name: data.full_name.trim(),
+            };
             const missing = profileProblem(saved);
             if (missing) throw new Error(missing);
             await firebase.auth.updateProfile(saved);

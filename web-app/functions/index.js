@@ -9,7 +9,7 @@ const Stripe = require('stripe');
 const { Anthropic } = require('@anthropic-ai/sdk');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
-const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, FieldPath, Timestamp } = require('firebase-admin/firestore');
 const { getStorage } = require('firebase-admin/storage');
 const sgMail = require('@sendgrid/mail');
 const {
@@ -20,6 +20,7 @@ const listingReview = require('./lib/listingReview');
 const { publicListing } = require('./lib/publicListing');
 const freeCodes = require('./lib/freeListingCodes');
 const indexNow = require('./lib/indexNow');
+const weekly = require('./lib/weeklyEmail');
 
 const REGION = 'australia-southeast1';
 const TIME_ZONE = 'Australia/Melbourne';
@@ -1243,6 +1244,128 @@ exports.healthCheck = onSchedule({ schedule: 'every 10 minutes', timeZone: TIME_
     if (failures.length) {
         const error = new Error(`Health check failed - ${failures.join('; ')}`);
         logReportedError('health-check', error.stack);
+    }
+});
+
+// ---------------------------------------------------------------------------
+// Weekly "sales near you" email
+// ---------------------------------------------------------------------------
+
+// The address of weeklyEmailUnsubscribe below, for this project.
+function unsubscribeUrl(uid, token) {
+    const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
+    return `https://${REGION}-${project}.cloudfunctions.net/weeklyEmailUnsubscribe?u=${encodeURIComponent(uid)}&t=${encodeURIComponent(token)}`;
+}
+
+// Every Friday at 12am Melbourne time, each user gets an email of the live sales on from Friday
+// to the next Thursday within 25 km of their area (lib/weeklyEmail.js). It goes only to verified
+// email addresses, not to users who turned it off (weekly_email: false), and not when no sales
+// are near them. last_weekly_email stops a re-run on the same day emailing anyone twice.
+// Locations come from the public copies of listings, which are moved to a grid about 2 km across.
+exports.sendWeeklySalesEmail = onSchedule({
+    schedule: '0 0 * * 5', timeZone: TIME_ZONE, secrets: ['SENDGRID_API_KEY'], timeoutSeconds: 540, memory: '512MiB',
+}, async () => {
+    const today = melbourneDate();
+    const listingSnap = await db.collection('publicListings').where('end_date', '>=', today).get();
+    const thisWeek = weekly.salesThisWeek(listingSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), today);
+    if (!thisWeek.length) {
+        logger.info('Weekly sales email: no sales this week, nothing sent');
+        return;
+    }
+
+    const counts = { sent: 0, noSales: 0, failed: 0 };
+    let last = null;
+    for (;;) {
+        let query = db.collection('users').orderBy(FieldPath.documentId())
+            .select('full_name', 'suburb', 'area_lat', 'area_lng', 'weekly_email', 'unsubscribe_token', 'last_weekly_email')
+            .limit(100);
+        if (last) query = query.startAfter(last);
+        const page = await query.get();
+        if (page.empty) break;
+        last = page.docs[page.docs.length - 1];
+
+        const due = page.docs.filter((doc) => weekly.wantsWeeklyEmail(doc.data()) && weekly.userArea(doc.data()) &&
+            doc.get('last_weekly_email') !== today);
+        if (!due.length) continue;
+        const { users } = await auth.getUsers(due.map((doc) => ({ uid: doc.id })));
+        const accounts = new Map(users.map((user) => [user.uid, user]));
+
+        for (const doc of due) {
+            const account = accounts.get(doc.id);
+            if (!account?.email || !account.emailVerified || account.disabled) continue;
+            const profile = doc.data();
+            const sales = weekly.salesNear(thisWeek, weekly.userArea(profile));
+            if (!sales.length) {
+                counts.noSales += 1;
+                continue;
+            }
+            const token = weekly.looksLikeToken(profile.unsubscribe_token) ? profile.unsubscribe_token : weekly.newUnsubscribeToken();
+            const unsubscribe = unsubscribeUrl(doc.id, token);
+            try {
+                if (token !== profile.unsubscribe_token) await doc.ref.update({ unsubscribe_token: token });
+                const sent = await sendEmail({
+                    to: account.email,
+                    subject: `${sales.length} garage ${sales.length === 1 ? 'sale' : 'sales'} near ${profile.suburb || 'you'} this week`,
+                    html: weekly.weeklySalesEmailHtml({ fullName: profile.full_name, suburb: profile.suburb, sales, siteUrl: APP_URL, unsubscribeUrl: unsubscribe }),
+                    // The unsubscribe button Gmail, Outlook and Apple Mail show next to the sender.
+                    headers: { 'List-Unsubscribe': `<${unsubscribe}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+                    categories: ['weekly-sales'],
+                });
+                if (!sent) {
+                    logger.warn('Weekly sales email: SendGrid is not configured, nothing sent');
+                    return;
+                }
+                await doc.ref.update({ last_weekly_email: today });
+                counts.sent += 1;
+            } catch (error) {
+                counts.failed += 1;
+                logger.warn(`Weekly sales email to ${doc.id} failed: ${error.message}`);
+            }
+        }
+    }
+    logger.info(`Weekly sales email: ${thisWeek.length} sale(s) this week; sent ${counts.sent}, ${counts.noSales} with no sales nearby, ${counts.failed} failed`);
+});
+
+// The unsubscribe link in the weekly email (?u=<uid>&t=<token>). Opening it shows a button;
+// posting turns the email off. Mail apps' one-click unsubscribe posts straight here (RFC 8058).
+// A GET alone changes nothing, because mail scanners open links in emails to check them.
+exports.weeklyEmailUnsubscribe = onRequest({ maxInstances: 3 }, async (req, res) => {
+    res.set({
+        'Cache-Control': 'no-store',
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https://www.urbangaragesales.com.au; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+        'Referrer-Policy': 'no-referrer',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+    });
+    const page = (status, state, actionUrl) => res.status(status).type('html').send(weekly.unsubscribePageHtml({ state, actionUrl, siteUrl: APP_URL }));
+
+    if (req.method !== 'GET' && req.method !== 'POST') {
+        res.set('Allow', 'GET, POST').status(405).send('');
+        return;
+    }
+    const uid = req.query.u;
+    const token = req.query.t;
+    if (!isDocId(uid) || !weekly.looksLikeToken(token)) {
+        page(400, 'invalid');
+        return;
+    }
+    try {
+        const ref = db.collection('users').doc(uid);
+        const profile = await ref.get();
+        if (!profile.exists || !weekly.tokenMatches(profile.get('unsubscribe_token'), token)) {
+            page(404, 'invalid');
+            return;
+        }
+        if (req.method === 'GET') {
+            page(200, 'confirm', unsubscribeUrl(uid, token));
+            return;
+        }
+        await ref.update({ weekly_email: false });
+        logger.info(`Weekly sales email turned off by ${uid}`);
+        page(200, 'done');
+    } catch (error) {
+        logger.error(`Weekly email unsubscribe failed: ${error.message}`);
+        res.status(500).type('text').send('Something went wrong. Please try again, or turn the email off on your profile.');
     }
 });
 

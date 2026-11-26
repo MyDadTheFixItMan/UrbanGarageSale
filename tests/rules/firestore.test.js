@@ -84,6 +84,17 @@ test('users cannot set role, 2FA or Stripe fields on their profile', async () =>
   await assertSucceeds(updateDoc(doc(db, 'users/alice'), { full_name: 'Alice B', phone: '+61412345678' }));
 });
 
+test('users can turn the weekly email on and off and set its area, but not its unsubscribe token', async () => {
+  await seed('users/alice', { full_name: 'Alice', role: 'user' });
+  const db = as.user('alice');
+  await assertSucceeds(updateDoc(doc(db, 'users/alice'), { weekly_email: false, area_lat: -37.81, area_lng: 144.96 }));
+  await assertSucceeds(updateDoc(doc(db, 'users/alice'), { area_lat: null, area_lng: null }));
+  await assertFails(updateDoc(doc(db, 'users/alice'), { weekly_email: 'no' }));
+  await assertFails(updateDoc(doc(db, 'users/alice'), { area_lat: 120 }));
+  await assertFails(updateDoc(doc(db, 'users/alice'), { unsubscribe_token: 'mine-now-1234567890' }));
+  await assertFails(updateDoc(doc(db, 'users/alice'), { last_weekly_email: '2026-11-27' }));
+});
+
 test('only active listings can be saved to favourites, and a favourite can always be removed', async () => {
   for (const status of ['active', 'draft', 'pending_payment', 'pending_approval', 'completed', 'rejected']) {
     await seed(`garageSales/${status}`, listing({ status }));
